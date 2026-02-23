@@ -1,0 +1,461 @@
+{% extends "aso/base.html" %}
+{% load aso_tags %}
+
+{% block title %}Search History — RespectASO{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header & Filter -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h1 class="text-xl font-bold text-white">Search History</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Browse past keyword research results.</p>
+        </div>
+        <div>
+            <form method="get" action="{% url 'aso:history' %}">
+                <div class="flex items-center gap-2">
+                    <label for="filter-app" class="text-sm text-slate-400 whitespace-nowrap">Filter by app:</label>
+                    <select id="filter-app" name="app" onchange="this.form.submit()"
+                            class="bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All apps</option>
+                        {% for app in apps %}
+                        <option value="{{ app.id }}" {% if selected_app == app.id %}selected{% endif %}>{{ app.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    {% if results %}
+    <!-- Toolbar -->
+    <div class="flex items-center justify-between">
+        <p class="text-slate-500 text-xs">
+            {{ total_count }} result{{ total_count|pluralize }} from {{ keyword_count }} keyword{{ keyword_count|pluralize }}
+            {% if total_pages > 1 %} · Page {{ page }} of {{ total_pages }}{% endif %}
+        </p>
+        <div class="flex items-center gap-2">
+            <button onclick="bulkRefresh()" id="bulk-refresh-btn"
+                    class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Refresh All
+            </button>
+            <button onclick="bulkDelete()" id="bulk-delete-btn"
+                    class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Delete All
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable(0,'text',this)">Keyword <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable(1,'text',this)">App <span class="sort-indicator text-slate-600"></span></th>
+                        {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable(2,'num',this)">Rank <span class="sort-indicator text-slate-600"></span></th>{% endif %}
+                        <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}3{% else %}2{% endif %},'num',this)">Popularity <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}4{% else %}3{% endif %},'num',this)">Difficulty <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}5{% else %}4{% endif %},'text',this)">Country <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}6{% else %}5{% endif %},'num',this)">Competitors <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}7{% else %}6{% endif %},'date',this)">Date <span class="sort-indicator text-slate-600"></span></th>
+                        <th class="text-right text-xs font-medium text-slate-400 px-3 py-2 w-20">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                        <td class="px-3 py-2">
+                            <span class="text-white text-sm font-medium">{{ result.keyword.keyword }}</span>
+                        </td>
+                        <td class="px-3 py-2 text-slate-400 text-xs">
+                            {% if result.keyword.app %}
+                            <span class="bg-slate-700 px-2 py-0.5 rounded text-xs">{{ result.keyword.app.name }}</span>
+                            {% else %}
+                            <span class="text-slate-500">—</span>
+                            {% endif %}
+                        </td>
+                        {% if show_rank %}
+                        <td class="px-3 py-2 text-center">
+                            {% if result.app_rank %}
+                            <span class="text-white text-sm font-semibold">#{{ result.app_rank }}</span>
+                            {% else %}
+                            <span class="text-slate-500 text-xs" title="Not in top results">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="px-3 py-2 text-center">
+                            {% if result.popularity_score is not None %}
+                            <span class="text-purple-400 text-sm font-semibold">{{ result.popularity_score }}</span>
+                            {% else %}
+                            <span class="text-slate-500 text-xs">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="{{ result.difficulty_color }} text-sm font-semibold">{{ result.difficulty_score }}</span>
+                            <span class="text-slate-500 text-xs block">{{ result.difficulty_label }}</span>
+                        </td>
+                        <td class="px-3 py-2 text-slate-400 text-xs">{{ result.country|country_display }}</td>
+                        <td class="px-3 py-2 text-center">
+                            {% if result.competitors_data %}
+                            <button onclick="toggleCompetitors(this)"
+                                    class="text-purple-400 hover:text-purple-300 text-sm transition-colors">
+                                {{ result.competitors_data|length }} apps ▾
+                            </button>
+                            {% else %}
+                            <span class="text-slate-500 text-sm">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-slate-500 text-xs">{{ result.searched_at|date:"M d, H:i" }}</td>
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="refreshKeyword({{ result.keyword.id }}, this)" title="Refresh difficulty"
+                                        class="text-slate-500 hover:text-purple-400 transition-colors p-1 rounded hover:bg-white/5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                                <button onclick="deleteResult({{ result.id }}, this)" title="Delete this result"
+                                        class="text-slate-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-white/5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% if result.competitors_data %}
+                    <tr class="competitor-row hidden">
+                        <td colspan="{% if show_rank %}9{% else %}8{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            {% with tiers=result.difficulty_breakdown.ranking_tiers %}
+                            {% if tiers %}
+                            <div class="mb-4">
+                                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Ranking Tier Analysis</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    {% with tier=tiers|get_tier:"top_5" %}
+                                    {% if tier %}
+                                    <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-sm font-bold text-white">Top 5</span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% else %}bg-red-500/20 text-red-400{% endif %}">{{ tier.label }}</span>
+                                        </div>
+                                        <div class="space-y-1 text-xs">
+                                            <div class="flex justify-between"><span class="text-slate-500">Entry Barrier</span><span class="text-slate-300">{{ tier.entry_barrier|format_number }} ratings</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weakest App</span><span class="text-slate-300 truncate ml-2 max-w-[140px]" title="{{ tier.entry_barrier_app }}">{{ tier.entry_barrier_app|truncatechars:20 }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Median Ratings</span><span class="text-slate-300">{{ tier.median_reviews|format_number }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weak Spots (&lt;1K)</span><span class="text-slate-300">{{ tier.weak_spots }} of {{ tier.total_apps }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Fresh (&lt;1yr)</span><span class="text-slate-300">{{ tier.fresh_entrants }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Title Optimized</span><span class="text-slate-300">{{ tier.title_optimized }} of {{ tier.total_apps }}</span></div>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed border-t border-white/5 pt-2">{{ tier.verdict }}</p>
+                                    </div>
+                                    {% endif %}
+                                    {% endwith %}
+                                    {% with tier=tiers|get_tier:"top_10" %}
+                                    {% if tier %}
+                                    <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-sm font-bold text-white">Top 10</span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% else %}bg-red-500/20 text-red-400{% endif %}">{{ tier.label }}</span>
+                                        </div>
+                                        <div class="space-y-1 text-xs">
+                                            <div class="flex justify-between"><span class="text-slate-500">Entry Barrier</span><span class="text-slate-300">{{ tier.entry_barrier|format_number }} ratings</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weakest App</span><span class="text-slate-300 truncate ml-2 max-w-[140px]" title="{{ tier.entry_barrier_app }}">{{ tier.entry_barrier_app|truncatechars:20 }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Median Ratings</span><span class="text-slate-300">{{ tier.median_reviews|format_number }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weak Spots (&lt;1K)</span><span class="text-slate-300">{{ tier.weak_spots }} of {{ tier.total_apps }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Fresh (&lt;1yr)</span><span class="text-slate-300">{{ tier.fresh_entrants }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Title Optimized</span><span class="text-slate-300">{{ tier.title_optimized }} of {{ tier.total_apps }}</span></div>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed border-t border-white/5 pt-2">{{ tier.verdict }}</p>
+                                    </div>
+                                    {% endif %}
+                                    {% endwith %}
+                                    {% with tier=tiers|get_tier:"top_20" %}
+                                    {% if tier %}
+                                    <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-sm font-bold text-white">Top 20</span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% else %}bg-red-500/20 text-red-400{% endif %}">{{ tier.label }}</span>
+                                        </div>
+                                        <div class="space-y-1 text-xs">
+                                            <div class="flex justify-between"><span class="text-slate-500">Entry Barrier</span><span class="text-slate-300">{{ tier.entry_barrier|format_number }} ratings</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weakest App</span><span class="text-slate-300 truncate ml-2 max-w-[140px]" title="{{ tier.entry_barrier_app }}">{{ tier.entry_barrier_app|truncatechars:20 }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Median Ratings</span><span class="text-slate-300">{{ tier.median_reviews|format_number }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Weak Spots (&lt;1K)</span><span class="text-slate-300">{{ tier.weak_spots }} of {{ tier.total_apps }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Fresh (&lt;1yr)</span><span class="text-slate-300">{{ tier.fresh_entrants }}</span></div>
+                                            <div class="flex justify-between"><span class="text-slate-500">Title Optimized</span><span class="text-slate-300">{{ tier.title_optimized }} of {{ tier.total_apps }}</span></div>
+                                        </div>
+                                        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed border-t border-white/5 pt-2">{{ tier.verdict }}</p>
+                                    </div>
+                                    {% endif %}
+                                    {% endwith %}
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endwith %}
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b border-white/5">
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">#</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500">App</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Rating</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Ratings</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Genre</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Price</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Released</th>
+                                            <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for comp in result.competitors_data %}
+                                        <tr class="border-b border-white/5">
+                                            <td class="px-2 py-1.5 text-slate-500 whitespace-nowrap">{{ forloop.counter }}</td>
+                                            <td class="px-2 py-1.5">
+                                                <div class="flex items-center gap-2">
+                                                    {% if comp.artworkUrl100 %}
+                                                    <img src="{{ comp.artworkUrl100 }}" alt="" class="w-7 h-7 rounded-lg flex-shrink-0" onerror="this.style.display='none'">
+                                                    {% endif %}
+                                                    <div class="min-w-0">
+                                                        <a href="{{ comp.trackViewUrl }}" target="_blank" rel="noopener"
+                                                           class="text-white hover:text-purple-400 transition-colors">
+                                                            {{ comp.trackName }}
+                                                        </a>
+                                                        <span class="text-slate-500 block text-xs">{{ comp.sellerName }}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">
+                                                {% if comp.averageUserRating %}⭐ {{ comp.averageUserRating|floatformat:1 }}{% else %}—{% endif %}
+                                            </td>
+                                            <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">{{ comp.userRatingCount|default:"0" }}</td>
+                                            <td class="px-2 py-1.5 text-slate-400 whitespace-nowrap">{{ comp.primaryGenreName }}</td>
+                                            <td class="px-2 py-1.5 text-slate-400 whitespace-nowrap">{{ comp.formattedPrice }}</td>
+                                            <td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap">
+                                                {% if comp.releaseDate %}{{ comp.releaseDate|truncatechars:10 }}{% else %}—{% endif %}
+                                            </td>
+                                            <td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap">
+                                                {% if comp.currentVersionReleaseDate %}{{ comp.currentVersionReleaseDate|truncatechars:10 }}{% elif comp.releaseDate %}{{ comp.releaseDate|truncatechars:10 }}{% else %}—{% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="flex items-center justify-center gap-2">
+        {% if has_prev %}
+        <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"-1" }}"
+           class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
+            ← Prev
+        </a>
+        {% endif %}
+        <span class="text-xs text-slate-500">Page {{ page }} of {{ total_pages }}</span>
+        {% if has_next %}
+        <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"1" }}"
+           class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
+            Next →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty State -->
+    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
+        <svg class="w-10 h-10 text-slate-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <h3 class="text-white text-sm font-medium mt-3">No search history yet</h3>
+        <p class="text-slate-400 text-xs mt-1.5">Results from your keyword searches will appear here.</p>
+        <a href="{% url 'aso:dashboard' %}" class="inline-block mt-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+            Start searching
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const selectedApp = {{ selected_app|default:"null" }};
+
+// --- Sortable Table ---
+let sortCol = -1;
+let sortAsc = true;
+
+function sortTable(colIndex, type, th) {
+    const tbody = document.querySelector('table tbody');
+    if (!tbody) return;
+
+    // Collect data rows (skip competitor-rows)
+    const dataRows = [];
+    const allRows = Array.from(tbody.children);
+
+    for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        if (row.classList.contains('competitor-row')) continue;
+        // Pair data row with its competitor-row (if any)
+        const next = allRows[i + 1];
+        const compRow = (next && next.classList.contains('competitor-row')) ? next : null;
+        dataRows.push({ row, compRow });
+    }
+
+    // Toggle direction
+    if (sortCol === colIndex) {
+        sortAsc = !sortAsc;
+    } else {
+        sortCol = colIndex;
+        sortAsc = true;
+    }
+
+    // Update indicators
+    document.querySelectorAll('.sort-indicator').forEach(s => s.textContent = '');
+    const indicator = th.querySelector('.sort-indicator');
+    if (indicator) indicator.textContent = sortAsc ? ' ▲' : ' ▼';
+
+    // Sort
+    dataRows.sort((a, b) => {
+        const cellA = a.row.children[colIndex];
+        const cellB = b.row.children[colIndex];
+        let valA = (cellA ? cellA.textContent : '').trim();
+        let valB = (cellB ? cellB.textContent : '').trim();
+
+        if (type === 'num') {
+            // Extract number from text like "89", "N/A", "10 apps ▾"
+            const numA = parseFloat(valA.replace(/[^0-9.\-]/g, '')) || 0;
+            const numB = parseFloat(valB.replace(/[^0-9.\-]/g, '')) || 0;
+            return sortAsc ? numA - numB : numB - numA;
+        } else if (type === 'date') {
+            const dA = new Date(valA) || 0;
+            const dB = new Date(valB) || 0;
+            return sortAsc ? dA - dB : dB - dA;
+        } else {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        }
+    });
+
+    // Re-append sorted rows
+    dataRows.forEach(({ row, compRow }) => {
+        tbody.appendChild(row);
+        if (compRow) tbody.appendChild(compRow);
+    });
+}
+
+function toggleCompetitors(btn) {
+    const row = btn.closest('tr');
+    const competitorRow = row.nextElementSibling;
+    if (competitorRow && competitorRow.classList.contains('competitor-row')) {
+        competitorRow.classList.toggle('hidden');
+        btn.textContent = competitorRow.classList.contains('hidden')
+            ? btn.textContent.replace('▴', '▾')
+            : btn.textContent.replace('▾', '▴');
+    }
+}
+
+async function deleteResult(resultId, btn) {
+    const ok = await showConfirm('Delete this search result?', {type: 'danger', title: 'Delete Result', confirmLabel: 'Delete', confirmStyle: 'danger'});
+    if (!ok) return;
+
+    try {
+        const resp = await fetch(`/results/${resultId}/delete/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken},
+        });
+        if (resp.ok) {
+            location.reload();
+        }
+    } catch (e) {
+        showAlert('Failed to delete result.', {type: 'danger', title: 'Error'});
+    }
+}
+
+async function refreshKeyword(keywordId, btn) {
+    const row = btn.closest('tr');
+    row.classList.add('animate-pulse');
+
+    try {
+        const resp = await fetch(`/keywords/${keywordId}/refresh/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'country=us',
+        });
+        if (resp.ok) {
+            row.classList.remove('animate-pulse');
+            setTimeout(() => location.reload(), 300);
+        }
+    } catch (e) {
+        row.classList.remove('animate-pulse');
+        showAlert('Failed to refresh keyword.', {type: 'danger', title: 'Error'});
+    }
+}
+
+async function bulkRefresh() {
+    const resultCount = {{ total_count|default:"0" }};
+    const ok = await showConfirm(`Refresh all ${resultCount} keywords? This may take a while.`, {type: 'alert', title: 'Bulk Refresh'});
+    if (!ok) return;
+
+    const btn = document.getElementById('bulk-refresh-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Refreshing...`;
+
+    try {
+        const resp = await fetch('{% url "aso:keywords_bulk_refresh" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({app_id: selectedApp, country: 'us'}),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            await showAlert(`Refreshed ${data.refreshed} keywords.`, {type: 'success', title: 'Done'});
+            location.reload();
+        }
+    } catch (e) {
+        showAlert('Bulk refresh failed.', {type: 'danger', title: 'Error'});
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function bulkDelete() {
+    const scope = selectedApp ? 'for this app' : '(all)';
+    const ok = await showConfirm(`Delete all keywords ${scope} and their search results?`, {type: 'danger', title: 'Bulk Delete', confirmLabel: 'Delete All', confirmStyle: 'danger'});
+    if (!ok) return;
+
+    try {
+        const resp = await fetch('{% url "aso:keywords_bulk_delete" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({app_id: selectedApp}),
+        });
+        if (resp.ok) {
+            location.reload();
+        }
+    } catch (e) {
+        showAlert('Bulk delete failed.', {type: 'danger', title: 'Error'});
+    }
+}
+</script>
+{% endblock %}

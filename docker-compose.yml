@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    ports:
+      - "80:8080"    # Access at http://localhost (port 80 = no port needed in URL)
+    volumes:
+      - aso_data:/app/data
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-}
+
+volumes:
+  aso_data:

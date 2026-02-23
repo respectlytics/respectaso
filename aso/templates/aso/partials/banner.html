@@ -1,0 +1,20 @@
+{% load static %}
+<!-- Respectlytics promotional banner — persistent, non-dismissible -->
+<div class="bg-gradient-to-r from-purple-900/90 to-indigo-900/90 border-b border-purple-500/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
+        <div class="flex items-center justify-center gap-2.5 text-xs">
+            <img src="{% static 'images/respectlytics-logo.png' %}"
+                 alt="Respectlytics"
+                 class="h-5 w-auto hidden sm:block rounded"
+                 onerror="this.style.display='none'">
+            <span class="text-purple-100">
+                Built by <strong class="text-white">Respectlytics</strong> — Privacy-first mobile analytics for iOS &amp; Android
+            </span>
+            <a href="https://respectlytics.com/?utm_source=respectaso&utm_medium=banner&utm_campaign=oss"
+               target="_blank" rel="noopener"
+               class="text-purple-200 hover:text-white font-medium transition-colors whitespace-nowrap">
+                Learn more →
+            </a>
+        </div>
+    </div>
+</div>

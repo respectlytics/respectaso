@@ -1,0 +1,304 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RespectASO — Free ASO Keyword Research Tool{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1a2234',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Minimal custom CSS — only for things Tailwind CDN can't do */
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fade-in 0.3s ease-out; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col">
+
+    <!-- Respectlytics Banner — persistent, non-dismissible -->
+    {% include "aso/partials/banner.html" %}
+
+    <!-- Navigation -->
+    <nav class="bg-slate-800/80 border-b border-white/10 backdrop-blur-sm sticky top-0 z-40">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-12">
+                <a href="{% url 'aso:dashboard' %}" class="flex items-center gap-2 text-white hover:text-purple-300 transition-colors">
+                    <span class="text-lg">🔍</span>
+                    <span class="font-bold text-base">RespectASO</span>
+                </a>
+                <div class="flex items-center gap-6">
+                    <a href="{% url 'aso:dashboard' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'dashboard' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Dashboard
+                    </a>
+                    <a href="{% url 'aso:apps' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'apps' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Apps
+                    </a>
+                    <a href="{% url 'aso:opportunity' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'opportunity' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Opportunity
+                    </a>
+                    <a href="{% url 'aso:methodology' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'methodology' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Methodology
+                    </a>
+                    <a href="{% url 'aso:setup' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'setup' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Setup
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-slate-900">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <p>
+                    RespectASO is free, open-source software (AGPL-3.0) by
+                    <a href="https://respectlytics.com/?utm_source=respectaso&utm_medium=footer&utm_campaign=oss"
+                       target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300 transition-colors">
+                        Respectlytics
+                    </a>
+                </p>
+                <a href="https://github.com/respectlytics/respectaso"
+                   target="_blank" rel="noopener"
+                   class="text-slate-400 hover:text-white transition-colors flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Custom Modal System -->
+    <div id="custom-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:99999; justify-content:center; align-items:center; padding:1rem;">
+        <div id="custom-modal-box" style="background:#1e293b; border:1px solid rgba(255,255,255,0.1); border-radius:1rem; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); max-width:28rem; width:100%; transform:scale(0.95); opacity:0; transition:transform 0.2s ease, opacity 0.2s ease;">
+            <!-- Icon -->
+            <div style="padding:1.5rem 0 0.5rem; display:flex; justify-content:center;">
+                <div id="custom-modal-icon-wrap" style="width:3rem; height:3rem; border-radius:9999px; display:flex; align-items:center; justify-content:center;">
+                    <svg id="custom-modal-icon-alert" style="width:1.5rem; height:1.5rem; display:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                    </svg>
+                    <svg id="custom-modal-icon-info" style="width:1.5rem; height:1.5rem; display:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <svg id="custom-modal-icon-success" style="width:1.5rem; height:1.5rem; display:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <svg id="custom-modal-icon-danger" style="width:1.5rem; height:1.5rem; display:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+            </div>
+            <!-- Body -->
+            <div style="padding:0 1.5rem 0.5rem; text-align:center;">
+                <h3 id="custom-modal-title" style="font-size:1.125rem; font-weight:600; color:#f8fafc; margin-bottom:0.5rem;"></h3>
+                <p id="custom-modal-message" style="font-size:0.875rem; color:#cbd5e1; line-height:1.625; white-space:pre-line;"></p>
+            </div>
+            <!-- Buttons -->
+            <div id="custom-modal-buttons" style="padding:1rem 1.5rem 1.5rem; display:flex; gap:0.75rem; justify-content:center;"></div>
+        </div>
+    </div>
+
+    <script>
+    // --- Custom modal system replacing native alert/confirm ---
+    (function() {
+        var overlay = document.getElementById('custom-modal-overlay');
+        var box = document.getElementById('custom-modal-box');
+        var titleEl = document.getElementById('custom-modal-title');
+        var msgEl = document.getElementById('custom-modal-message');
+        var btnWrap = document.getElementById('custom-modal-buttons');
+        var iconWrap = document.getElementById('custom-modal-icon-wrap');
+        var icons = {
+            alert: document.getElementById('custom-modal-icon-alert'),
+            info: document.getElementById('custom-modal-icon-info'),
+            success: document.getElementById('custom-modal-icon-success'),
+            danger: document.getElementById('custom-modal-icon-danger'),
+        };
+
+        var iconBgColors = {
+            alert: 'rgba(245,158,11,0.2)',
+            info: 'rgba(6,182,212,0.2)',
+            success: 'rgba(16,185,129,0.2)',
+            danger: 'rgba(239,68,68,0.2)',
+        };
+
+        var iconStrokeColors = {
+            alert: '#fbbf24',
+            info: '#22d3ee',
+            success: '#34d399',
+            danger: '#f87171',
+        };
+
+        var activeKeyHandler = null;
+
+        function showModal(opts) {
+            return new Promise(function(resolve) {
+                var type = opts.type || 'info';
+                titleEl.textContent = opts.title || '';
+                titleEl.style.display = opts.title ? '' : 'none';
+                msgEl.textContent = opts.message || '';
+
+                // Set icon
+                Object.keys(icons).forEach(function(k) {
+                    icons[k].style.display = 'none';
+                });
+                iconWrap.style.background = iconBgColors[type] || iconBgColors.info;
+                if (icons[type]) {
+                    icons[type].style.display = 'block';
+                    icons[type].style.color = iconStrokeColors[type] || '#fff';
+                }
+
+                // Build buttons
+                btnWrap.innerHTML = '';
+                var buttons = opts.buttons || [{label: 'OK', style: 'primary', value: true}];
+                buttons.forEach(function(b) {
+                    var btn = document.createElement('button');
+                    btn.textContent = b.label;
+                    btn.style.cssText = 'padding:0.625rem 1.25rem; border-radius:0.75rem; font-size:0.875rem; font-weight:500; min-width:100px; cursor:pointer; border:none; transition:background 0.15s;';
+                    if (b.style === 'primary') {
+                        btn.style.background = '#9333ea';
+                        btn.style.color = '#fff';
+                        btn.onmouseenter = function() { btn.style.background = '#a855f7'; };
+                        btn.onmouseleave = function() { btn.style.background = '#9333ea'; };
+                    } else if (b.style === 'danger') {
+                        btn.style.background = '#dc2626';
+                        btn.style.color = '#fff';
+                        btn.onmouseenter = function() { btn.style.background = '#ef4444'; };
+                        btn.onmouseleave = function() { btn.style.background = '#dc2626'; };
+                    } else {
+                        btn.style.background = '#334155';
+                        btn.style.color = '#cbd5e1';
+                        btn.onmouseenter = function() { btn.style.background = '#475569'; };
+                        btn.onmouseleave = function() { btn.style.background = '#334155'; };
+                    }
+                    btn.addEventListener('click', function() {
+                        hideModal();
+                        resolve(b.value);
+                    });
+                    btnWrap.appendChild(btn);
+                });
+
+                // Show overlay
+                overlay.style.display = 'flex';
+                // Trigger reflow then animate box in
+                void box.offsetWidth;
+                box.style.transform = 'scale(1)';
+                box.style.opacity = '1';
+
+                // Focus last button (primary/action)
+                var lastBtn = btnWrap.querySelector('button:last-child');
+                if (lastBtn) lastBtn.focus();
+
+                // Close on overlay click
+                overlay.onclick = function(e) {
+                    if (e.target === overlay) {
+                        hideModal();
+                        resolve(buttons.length > 1 ? false : true);
+                    }
+                };
+
+                // Remove previous key handler if any
+                if (activeKeyHandler) {
+                    document.removeEventListener('keydown', activeKeyHandler);
+                }
+                activeKeyHandler = function(e) {
+                    if (e.key === 'Escape') {
+                        hideModal();
+                        resolve(buttons.length > 1 ? false : true);
+                    }
+                };
+                document.addEventListener('keydown', activeKeyHandler);
+            });
+        }
+
+        function hideModal() {
+            box.style.transform = 'scale(0.95)';
+            box.style.opacity = '0';
+            if (activeKeyHandler) {
+                document.removeEventListener('keydown', activeKeyHandler);
+                activeKeyHandler = null;
+            }
+            setTimeout(function() {
+                overlay.style.display = 'none';
+            }, 200);
+        }
+
+        // Public API
+        window.showAlert = function(message, opts) {
+            opts = opts || {};
+            return showModal({
+                type: opts.type || 'info',
+                title: opts.title || '',
+                message: message,
+                buttons: [{label: 'OK', style: 'primary', value: true}],
+            });
+        };
+
+        window.showConfirm = function(message, opts) {
+            opts = opts || {};
+            return showModal({
+                type: opts.type || 'alert',
+                title: opts.title || '',
+                message: message,
+                buttons: [
+                    {label: opts.cancelLabel || 'Cancel', style: 'secondary', value: false},
+                    {label: opts.confirmLabel || 'OK', style: opts.confirmStyle || 'primary', value: true},
+                ],
+            });
+        };
+    })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+
+    <!-- Global navigation protection while searches are running -->
+    <script>
+    window.searchInProgress = false;
+    window.addEventListener('beforeunload', function(e) {
+        if (window.searchInProgress) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+    document.addEventListener('click', function(e) {
+        if (!window.searchInProgress) return;
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank') return;
+        e.preventDefault();
+        showConfirm('A search is currently running. Leaving this page will cancel it.\n\nLeave anyway?', {type: 'alert', title: 'Search in Progress', confirmLabel: 'Leave', confirmStyle: 'danger'}).then(function(ok) {
+            if (ok) {
+                window.searchInProgress = false;
+                window.location.href = href;
+            }
+        });
+    });
+    </script>
+</body>
+</html>

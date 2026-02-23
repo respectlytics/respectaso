@@ -1,0 +1,947 @@
+{% extends "aso/base.html" %}
+{% load static %}
+
+{% block title %}Country Opportunity Finder — RespectASO{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <!-- Header -->
+    <div>
+        <h1 class="text-xl font-bold text-white">Country Opportunity Finder</h1>
+        <p class="text-slate-400 text-sm mt-0.5">Find the best App Store country to rank for a keyword — analyzed across all 30 markets.</p>
+    </div>
+
+    <!-- Search Form -->
+    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
+        <form id="opp-form" method="post">
+            {% csrf_token %}
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex-1">
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">Keyword</label>
+                    {{ form.keyword }}
+                </div>
+                <div class="w-full sm:w-48">
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5">App (optional)</label>
+                    <select id="opp-app" class="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">No app</option>
+                        {% for app in apps %}
+                        <option value="{{ app.id }}">{{ app.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" id="opp-btn"
+                            class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Find Best Country
+                    </button>
+                </div>
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Searches all 30 countries sequentially. Takes about 60–90 seconds. Please stay on this page while it runs.</p>
+        </form>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="opp-progress" class="hidden">
+        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 flex-shrink-0"></div>
+                <p class="text-sm text-slate-300" id="opp-progress-text">Scanning countries...</p>
+            </div>
+            <div class="w-full bg-slate-700/50 rounded-full h-2">
+                <div id="opp-progress-bar" class="h-2 rounded-full bg-purple-500 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2" id="opp-progress-detail">0 / 30 countries scanned</p>
+            <p class="text-xs text-yellow-500/70 mt-1.5 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Please stay on this page — navigating away will cancel the scan.
+            </p>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="opp-results" class="hidden space-y-4">
+        <!-- Best Opportunity Card -->
+        <div id="opp-best" class="bg-green-900/20 border border-green-500/20 rounded-xl p-5">
+            <!-- Filled by JS -->
+        </div>
+
+        <!-- Action Bar -->
+        <div id="opp-actions" class="hidden flex flex-wrap items-center gap-2">
+            <button onclick="addSelectedToHistory()" id="add-selected-btn" disabled
+                    class="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 opacity-50 cursor-not-allowed">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span id="add-selected-text">Add Selected to History</span>
+            </button>
+            <button onclick="addAllToHistory()"
+                    class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add All to History
+            </button>
+            <button onclick="exportOpportunityCSV()"
+                    class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Export CSV
+            </button>
+        </div>
+
+        <!-- Save confirmation banner (hidden by default) -->
+        <div id="opp-saved-banner" class="hidden bg-green-900/20 border border-green-500/20 rounded-xl p-3 text-green-300 text-sm flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span id="opp-saved-text"></span>
+        </div>
+
+        <!-- Full Ranking Table -->
+        <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-white/10">
+                <h2 class="text-sm font-semibold text-white">All Countries — Ranked by Opportunity Score</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Opportunity = Popularity × (100 − Difficulty) / 100. Higher = better chance to rank and get downloads. Click a row to see detailed insights.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="opp-table">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 w-10">
+                                <input type="checkbox" id="opp-select-all" class="rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" title="Select / deselect all">
+                            </th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 w-12 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(1,'num',this)"># <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(2,'text',this)">Country <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(3,'num',this)">Opportunity <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(4,'num',this)">Popularity <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(5,'num',this)">Difficulty <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(6,'num',this)">Competitors <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(7,'text',this)">Top Competitor <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(8,'num',this)">Your Rank <span class="sort-indicator text-slate-600"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="opp-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+
+const COUNTRY_NAMES = {
+    us:'United States',gb:'United Kingdom',ca:'Canada',au:'Australia',de:'Germany',
+    fr:'France',jp:'Japan',kr:'South Korea',cn:'China',br:'Brazil',in:'India',
+    mx:'Mexico',es:'Spain',it:'Italy',nl:'Netherlands',se:'Sweden',no:'Norway',
+    dk:'Denmark',fi:'Finland',ru:'Russia',pt:'Portugal',tr:'Türkiye',
+    sa:'Saudi Arabia',ae:'UAE',sg:'Singapore',th:'Thailand',id:'Indonesia',
+    ph:'Philippines',vn:'Vietnam',tw:'Taiwan'
+};
+
+function countryFlag(code) {
+    if (!code || code.length !== 2) return '';
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+function oppColor(score) {
+    if (score >= 50) return 'text-green-400';
+    if (score >= 35) return 'text-emerald-400';
+    if (score >= 20) return 'text-yellow-400';
+    if (score >= 10) return 'text-orange-400';
+    return 'text-red-400';
+}
+
+function diffColor(score) {
+    if (score <= 15) return 'text-green-400';
+    if (score <= 35) return 'text-green-300';
+    if (score <= 55) return 'text-yellow-400';
+    if (score <= 75) return 'text-orange-400';
+    return 'text-red-400';
+}
+
+function oppBg(score) {
+    if (score >= 50) return 'bg-green-900/30';
+    if (score >= 35) return 'bg-emerald-900/20';
+    if (score >= 20) return 'bg-yellow-900/20';
+    return '';
+}
+
+function diffLabel(score) {
+    if (score <= 15) return 'Very Easy';
+    if (score <= 35) return 'Easy';
+    if (score <= 55) return 'Moderate';
+    if (score <= 75) return 'Hard';
+    if (score <= 90) return 'Very Hard';
+    return 'Extreme';
+}
+
+// --- Shared rendering functions ---
+function fmt(n) {
+    if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'K';
+    return Math.round(n).toString();
+}
+
+function renderDownloadChart(estimates, appRank) {
+    if (!estimates || !estimates.positions) return '';
+    const positions = estimates.positions;
+    const maxDl = Math.max(...positions.map(p => p.downloads_high), 1);
+    const dailySearches = estimates.daily_searches || 0;
+
+    const W = 680, H = 220, PAD_L = 55, PAD_R = 15, PAD_T = 25, PAD_B = 35;
+    const chartW = W - PAD_L - PAD_R;
+    const chartH = H - PAD_T - PAD_B;
+    const barW = Math.floor(chartW / 20) - 3;
+    const barGap = Math.floor(chartW / 20);
+
+    let yTicks = [];
+    const yStep = maxDl / 4;
+    for (let i = 0; i <= 4; i++) {
+        const val = Math.round(yStep * i);
+        const y = PAD_T + chartH - (chartH * val / maxDl);
+        yTicks.push(`<text x="${PAD_L - 8}" y="${y + 3}" fill="rgba(148,163,184,0.7)" text-anchor="end" font-size="10">${fmt(val)}</text>`);
+        yTicks.push(`<line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3,3"/>`);
+    }
+
+    const zoneX1 = PAD_L, zoneX2 = PAD_L + 5 * barGap, zoneX3 = PAD_L + 10 * barGap, zoneX4 = PAD_L + 20 * barGap;
+    const zones = `
+        <rect x="${zoneX1}" y="${PAD_T}" width="${zoneX2 - zoneX1}" height="${chartH}" fill="rgba(139,92,246,0.06)" rx="4"/>
+        <rect x="${zoneX2}" y="${PAD_T}" width="${zoneX3 - zoneX2}" height="${chartH}" fill="rgba(59,130,246,0.04)" rx="4"/>
+        <rect x="${zoneX3}" y="${PAD_T}" width="${zoneX4 - zoneX3}" height="${chartH}" fill="rgba(100,116,139,0.03)" rx="4"/>`;
+    const zoneLabels = `
+        <text x="${(zoneX1 + zoneX2) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(167,139,250,0.6)" text-anchor="middle" font-weight="600">TOP 5</text>
+        <text x="${(zoneX2 + zoneX3) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(96,165,250,0.5)" text-anchor="middle" font-weight="600">TOP 6\u201310</text>
+        <text x="${(zoneX3 + zoneX4) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(148,163,184,0.4)" text-anchor="middle" font-weight="600">TOP 11\u201320</text>`;
+
+    let bars = '';
+    positions.forEach((p, i) => {
+        const x = PAD_L + i * barGap + (barGap - barW) / 2;
+        const hHigh = (p.downloads_high / maxDl) * chartH;
+        const hLow = (p.downloads_low / maxDl) * chartH;
+        const yHigh = PAD_T + chartH - hHigh;
+        const yLow = PAD_T + chartH - hLow;
+        const hRange = hHigh - hLow;
+        const isAppPos = appRank && appRank === p.pos;
+        let barColor, solidOpacity, rangeOpacity;
+        if (p.pos <= 5) { barColor = 'rgb(139,92,246)'; solidOpacity = isAppPos ? 1 : 0.8; rangeOpacity = isAppPos ? 0.35 : 0.22; }
+        else if (p.pos <= 10) { barColor = 'rgb(59,130,246)'; solidOpacity = isAppPos ? 1 : 0.7; rangeOpacity = isAppPos ? 0.3 : 0.18; }
+        else { barColor = 'rgb(100,116,139)'; solidOpacity = isAppPos ? 0.9 : 0.5; rangeOpacity = isAppPos ? 0.25 : 0.12; }
+
+        // Optimistic range segment (downloads_low → downloads_high) — lighter top portion
+        if (hRange > 0.5) {
+            bars += `<rect x="${x}" y="${yHigh}" width="${barW}" height="${hRange}" fill="${barColor}" opacity="${rangeOpacity}" rx="2"/>`;
+        }
+        // Conservative base segment (0 → downloads_low) — solid bottom portion
+        if (hLow > 0.5) {
+            bars += `<rect x="${x}" y="${yLow}" width="${barW}" height="${hLow}" fill="${barColor}" opacity="${solidOpacity}" rx="2"/>`;
+        }
+
+        // Download value label above bar for key positions
+        if (p.downloads_high > 0 && (p.pos <= 5 || p.pos === 10 || p.pos === 15 || p.pos === 20 || isAppPos)) {
+            const labelY = yHigh - (isAppPos ? 16 : 5);
+            bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}\u2013${fmt(p.downloads_high)}</text>`;
+        }
+
+        // "YOU" marker for your app position
+        if (isAppPos) {
+            bars += `<rect x="${x - 2}" y="${yHigh - 2}" width="${barW + 4}" height="${hHigh + 4}" rx="3" fill="none" stroke="rgb(250,204,21)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="700" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
+        }
+
+        // Position number on x-axis
+        bars += `<text x="${x + barW/2}" y="${PAD_T + chartH + 14}" font-size="9" fill="${isAppPos ? 'rgb(250,204,21)' : 'rgba(148,163,184,0.7)'}" ${isAppPos ? 'font-weight="bold"' : ''} text-anchor="middle">${p.pos}</text>`;
+    });
+
+    const axisLabels = `
+        <text x="${PAD_L + chartW/2}" y="${H - 2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle">Ranking Position</text>
+        <text x="12" y="${PAD_T + chartH/2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle" transform="rotate(-90, 12, ${PAD_T + chartH/2})">Downloads / day</text>`;
+
+    // Per-position tier cards (not averages — show what each position actually gets)
+    function posRow(pos, p, isBold) {
+        const cls = isBold ? 'font-semibold' : 'opacity-80';
+        return '<div style="display:flex;justify-content:space-between;font-size:0.75rem;"><span style="color:#94a3b8;">#' + pos + '</span><span class="' + cls + '">' + fmt(p.downloads_low) + '\u2013' + fmt(p.downloads_high) + '/day</span></div>';
+    }
+    const p1 = positions[0], p3 = positions[2], p5 = positions[4];
+    const p6 = positions[5], p8 = positions[7], p10 = positions[9];
+    const p11 = positions[10], p15 = positions[14], p20 = positions[19];
+
+    const tierCards = `
+        <div class="grid grid-cols-3 gap-3 mt-3">
+            <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5 — per position</p>
+                <div class="space-y-1 text-purple-300">
+                    ${posRow(1, p1, true)}
+                    ${posRow(3, p3, false)}
+                    ${posRow(5, p5, false)}
+                </div>
+            </div>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310 — per position</p>
+                <div class="space-y-1 text-blue-300">
+                    ${posRow(6, p6, true)}
+                    ${posRow(8, p8, false)}
+                    ${posRow(10, p10, false)}
+                </div>
+            </div>
+            <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320 — per position</p>
+                <div class="space-y-1 text-slate-300">
+                    ${posRow(11, p11, true)}
+                    ${posRow(15, p15, false)}
+                    ${posRow(20, p20, false)}
+                </div>
+            </div>
+        </div>`;
+
+    return `
+        <div class="mb-4">
+            <div class="flex items-center gap-2 mb-2">
+                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Estimated Downloads by Position</h4>
+                <span class="relative group/dlinfo">
+                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on \u2248${fmt(dailySearches)} estimated daily searches for this keyword. The solid bar shows conservative downloads (35% conversion), the lighter extension shows optimistic downloads (55% conversion). Actual results vary by app quality and metadata.</span>
+                </span>
+            </div>
+            <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3 overflow-x-auto">
+                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:500px;max-width:700px">
+                    ${zones}
+                    ${zoneLabels}
+                    ${yTicks.join('')}
+                    ${bars}
+                    <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${PAD_T + chartH}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.1)"/>
+                    ${axisLabels}
+                </svg>
+                <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> Conservative</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Optimistic</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-2 rounded-sm" style="border:1px dashed rgb(250,204,21);"></span> Your Position</span>
+                </div>
+                ${tierCards}
+            </div>
+        </div>`;
+}
+
+function renderRankingTiers(tiers) {
+    if (!tiers) return '';
+    const tierDefs = [
+        { key: 'top_5', label: 'Top 5' },
+        { key: 'top_10', label: 'Top 10' },
+        { key: 'top_20', label: 'Top 20' },
+    ];
+    const labelColors = {
+        'Very Easy': 'bg-emerald-500/20 text-emerald-400',
+        'Easy': 'bg-green-500/20 text-green-400',
+        'Moderate': 'bg-yellow-500/20 text-yellow-400',
+        'Hard': 'bg-orange-500/20 text-orange-400',
+        'Very Hard': 'bg-red-500/20 text-red-400',
+        'Extreme': 'bg-red-700/20 text-red-300',
+    };
+    function tierBarColor(score) {
+        if (score <= 15) return 'bg-emerald-500';
+        if (score <= 35) return 'bg-green-500';
+        if (score <= 55) return 'bg-yellow-500';
+        if (score <= 75) return 'bg-orange-500';
+        if (score <= 90) return 'bg-red-500';
+        return 'bg-red-700';
+    }
+    function tierTextColor(score) {
+        if (score <= 15) return 'text-emerald-400';
+        if (score <= 35) return 'text-green-400';
+        if (score <= 55) return 'text-yellow-400';
+        if (score <= 75) return 'text-orange-400';
+        if (score <= 90) return 'text-red-400';
+        return 'text-red-300';
+    }
+    let cards = '';
+    for (const { key, label } of tierDefs) {
+        const t = tiers[key];
+        if (!t) continue;
+        const score = t.tier_score || 0;
+        const lc = labelColors[t.label] || 'bg-slate-500/20 text-slate-400';
+        const barColor = tierBarColor(score);
+        const txtColor = tierTextColor(score);
+        const highlightItems = (t.highlights || []).map(h =>
+            `<li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">•</span><span>${h}</span></li>`
+        ).join('');
+        cards += `
+            <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-white">${label}</span>
+                        <span class="text-lg font-bold ${txtColor}">${score}</span>
+                        <span class="text-slate-600 text-xs">/100</span>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold ${lc}">${t.label}</span>
+                </div>
+                <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
+                    <div class="h-1.5 rounded-full ${barColor}" style="width:${Math.min(score,100)}%"></div>
+                </div>
+                <ul class="space-y-1.5 text-xs text-slate-400">${highlightItems}</ul>
+            </div>`;
+    }
+    if (!cards) return '';
+    return `
+        <div class="mb-4">
+            <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">How Hard Is It to Rank?</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">${cards}</div>
+        </div>`;
+}
+
+function getTargetingAdvice(pop, diff) {
+    let icon, color, title, advice;
+    if (pop !== null && pop !== undefined) {
+        if (pop >= 40 && diff <= 40) { icon = '🎯'; color = 'green'; title = 'Sweet Spot'; advice = 'High popularity + low difficulty — ideal keyword to target with good ASO.'; }
+        else if (pop >= 40 && diff <= 60) { icon = '✅'; color = 'green'; title = 'Good Target'; advice = 'Solid popularity with manageable difficulty.'; }
+        else if (pop >= 40 && diff > 60) { icon = '⚔️'; color = 'yellow'; title = 'Worth Competing'; advice = 'High demand but tough competition. Consider long-tail variants.'; }
+        else if (pop >= 30 && pop < 40 && diff <= 40) { icon = '💎'; color = 'blue'; title = 'Hidden Gem'; advice = 'Moderate volume with little competition. Good for niche apps.'; }
+        else if (pop >= 30 && pop < 40 && diff <= 60) { icon = '👍'; color = 'slate'; title = 'Decent Option'; advice = 'Moderate demand and competition. Can work as a supporting keyword.'; }
+        else if (pop < 30 && diff <= 30) { icon = '🔍'; color = 'slate'; title = 'Low Volume'; advice = 'Easy to rank but few people search for this. Best as a supporting keyword.'; }
+        else if (pop < 30 && diff > 30) { icon = '🚫'; color = 'red'; title = 'Avoid'; advice = 'Low search volume with notable competition.'; }
+        else { icon = '⚔️'; color = 'yellow'; title = 'Challenging'; advice = 'Strong competition. Focus on long-tail variants.'; }
+    } else {
+        if (diff <= 25) { icon = '🟢'; color = 'green'; title = 'Easy to Rank'; advice = 'Low competition — a well-optimized app can rank quickly.'; }
+        else if (diff <= 50) { icon = '🟡'; color = 'yellow'; title = 'Moderate Competition'; advice = 'Achievable with strong ASO.'; }
+        else if (diff <= 75) { icon = '🟠'; color = 'orange'; title = 'Competitive'; advice = 'Consider long-tail variants.'; }
+        else { icon = '🔴'; color = 'red'; title = 'Very Competitive'; advice = 'Dominated by established apps. Target easier keywords first.'; }
+    }
+    const colorMap = {
+        green: 'bg-green-900/20 border-green-500/20 text-green-300',
+        yellow: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300',
+        blue: 'bg-blue-900/20 border-blue-500/20 text-blue-300',
+        orange: 'bg-orange-900/20 border-orange-500/20 text-orange-300',
+        red: 'bg-red-900/20 border-red-500/20 text-red-300',
+        slate: 'bg-slate-800 border-white/10 text-slate-300',
+    };
+    return `
+        <div class="${colorMap[color]} border rounded-lg p-2.5">
+            <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
+            <p class="text-xs font-medium">${icon} ${title}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${advice}</p>
+        </div>`;
+}
+
+function highlightKeyword(title, keyword) {
+    if (!keyword || !title) return title || '';
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const words = keyword.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return escHtml(title);
+    const titleLower = title.toLowerCase();
+    const kwLower = keyword.trim().toLowerCase();
+    const present = words.filter(w => titleLower.includes(w.toLowerCase()));
+    const hasExactPhrase = words.length > 1 && titleLower.includes(kwLower);
+    const CLS_EXACT = 'bg-green-500/25 text-green-300 rounded px-0.5';
+    const CLS_ALL   = 'bg-amber-500/25 text-amber-300 rounded px-0.5';
+    const CLS_PART  = 'bg-slate-400/20 text-slate-300 rounded px-0.5';
+    if (hasExactPhrase) {
+        const re = new RegExp(`(${esc(keyword.trim())})`, 'gi');
+        return title.replace(re, `<mark class="${CLS_EXACT}">$1</mark>`);
+    }
+    if (!present.length) return escHtml(title);
+    let cls;
+    if (words.length === 1) cls = CLS_EXACT;
+    else if (present.length === words.length) cls = CLS_ALL;
+    else cls = CLS_PART;
+    const re = new RegExp(`(${present.map(w => esc(w)).join('|')})`, 'gi');
+    return title.replace(re, `<mark class="${cls}">$1</mark>`);
+}
+
+// --- Table sorting ---
+let oppSortCol = -1;
+let oppSortAsc = true;
+
+function sortOppTable(colIndex, type, th) {
+    const tbody = document.getElementById('opp-tbody');
+    if (!tbody) return;
+
+    const dataRows = [];
+    const allRows = Array.from(tbody.children);
+    for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        if (row.classList.contains('opp-detail-row')) continue;
+        const next = allRows[i + 1];
+        const detailRow = (next && next.classList.contains('opp-detail-row')) ? next : null;
+        dataRows.push({ row, detailRow });
+    }
+
+    if (oppSortCol === colIndex) {
+        oppSortAsc = !oppSortAsc;
+    } else {
+        oppSortCol = colIndex;
+        oppSortAsc = true;
+    }
+
+    document.querySelectorAll('#opp-table .sort-indicator').forEach(s => s.textContent = '');
+    const indicator = th.querySelector('.sort-indicator');
+    if (indicator) indicator.textContent = oppSortAsc ? ' ▲' : ' ▼';
+
+    dataRows.sort((a, b) => {
+        const cellA = a.row.children[colIndex];
+        const cellB = b.row.children[colIndex];
+        let valA = (cellA ? cellA.textContent : '').trim();
+        let valB = (cellB ? cellB.textContent : '').trim();
+        if (type === 'num') {
+            const isEmptyA = !valA || valA === '—' || valA === 'N/A';
+            const isEmptyB = !valB || valB === '—' || valB === 'N/A';
+            if (isEmptyA && !isEmptyB) return 1;
+            if (!isEmptyA && isEmptyB) return -1;
+            if (isEmptyA && isEmptyB) return 0;
+            const numA = parseFloat(valA.replace(/[^0-9.\-]/g, '')) || 0;
+            const numB = parseFloat(valB.replace(/[^0-9.\-]/g, '')) || 0;
+            return oppSortAsc ? numA - numB : numB - numA;
+        } else {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+            if (valA < valB) return oppSortAsc ? -1 : 1;
+            if (valA > valB) return oppSortAsc ? 1 : -1;
+            return 0;
+        }
+    });
+
+    dataRows.forEach(({ row, detailRow }) => {
+        tbody.appendChild(row);
+        if (detailRow) tbody.appendChild(detailRow);
+    });
+}
+
+// --- Row click → expand/collapse detail ---
+function toggleOppDetail(rowEl, index) {
+    const detailRow = rowEl.nextElementSibling;
+    if (detailRow && detailRow.classList.contains('opp-detail-row')) {
+        detailRow.classList.toggle('hidden');
+        rowEl.classList.toggle('bg-purple-900/10');
+        return;
+    }
+    // Create detail row
+    const r = lastResultsData[index];
+    if (!r) return;
+
+    const tr = document.createElement('tr');
+    tr.className = 'opp-detail-row border-b border-white/5';
+    const td = document.createElement('td');
+    td.colSpan = 10;
+    td.className = 'px-4 py-4 bg-slate-800/50';
+
+    // Targeting advice
+    const adviceHtml = getTargetingAdvice(r.popularity, r.difficulty);
+
+    // Ranking tiers
+    const tiersHtml = renderRankingTiers(r.difficulty_breakdown?.ranking_tiers);
+
+    // Download estimates chart
+    const dlHtml = renderDownloadChart(r.difficulty_breakdown?.download_estimates, r.app_rank);
+
+    // Score breakdown details
+    const bd = r.difficulty_breakdown || {};
+    const subScores = [
+        {k:'rating_volume', label:'Rating count', w:30, tip:'Measures total rating count of top competitors.'},
+        {k:'review_velocity', label:'Rating growth speed', w:10, tip:'How fast competitors gain new ratings.'},
+        {k:'dominant_players', label:'Big-brand presence', w:20, tip:'Whether big-name apps dominate the results.'},
+        {k:'title_relevance', label:'Keyword in titles', w:10, tip:'How many competitor apps use this keyword in title.'},
+        {k:'rating_quality', label:'Competitor ratings', w:10, tip:'Average star ratings of competitors.'},
+        {k:'market_age', label:'Market maturity', w:10, tip:'How long competitors have been on the App Store.'},
+        {k:'publisher_diversity', label:'Publisher variety', w:10, tip:'Whether many different publishers compete.'},
+    ];
+    let subScoreHtml = '';
+    if (bd.rating_volume !== undefined) {
+        subScoreHtml = '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs mb-4">' +
+            subScores.map(({k, label, w, tip}) => {
+                const val = bd[k] || 0;
+                const lvl = val <= 25 ? 'Low' : val <= 50 ? 'Medium' : val <= 75 ? 'High' : 'Very High';
+                const barColor = val <= 25 ? 'bg-green-500' : val <= 50 ? 'bg-yellow-500' : val <= 75 ? 'bg-orange-500' : 'bg-red-500';
+                const textColor = val <= 25 ? 'text-green-400' : val <= 50 ? 'text-yellow-400' : val <= 75 ? 'text-orange-400' : 'text-red-400';
+                return `<div class="bg-slate-800 rounded p-2 group/tip relative cursor-help">
+                    <p class="text-slate-500">${label}</p>
+                    <p class="${textColor} font-semibold mt-0.5">${lvl}</p>
+                    <div class="w-full bg-slate-700 rounded-full h-1 mt-1">
+                        <div class="${barColor} h-1 rounded-full" style="width:${Math.min(val,100)}%"></div>
+                    </div>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-lg">${tip}<br><br><strong>Score: ${Math.round(val)}/100</strong> — contributes <strong>${w}%</strong> to overall.</div>
+                </div>`;
+            }).join('') + '</div>';
+    }
+
+    // Competitor table
+    const competitors = r.competitors_data || [];
+    let compRows = '';
+    if (competitors.length) {
+        compRows = competitors.map((app, i) => {
+            const stars = app.averageUserRating ? '⭐ ' + app.averageUserRating.toFixed(1) : '—';
+            const ratings = app.userRatingCount ? app.userRatingCount.toLocaleString() : '0';
+            const releaseDate = app.releaseDate ? new Date(app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
+            const updatedDate = (app.currentVersionReleaseDate || app.releaseDate) ? new Date(app.currentVersionReleaseDate || app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
+            const highlighted = highlightKeyword(app.trackName, lastKeyword);
+            return `
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td class="px-2 py-1.5 text-slate-500 text-sm whitespace-nowrap">${i + 1}</td>
+                    <td class="px-2 py-1.5">
+                        <div class="flex items-center gap-2">
+                            ${app.artworkUrl100 ? `<img src="${app.artworkUrl100}" alt="" class="w-7 h-7 rounded-lg flex-shrink-0" onerror="this.style.display='none'">` : ''}
+                            <div class="min-w-0">
+                                <a href="${app.trackViewUrl}" target="_blank" rel="noopener" class="text-white text-sm hover:text-purple-400 transition-colors">${highlighted}</a>
+                                <span class="text-slate-500 block text-xs">${app.sellerName || ''}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-2 py-1.5 text-sm text-slate-300 whitespace-nowrap">${stars}</td>
+                    <td class="px-2 py-1.5 text-sm text-slate-300 whitespace-nowrap">${ratings}</td>
+                    <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${app.primaryGenreName || ''}</td>
+                    <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${app.formattedPrice || ''}</td>
+                    <td class="px-2 py-1.5 text-sm text-slate-500 whitespace-nowrap">${releaseDate}</td>
+                    <td class="px-2 py-1.5 text-sm text-slate-500 whitespace-nowrap">${updatedDate}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    const compTableHtml = competitors.length ? `
+        <div class="overflow-x-auto">
+            <h4 class="text-xs font-medium text-slate-400 mb-2">Top ${competitors.length} Competitors</h4>
+            <table class="w-full text-sm text-left">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">#</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500">App</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Rating</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Ratings</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Genre</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Price</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Released</th>
+                        <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Updated</th>
+                    </tr>
+                </thead>
+                <tbody>${compRows}</tbody>
+            </table>
+        </div>` : '';
+
+    // Insights
+    const insights = bd.insights || [];
+    let insightsHtml = '';
+    if (insights.length) {
+        insightsHtml = '<div class="space-y-1.5 mb-4">' + insights.map(ins =>
+            `<div class="flex items-start gap-2 text-xs ${ins.type === 'barrier' ? 'text-red-400' : ins.type === 'opportunity' ? 'text-green-400' : 'text-slate-400'}">
+                <span class="flex-shrink-0">${ins.icon}</span><span>${ins.text}</span>
+            </div>`
+        ).join('') + '</div>';
+    }
+
+    // Opportunity signals
+    const oppSignals = bd.opportunity_signals || [];
+    let oppSigHtml = '';
+    if (oppSignals.length) {
+        oppSigHtml = `<div class="bg-green-900/20 border border-green-500/20 rounded-lg p-3 mb-4">
+            <p class="text-xs font-medium text-green-400 mb-2">Opportunity Signals</p>
+            <div class="space-y-2">${oppSignals.map(sig =>
+                `<div class="flex items-start gap-2 text-xs">
+                    <span class="flex-shrink-0">${sig.icon}</span>
+                    <div><span class="text-green-300 font-medium">${sig.signal}</span>
+                    <span class="text-slate-500 ml-1">(${sig.strength})</span>
+                    <p class="text-slate-400 mt-0.5">${sig.detail}</p></div>
+                </div>`
+            ).join('')}</div>
+        </div>`;
+    }
+
+    td.innerHTML = `
+        <div class="flex flex-col lg:flex-row gap-4">
+            <div class="lg:w-1/3 space-y-2">
+                <div class="bg-slate-800 rounded-lg p-2.5">
+                    <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Popularity</p>
+                    <span class="text-2xl font-bold text-purple-400">${r.popularity ?? 'N/A'}</span>
+                    ${r.popularity ? '<span class="text-slate-500 text-xs ml-1">/ 100</span>' : ''}
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2.5">
+                    <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Overall Difficulty</p>
+                    <span class="text-2xl font-bold ${diffColor(r.difficulty)}">${r.difficulty}</span>
+                    <span class="text-slate-500 text-xs ml-1">/ 100</span>
+                    <p class="${diffColor(r.difficulty)} text-xs mt-0.5 font-medium">${r.difficulty_label}</p>
+                </div>
+                ${r.app_rank ? `<div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-2.5">
+                    <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Your App Rank</p>
+                    <span class="text-2xl font-bold text-yellow-400">#${r.app_rank}</span>
+                </div>` : ''}
+                ${adviceHtml}
+            </div>
+            <div class="flex-1 overflow-x-auto">
+                ${tiersHtml}
+                ${dlHtml}
+                <details class="mb-4">
+                    <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">Difficulty breakdown &amp; insights</summary>
+                    <div class="mt-2 space-y-3">
+                        ${insightsHtml}
+                        ${oppSigHtml}
+                        ${subScoreHtml}
+                    </div>
+                </details>
+                ${compTableHtml}
+            </div>
+        </div>`;
+
+    tr.appendChild(td);
+    rowEl.after(tr);
+    rowEl.classList.add('bg-purple-900/10');
+}
+
+// Store full results data for save-to-history and CSV export
+let lastResultsData = null;
+let lastKeyword = '';
+let lastAppId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('opp-form');
+    const btn = document.getElementById('opp-btn');
+    const progress = document.getElementById('opp-progress');
+    const results = document.getElementById('opp-results');
+    const progressText = document.getElementById('opp-progress-text');
+    const progressBar = document.getElementById('opp-progress-bar');
+    const progressDetail = document.getElementById('opp-progress-detail');
+    const selectAll = document.getElementById('opp-select-all');
+    const oppApp = document.getElementById('opp-app');
+
+    // Restore app selection from localStorage
+    try {
+        const savedApp = localStorage.getItem('aso_app');
+        if (savedApp && oppApp.querySelector(`option[value="${savedApp}"]`)) {
+            oppApp.value = savedApp;
+        }
+    } catch(e) {}
+
+    // Save app selection on change
+    oppApp.addEventListener('change', function() {
+        try {
+            if (this.value) {
+                localStorage.setItem('aso_app', this.value);
+            } else {
+                localStorage.removeItem('aso_app');
+            }
+        } catch(e) {}
+    });
+
+    // Select-all checkbox
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('.opp-row-cb').forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+        updateSelectedCount();
+    });
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const keyword = form.querySelector('[name="keyword"]').value.trim();
+        if (!keyword) return;
+
+        const appId = document.getElementById('opp-app').value;
+
+        // Show progress, set nav protection
+        results.classList.add('hidden');
+        progress.classList.remove('hidden');
+        document.getElementById('opp-saved-banner').classList.add('hidden');
+        window.searchInProgress = true;
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        const btnOriginal = btn.innerHTML;
+        btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Scanning...`;
+
+        // Simulate progress
+        let progressPct = 0;
+        const interval = setInterval(() => {
+            if (progressPct < 95) {
+                progressPct += (95 - progressPct) * 0.05;
+                progressBar.style.width = `${progressPct}%`;
+                const scanned = Math.min(30, Math.round(progressPct / 100 * 30));
+                progressDetail.textContent = `~${scanned} / 30 countries scanned`;
+                progressText.textContent = `Scanning "${keyword}" across all countries...`;
+            }
+        }, 1000);
+
+        try {
+            const formData = new FormData();
+            formData.append('keyword', keyword);
+            if (appId) formData.append('app_id', appId);
+            formData.append('csrfmiddlewaretoken', csrfToken);
+
+            const resp = await fetch('{% url "aso:opportunity_search" %}', {
+                method: 'POST',
+                body: formData,
+            });
+
+            clearInterval(interval);
+            progressBar.style.width = '100%';
+            progressDetail.textContent = '30 / 30 countries scanned';
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || 'Search failed');
+            }
+
+            const data = await resp.json();
+
+            lastResultsData = data.results;
+            lastKeyword = data.keyword;
+            lastAppId = data.app_id;
+
+            await new Promise(r => setTimeout(r, 500));
+            progress.classList.add('hidden');
+            results.classList.remove('hidden');
+            document.getElementById('opp-actions').classList.remove('hidden');
+
+            renderResults(data);
+
+        } catch (error) {
+            clearInterval(interval);
+            progress.classList.add('hidden');
+            results.classList.remove('hidden');
+            document.getElementById('opp-actions').classList.add('hidden');
+            document.getElementById('opp-best').innerHTML = `
+                <div class="text-red-400 text-sm"><strong>Error:</strong> ${error.message}</div>`;
+            document.getElementById('opp-tbody').innerHTML = '';
+        }
+
+        window.searchInProgress = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.innerHTML = btnOriginal;
+    });
+
+    function renderResults(data) {
+        const best = data.results[0];
+        const bestCard = document.getElementById('opp-best');
+
+        if (best) {
+            bestCard.className = 'bg-green-900/20 border border-green-500/20 rounded-xl p-5';
+            bestCard.innerHTML = `
+                <div class="flex items-center gap-1 text-xs text-green-400 uppercase tracking-wide font-semibold mb-2">
+                    <span>🏆</span> Best Opportunity for "${data.keyword}"
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-4xl">${countryFlag(best.country)}</div>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">${COUNTRY_NAMES[best.country] || best.country.toUpperCase()}</h3>
+                        <p class="text-sm text-slate-400 mt-0.5">
+                            Opportunity <span class="text-green-400 font-bold">${best.opportunity}</span>
+                            · Popularity <span class="text-purple-400 font-semibold">${best.popularity}</span>
+                            · Difficulty <span class="${diffColor(best.difficulty)} font-semibold">${best.difficulty}</span>
+                            <span class="text-slate-600">(${best.difficulty_label})</span>
+                        </p>
+                        ${best.app_rank ? `<p class="text-sm text-slate-400 mt-0.5">Your rank: <span class="text-yellow-400 font-bold">#${best.app_rank}</span></p>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        const tbody = document.getElementById('opp-tbody');
+        tbody.innerHTML = data.results.map((r, i) => `
+            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${oppBg(r.opportunity)}" data-index="${i}" onclick="if(!event.target.closest('input')){toggleOppDetail(this,${i})}">
+                <td class="px-3 py-2 text-center" onclick="event.stopPropagation()">
+                    <input type="checkbox" class="opp-row-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" data-index="${i}" onchange="updateSelectedCount()">
+                </td>
+                <td class="px-3 py-2 text-center text-slate-500 text-sm">${i + 1}</td>
+                <td class="px-3 py-2 text-white text-sm font-medium whitespace-nowrap">${countryFlag(r.country)} ${COUNTRY_NAMES[r.country] || r.country.toUpperCase()}</td>
+                <td class="px-3 py-2 text-center"><span class="${oppColor(r.opportunity)} font-bold text-sm">${r.opportunity}</span></td>
+                <td class="px-3 py-2 text-center text-purple-400 text-sm font-semibold">${r.popularity}</td>
+                <td class="px-3 py-2 text-center"><span class="${diffColor(r.difficulty)} text-sm font-semibold">${r.difficulty}</span><span class="text-slate-600 text-xs ml-1">${r.difficulty_label}</span></td>
+                <td class="px-3 py-2 text-center text-slate-400 text-sm">${r.competitor_count}</td>
+                <td class="px-3 py-2 text-slate-300 text-sm">${r.top_competitor}${r.top_ratings ? ` <span class="text-slate-600 text-xs">(${r.top_ratings.toLocaleString()} ratings)</span>` : ''}</td>
+                <td class="px-3 py-2 text-center">${r.app_rank ? `<span class="text-yellow-400 font-bold text-sm">#${r.app_rank}</span>` : '<span class="text-slate-600 text-xs">—</span>'}</td>
+            </tr>
+        `).join('');
+
+        selectAll.checked = false;
+        updateSelectedCount();
+    }
+});
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.opp-row-cb:checked');
+    const text = document.getElementById('add-selected-text');
+    const btn = document.getElementById('add-selected-btn');
+    if (checked.length > 0) {
+        text.textContent = `Add ${checked.length} Selected to History`;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        btn.disabled = false;
+    } else {
+        text.textContent = 'Add Selected to History';
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        btn.disabled = true;
+    }
+}
+
+async function saveToHistory(resultsToSave) {
+    if (!resultsToSave.length) return;
+    try {
+        const resp = await fetch('{% url "aso:opportunity_save" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                keyword: lastKeyword,
+                app_id: lastAppId,
+                results: resultsToSave,
+            }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Save failed');
+        }
+        const data = await resp.json();
+        const banner = document.getElementById('opp-saved-banner');
+        document.getElementById('opp-saved-text').textContent = `Saved ${data.saved} result(s) to search history. View them on the Dashboard.`;
+        banner.classList.remove('hidden');
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, {type: 'danger', title: 'Save Failed'});
+    }
+}
+
+function addSelectedToHistory() {
+    if (!lastResultsData) return;
+    const checked = document.querySelectorAll('.opp-row-cb:checked');
+    if (!checked.length) return;
+    const selected = Array.from(checked).map(cb => {
+        const idx = parseInt(cb.dataset.index);
+        return lastResultsData[idx];
+    });
+    saveToHistory(selected);
+}
+
+async function addAllToHistory() {
+    if (!lastResultsData) return;
+    const ok = await showConfirm(`Add all ${lastResultsData.length} country results to your search history?`, {type: 'info', title: 'Save All Results'});
+    if (!ok) return;
+    saveToHistory(lastResultsData);
+}
+
+function exportOpportunityCSV() {
+    if (!lastResultsData || !lastResultsData.length) return;
+    const headers = ['Rank', 'Country Code', 'Country', 'Opportunity', 'Popularity', 'Difficulty', 'Difficulty Label', 'Competitors', 'Top Competitor', 'Top Ratings', 'Your Rank'];
+    const rows = lastResultsData.map((r, i) => [
+        i + 1,
+        r.country.toUpperCase(),
+        COUNTRY_NAMES[r.country] || r.country.toUpperCase(),
+        r.opportunity,
+        r.popularity,
+        r.difficulty,
+        r.difficulty_label,
+        r.competitor_count,
+        '"' + (r.top_competitor || '').replace(/"/g, '""') + '"',
+        r.top_ratings || 0,
+        r.app_rank || '',
+    ]);
+    let csv = headers.join(',') + '\n';
+    csv += rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'respectaso-opportunity-' + lastKeyword.replace(/[^a-z0-9]/gi, '-') + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}

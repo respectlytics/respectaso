@@ -1,0 +1,234 @@
+{% extends "aso/base.html" %}
+
+{% block title %}Setup Guide — RespectASO{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-white mb-2">Setup Guide</h1>
+        <p class="text-slate-400 text-sm leading-relaxed">
+            Getting started, accessing the tool, and optional configuration.
+        </p>
+    </div>
+
+    <!-- Getting Started -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">🚀</span> Getting Started
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                RespectASO runs as a Docker container on your machine. Three commands to get started:
+            </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs space-y-1.5">
+                <p class="text-slate-400"># Clone the repository</p>
+                <p class="text-green-400">git clone https://github.com/respectlytics/respectaso.git</p>
+                <p class="text-green-400">cd respectaso</p>
+                <p class="text-slate-400 mt-3"># Start the container</p>
+                <p class="text-green-400">docker compose up -d</p>
+            </div>
+            <p>
+                That's it. Open your browser and go to:
+            </p>
+            <div class="bg-purple-900/20 border border-purple-500/20 rounded-lg p-4 text-center">
+                <a href="http://localhost" class="text-lg text-purple-300 font-mono hover:text-purple-200 transition-colors">http://localhost</a>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg p-3 text-xs text-slate-400 mt-2">
+                <p class="text-white font-medium mb-1">Why no port number?</p>
+                <p>
+                    We map to port 80 — the default HTTP port — so you never need to type a port number.
+                    The container internally uses 8080, but Docker maps it to 80 on your machine.
+                    If you see <code class="bg-slate-800 px-1 py-0.5 rounded">0.0.0.0:8080</code>
+                    in the container logs, that's the internal address — just use <code class="bg-slate-800 px-1 py-0.5 rounded">localhost</code> in your browser.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Custom Port -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">🔌</span> Changing the Port
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                If port 80 is already in use on your machine (e.g., by Apache, Nginx, or another web server), edit
+                <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">docker-compose.yml</code> and change the port mapping:
+            </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs space-y-1.5">
+                <p class="text-slate-400"># Change the left side (host port) to whatever you want:</p>
+                <p><span class="text-slate-500">ports:</span></p>
+                <p><span class="text-slate-500">  - "</span><span class="text-green-400">9090</span><span class="text-slate-500">:8080"</span></p>
+            </div>
+            <p>
+                Then restart the container and access the tool at
+                <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">http://localhost:9090</code>.
+            </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs">
+                <p class="text-green-400">docker compose down && docker compose up -d</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Custom Domain -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">🌐</span> Custom Domain Name
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                Instead of <code class="bg-slate-800 px-1.5 py-0.5 rounded">http://localhost</code>, you can access
+                RespectASO with a clean custom domain like <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">http://respectaso.private</code>.
+                This just requires adding one line to your hosts file.
+            </p>
+
+            <!-- macOS -->
+            <div class="bg-slate-800/80 rounded-lg p-4">
+                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-3">macOS / Linux</h3>
+                <div class="font-mono text-xs space-y-1.5">
+                    <p class="text-slate-400"># Open your hosts file</p>
+                    <p class="text-green-400">sudo nano /etc/hosts</p>
+                    <p class="text-slate-400 mt-3"># Add this line at the end</p>
+                    <p class="text-green-400">127.0.0.1  respectaso.private</p>
+                    <p class="text-slate-400 mt-3"># Save and exit (Ctrl+O, Enter, Ctrl+X)</p>
+                </div>
+            </div>
+
+            <!-- Windows -->
+            <div class="bg-slate-800/80 rounded-lg p-4">
+                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-3">Windows</h3>
+                <div class="font-mono text-xs space-y-1.5">
+                    <p class="text-slate-400"># Open Notepad as Administrator, then open this file:</p>
+                    <p class="text-green-400">C:\Windows\System32\drivers\etc\hosts</p>
+                    <p class="text-slate-400 mt-3"># Add this line at the end</p>
+                    <p class="text-green-400">127.0.0.1  respectaso.private</p>
+                    <p class="text-slate-400 mt-3"># Save the file</p>
+                </div>
+            </div>
+
+            <p>
+                After saving, open your browser and go to
+                <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">http://respectaso.private</code>.
+                No restart needed — it works immediately.
+            </p>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
+                <p class="text-white font-medium mb-1">Why <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code>?</p>
+                <p>
+                    We recommend the <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code> TLD because it's reserved for
+                    private use and won't conflict with real domains or macOS mDNS resolution (<code class="bg-slate-800 px-1 py-0.5 rounded">.local</code>
+                    can cause slowdowns on macOS because it triggers Bonjour lookups). You can use any name you want —
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">aso.test</code>,
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">respectaso.dev</code>, etc. — but <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code>
+                    is the safest choice.
+                </p>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
+                <p class="text-white font-medium mb-1">Changed the port?</p>
+                <p>
+                    If you changed the port in <code class="bg-slate-800 px-1 py-0.5 rounded">docker-compose.yml</code> (e.g., to 9090),
+                    use that port with your custom domain:
+                    <code class="bg-slate-800 px-1 py-0.5 rounded text-purple-300">http://respectaso.private:9090</code>.
+                    The hosts file handles name resolution, the port mapping is separate.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Automatic Startup -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">⚡</span> Automatic Startup
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                RespectASO starts automatically when your computer boots — no need to run
+                <code class="bg-slate-800 px-1.5 py-0.5 rounded">docker compose up</code> again after the initial setup.
+            </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
+                <p class="text-white font-medium mb-1">How it works</p>
+                <p>
+                    The <code class="bg-slate-800 px-1 py-0.5 rounded">docker-compose.yml</code> includes
+                    <code class="bg-slate-800 px-1 py-0.5 rounded text-purple-300">restart: unless-stopped</code>,
+                    which tells Docker to automatically restart the container whenever Docker itself starts.
+                    Docker Desktop starts on login by default on macOS and Windows, so RespectASO is always available.
+                </p>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
+                <p class="text-white font-medium mb-1">Verify Docker starts on login</p>
+                <p>
+                    <strong class="text-slate-300">macOS / Windows:</strong> Open Docker Desktop → Settings → General →
+                    ensure <em>"Start Docker Desktop when you sign in"</em> is checked (it's on by default).
+                </p>
+                <p class="mt-1.5">
+                    <strong class="text-slate-300">Linux:</strong> Docker Engine auto-starts via systemd by default. If not:
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">sudo systemctl enable docker</code>
+                </p>
+            </div>
+            <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
+                <p class="text-white font-medium mb-1">Want to stop auto-start?</p>
+                <p>
+                    If you don't want RespectASO running all the time, stop it with
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">docker compose stop</code>.
+                    It won't restart until you manually run
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">docker compose up -d</code> again.
+                    That's the "unless-stopped" part — Docker respects your manual stop.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data & Persistence -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">💾</span> Data & Persistence
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                Your data (apps, keywords, search history) is stored in an SQLite database inside a Docker volume
+                (<code class="bg-slate-800 px-1.5 py-0.5 rounded">aso_data</code>). This means:
+            </p>
+            <ul class="list-disc list-inside space-y-1.5 text-slate-400">
+                <li><strong class="text-white">Container restarts</strong> — your data survives</li>
+                <li><strong class="text-white">Image rebuilds</strong> — your data survives</li>
+                <li><strong class="text-white"><code class="bg-slate-800 px-1 py-0.5 rounded text-red-300">docker compose down -v</code></strong> — this deletes the volume and all your data</li>
+            </ul>
+            <p>
+                A secret key is auto-generated on first run and persisted in the same volume. No manual configuration needed.
+            </p>
+        </div>
+    </section>
+
+    <!-- Updating -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">🔄</span> Updating to a New Version
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs space-y-1.5">
+                <p class="text-green-400">cd respectaso</p>
+                <p class="text-green-400">git pull</p>
+                <p class="text-green-400">docker compose down</p>
+                <p class="text-green-400">docker compose build --no-cache</p>
+                <p class="text-green-400">docker compose up -d</p>
+            </div>
+            <p>
+                Database migrations run automatically on container start. Your existing data is preserved.
+            </p>
+        </div>
+    </section>
+
+    <!-- Back to Dashboard -->
+    <div class="text-center mb-8">
+        <a href="{% url 'aso:dashboard' %}"
+           class="text-sm text-purple-400 hover:text-purple-300 transition-colors inline-flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+</div>
+{% endblock %}

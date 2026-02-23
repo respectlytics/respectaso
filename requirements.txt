@@ -1,0 +1,5 @@
+Django>=5.1,<5.2
+gunicorn==23.0.0
+whitenoise==6.8.2
+requests==2.32.3
+python-dotenv==1.0.1

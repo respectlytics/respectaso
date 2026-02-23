@@ -1,0 +1,1532 @@
+{% extends "aso/base.html" %}
+{% load static %}
+{% load aso_tags %}
+
+{% block title %}Dashboard — RespectASO{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <!-- Header -->
+    <div>
+        <h1 class="text-xl font-bold text-white">Keyword Research</h1>
+        <p class="text-slate-400 text-sm mt-0.5">Search for App Store keywords to analyze popularity, difficulty, and competitors.</p>
+    </div>
+
+    <!-- Shared Filters -->
+    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1">
+                <label for="global-app" class="block text-xs font-medium text-slate-300 mb-1.5">App</label>
+                <select id="global-app"
+                        class="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="">All apps</option>
+                    {% for app in apps %}
+                    <option value="{{ app.id }}" {% if selected_app == app.id %}selected{% endif %}>{{ app.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs font-medium text-slate-300 mb-1.5">Countries <span class="text-slate-500">(max 5)</span></label>
+                <div id="country-dropdown" class="relative">
+                    <button type="button" id="country-btn"
+                            class="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white text-left focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between">
+                        <span id="country-btn-text" class="truncate">🇺🇸 United States</span>
+                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div id="country-panel" class="hidden absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-72 overflow-y-auto">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Form -->
+    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
+        <form id="search-form" method="post" action="{% url 'aso:search' %}">
+            {% csrf_token %}
+            <div class="flex gap-3">
+                <div class="flex-1">
+                    <label for="id_keywords" class="block text-xs font-medium text-slate-300 mb-1.5">
+                        Keywords <span class="text-slate-500">(comma-separated, max 20)</span>
+                    </label>
+                    {{ search_form.keywords }}
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" id="search-btn"
+                            class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results Container -->
+    <div id="results-container" class="space-y-4 hidden">
+        <!-- Results will be dynamically inserted here -->
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="hidden">
+        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
+            <p class="text-slate-400 text-sm mt-3" id="loading-text">Analyzing keywords...</p>
+        </div>
+    </div>
+
+    <!-- Scoring Guide -->
+    <details class="bg-[#1e293b] border border-white/10 rounded-xl">
+        <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-slate-300 hover:text-white transition-colors select-none flex items-center gap-2">
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Scoring Guide — What to aim for
+        </summary>
+        <div class="px-4 pb-4 pt-1">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Popularity (1–100)</h4>
+                    <div class="space-y-1.5 text-xs">
+                        <div class="flex justify-between"><span class="text-slate-400">50+ &nbsp;High demand</span><span class="text-green-400 font-medium">Excellent</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">30–49 &nbsp;Good search volume</span><span class="text-emerald-400 font-medium">Good</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">15–29 &nbsp;Moderate volume</span><span class="text-yellow-400 font-medium">Fair</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">5–14 &nbsp;Low volume</span><span class="text-orange-400 font-medium">Low</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">&lt;5 &nbsp;Very few searches</span><span class="text-red-400 font-medium">Minimal</span></div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Difficulty (1–100)</h4>
+                    <div class="space-y-1.5 text-xs">
+                        <div class="flex justify-between"><span class="text-slate-400">0–15 &nbsp;Very Easy</span><span class="text-green-400 font-medium">Go for it</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">16–35 &nbsp;Easy</span><span class="text-green-300 font-medium">Good chance</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">36–55 &nbsp;Moderate</span><span class="text-yellow-400 font-medium">Achievable</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">56–75 &nbsp;Hard</span><span class="text-orange-400 font-medium">Tough</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">76–90 &nbsp;Very Hard</span><span class="text-red-400 font-medium">Risky</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">91–100 &nbsp;Extreme</span><span class="text-red-600 font-medium">Avoid</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 border-t border-white/5 pt-3">
+                <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Targeting Advice</h4>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-2.5 py-1.5 text-green-300">🎯 Sweet Spot<span class="block text-[10px] text-slate-500 mt-0.5">High pop + low diff</span></div>
+                    <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-2.5 py-1.5 text-green-300">✅ Good Target<span class="block text-[10px] text-slate-500 mt-0.5">High pop, ok diff</span></div>
+                    <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg px-2.5 py-1.5 text-blue-300">💎 Hidden Gem<span class="block text-[10px] text-slate-500 mt-0.5">Mid pop + low diff</span></div>
+                    <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-2.5 py-1.5 text-yellow-300">⚔️ Worth Competing<span class="block text-[10px] text-slate-500 mt-0.5">High pop + high diff</span></div>
+                    <div class="bg-slate-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-300">👍 Decent Option<span class="block text-[10px] text-slate-500 mt-0.5">Mid pop + mid diff</span></div>
+                    <div class="bg-slate-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-300">🔍 Low Volume<span class="block text-[10px] text-slate-500 mt-0.5">Few searches, easy</span></div>
+                    <div class="bg-red-900/20 border border-red-500/20 rounded-lg px-2.5 py-1.5 text-red-300">🚫 Avoid<span class="block text-[10px] text-slate-500 mt-0.5">Low pop + high diff</span></div>
+                    <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-2.5 py-1.5 text-yellow-300">⚔️ Challenging<span class="block text-[10px] text-slate-500 mt-0.5">Strong competition</span></div>
+                </div>
+            </div>
+        </div>
+    </details>
+
+    <!-- Search History -->
+    <div id="history-section">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div>
+                <h2 class="text-base font-semibold text-white">
+                    Search History{% if selected_app_name %} — {{ selected_app_name }}{% else %} — All Apps{% endif %}
+                </h2>
+                {% if total_count %}
+                <p class="text-slate-500 text-xs mt-0.5">
+                    {{ total_count }} result{{ total_count|pluralize }} from {{ keyword_count }} keyword{{ keyword_count|pluralize }}
+                    {% if total_pages > 1 %} · Page {{ page }} of {{ total_pages }}{% endif %}
+                </p>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="location.reload()" title="Reload history table"
+                        class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Reload
+                </button>
+                {% if history_results %}
+                <a href="{% url 'aso:export_history_csv' %}{% if selected_app %}?app={{ selected_app }}{% endif %}" title="Export all search history as CSV"
+                   class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Export CSV
+                </a>
+                <div class="flex items-center gap-2">
+                    <button onclick="bulkRefresh()" id="bulk-refresh-btn"
+                            class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh Rankings
+                    </button>
+                    <button onclick="bulkDelete()" id="bulk-delete-btn"
+                            class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Delete All
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if history_results %}
+        <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full" id="history-table">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable(0,'text',this)">Keyword <span class="sort-indicator text-slate-600"></span></th>
+                            {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable(1,'num',this)">Rank <span class="sort-indicator text-slate-600"></span></th>{% endif %}
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}2{% else %}1{% endif %},'num',this)">Popularity <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}3{% else %}2{% endif %},'num',this)">
+                                <span class="inline-flex items-center gap-1">Overall Difficulty
+                                    <span class="relative group/diff">
+                                        <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/diff:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal normal-case tracking-normal">Weighted score (0–100) based on 7 competition signals across <strong>all</strong> search results: rating volume, growth speed, brand strength, title relevance, rating quality, market maturity, and publisher diversity.</span>
+                                    </span>
+                                </span>
+                                <span class="sort-indicator text-slate-600"></span>
+                            </th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2">Ranking Difficulty
+                                <span class="relative group/rank">
+                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/rank:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal normal-case tracking-normal">Difficulty score computed for reaching the <strong>Top 5</strong>, <strong>Top 10</strong>, and <strong>Top 20</strong> positions specifically, based on the competitors in each tier.</span>
+                                </span>
+                            </th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2">Insight</th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}6{% else %}5{% endif %},'text',this)">Country <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}7{% else %}6{% endif %},'num',this)">Competitors <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortTable({% if show_rank %}8{% else %}7{% endif %},'date',this)">Date <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-right text-xs font-medium text-slate-400 px-3 py-2 w-20">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        {% for result in history_results %}
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                            <td class="px-3 py-2">
+                                <span class="text-white text-sm font-medium">{{ result.keyword.keyword }}</span>
+                                {% if result.keyword.app %}
+                                <span class="text-slate-500 text-[10px] block">{{ result.keyword.app.name }}</span>
+                                {% endif %}
+                            </td>
+                            {% if show_rank %}
+                            <td class="px-3 py-2 text-center">
+                                {% if result.app_rank %}
+                                <span class="text-white text-sm font-semibold">#{{ result.app_rank }}</span>
+                                {% else %}
+                                <span class="text-slate-500 text-xs" title="Not in top 200">—</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            <td class="px-3 py-2 text-center">
+                                {% if result.popularity_score is not None %}
+                                <span class="text-purple-400 text-sm font-semibold relative group/pop cursor-help">{{ result.popularity_score }}
+                                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/pop:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal">Estimated from competitor data (5–100). Reflects relative search volume for this keyword. Higher = more people searching. <a href="{% url 'aso:methodology' %}" class="text-purple-400 hover:underline">How we estimate this →</a></span>
+                                </span>
+                                {% else %}
+                                <span class="text-slate-500 text-xs">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-center">
+                                <span class="{{ result.difficulty_color }} text-sm font-semibold">{{ result.difficulty_score }}</span>
+                                <span class="text-slate-500 text-xs block">{{ result.difficulty_label }}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                {% with tiers=result.difficulty_breakdown.ranking_tiers %}
+                                {% if tiers %}
+                                <div class="space-y-1 min-w-[130px]">
+                                    {% with t5=tiers|get_tier:"top_5" %}{% if t5 %}
+                                    <div class="flex items-center gap-1.5" title="Top 5 ranking difficulty: {{ t5.tier_score }}/100 ({{ t5.label }})">
+                                        <span class="text-[10px] text-slate-500 w-7 text-right font-medium">T5</span>
+                                        <div class="flex-1 bg-slate-700/50 rounded-full h-1.5 min-w-[50px]">
+                                            <div class="h-1.5 rounded-full transition-all {% if t5.tier_score <= 15 %}bg-emerald-500{% elif t5.tier_score <= 35 %}bg-green-500{% elif t5.tier_score <= 55 %}bg-yellow-500{% elif t5.tier_score <= 75 %}bg-orange-500{% elif t5.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ t5.tier_score }}%"></div>
+                                        </div>
+                                        <span class="text-[11px] font-bold w-5 text-right {% if t5.tier_score <= 15 %}text-emerald-400{% elif t5.tier_score <= 35 %}text-green-400{% elif t5.tier_score <= 55 %}text-yellow-400{% elif t5.tier_score <= 75 %}text-orange-400{% elif t5.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ t5.tier_score }}</span>
+                                    </div>
+                                    {% endif %}{% endwith %}
+                                    {% with t10=tiers|get_tier:"top_10" %}{% if t10 %}
+                                    <div class="flex items-center gap-1.5" title="Top 10 ranking difficulty: {{ t10.tier_score }}/100 ({{ t10.label }})">
+                                        <span class="text-[10px] text-slate-500 w-7 text-right font-medium">T10</span>
+                                        <div class="flex-1 bg-slate-700/50 rounded-full h-1.5 min-w-[50px]">
+                                            <div class="h-1.5 rounded-full transition-all {% if t10.tier_score <= 15 %}bg-emerald-500{% elif t10.tier_score <= 35 %}bg-green-500{% elif t10.tier_score <= 55 %}bg-yellow-500{% elif t10.tier_score <= 75 %}bg-orange-500{% elif t10.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ t10.tier_score }}%"></div>
+                                        </div>
+                                        <span class="text-[11px] font-bold w-5 text-right {% if t10.tier_score <= 15 %}text-emerald-400{% elif t10.tier_score <= 35 %}text-green-400{% elif t10.tier_score <= 55 %}text-yellow-400{% elif t10.tier_score <= 75 %}text-orange-400{% elif t10.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ t10.tier_score }}</span>
+                                    </div>
+                                    {% endif %}{% endwith %}
+                                    {% with t20=tiers|get_tier:"top_20" %}{% if t20 %}
+                                    <div class="flex items-center gap-1.5" title="Top 20 ranking difficulty: {{ t20.tier_score }}/100 ({{ t20.label }})">
+                                        <span class="text-[10px] text-slate-500 w-7 text-right font-medium">T20</span>
+                                        <div class="flex-1 bg-slate-700/50 rounded-full h-1.5 min-w-[50px]">
+                                            <div class="h-1.5 rounded-full transition-all {% if t20.tier_score <= 15 %}bg-emerald-500{% elif t20.tier_score <= 35 %}bg-green-500{% elif t20.tier_score <= 55 %}bg-yellow-500{% elif t20.tier_score <= 75 %}bg-orange-500{% elif t20.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ t20.tier_score }}%"></div>
+                                        </div>
+                                        <span class="text-[11px] font-bold w-5 text-right {% if t20.tier_score <= 15 %}text-emerald-400{% elif t20.tier_score <= 35 %}text-green-400{% elif t20.tier_score <= 55 %}text-yellow-400{% elif t20.tier_score <= 75 %}text-orange-400{% elif t20.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ t20.tier_score }}</span>
+                                    </div>
+                                    {% endif %}{% endwith %}
+                                </div>
+                                {% else %}
+                                <span class="text-slate-500 text-xs">—</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td class="px-3 py-2">
+                                {% with advice=result.targeting_advice %}
+                                <span class="{{ advice.2 }} border rounded px-1.5 py-0.5 text-[11px] whitespace-nowrap inline-flex items-center gap-0.5 relative group/adv cursor-help">{{ advice.0 }} {{ advice.1 }}
+                                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-48 bg-slate-900 border border-white/10 rounded-lg p-2 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/adv:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal font-normal">{{ advice.3 }}</span>
+                                </span>
+                                {% endwith %}
+                            </td>
+                            <td class="px-3 py-2 text-slate-400 text-xs">{{ result.country|country_display }}</td>
+                            <td class="px-3 py-2 text-center">
+                                {% if result.competitors_data %}
+                                <button onclick="toggleCompetitors(this)"
+                                        class="text-purple-400 hover:text-purple-300 text-sm transition-colors">
+                                    {{ result.competitors_data|length }} apps ▾
+                                </button>
+                                {% else %}
+                                <span class="text-slate-500 text-sm">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-slate-500 text-xs whitespace-nowrap"><time datetime="{{ result.searched_at|date:'c' }}">{{ result.searched_at|date:"M d, Y" }}</time></td>
+                            <td class="px-3 py-2 text-right">
+                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="refreshKeyword({{ result.keyword.id }}, this)" title="Refresh difficulty"
+                                            class="text-slate-500 hover:text-purple-400 transition-colors p-1 rounded hover:bg-white/5">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                        </svg>
+                                    </button>
+                                    <button onclick="deleteResult({{ result.id }}, this)" title="Delete this result"
+                                            class="text-slate-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-white/5">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% if result.competitors_data %}
+                        <tr class="competitor-row hidden">
+                            <td colspan="{% if show_rank %}10{% else %}9{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                                {% with advice=result.targeting_advice %}
+                                <div class="{{ advice.2 }} border rounded-lg p-2.5 mb-4">
+                                    <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
+                                    <p class="text-xs font-medium">{{ advice.0 }} {{ advice.1 }}</p>
+                                    <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{{ advice.3 }}</p>
+                                </div>
+                                {% endwith %}
+                                {% with tiers=result.difficulty_breakdown.ranking_tiers %}
+                                {% if tiers %}
+                                <div class="mb-4">
+                                    <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">How Hard Is It to Rank?</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        {% with tier=tiers|get_tier:"top_5" %}
+                                        {% if tier %}
+                                        <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-sm font-bold text-white">Top 5</span>
+                                                    <span class="text-lg font-bold {% if tier.tier_score <= 15 %}text-emerald-400{% elif tier.tier_score <= 35 %}text-green-400{% elif tier.tier_score <= 55 %}text-yellow-400{% elif tier.tier_score <= 75 %}text-orange-400{% elif tier.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ tier.tier_score }}</span>
+                                                    <span class="text-slate-600 text-xs">/100</span>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Very Easy' %}bg-emerald-500/20 text-emerald-400{% elif tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% elif tier.label == 'Very Hard' %}bg-red-500/20 text-red-400{% else %}bg-red-700/20 text-red-300{% endif %}">{{ tier.label }}</span>
+                                            </div>
+                                            <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
+                                                <div class="h-1.5 rounded-full {% if tier.tier_score <= 15 %}bg-emerald-500{% elif tier.tier_score <= 35 %}bg-green-500{% elif tier.tier_score <= 55 %}bg-yellow-500{% elif tier.tier_score <= 75 %}bg-orange-500{% elif tier.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ tier.tier_score }}%"></div>
+                                            </div>
+                                            <ul class="space-y-1.5 text-xs text-slate-400">
+                                                {% for h in tier.highlights %}
+                                                <li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">•</span><span>{{ h }}</span></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                        {% endwith %}
+                                        {% with tier=tiers|get_tier:"top_10" %}
+                                        {% if tier %}
+                                        <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-sm font-bold text-white">Top 10</span>
+                                                    <span class="text-lg font-bold {% if tier.tier_score <= 15 %}text-emerald-400{% elif tier.tier_score <= 35 %}text-green-400{% elif tier.tier_score <= 55 %}text-yellow-400{% elif tier.tier_score <= 75 %}text-orange-400{% elif tier.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ tier.tier_score }}</span>
+                                                    <span class="text-slate-600 text-xs">/100</span>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Very Easy' %}bg-emerald-500/20 text-emerald-400{% elif tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% elif tier.label == 'Very Hard' %}bg-red-500/20 text-red-400{% else %}bg-red-700/20 text-red-300{% endif %}">{{ tier.label }}</span>
+                                            </div>
+                                            <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
+                                                <div class="h-1.5 rounded-full {% if tier.tier_score <= 15 %}bg-emerald-500{% elif tier.tier_score <= 35 %}bg-green-500{% elif tier.tier_score <= 55 %}bg-yellow-500{% elif tier.tier_score <= 75 %}bg-orange-500{% elif tier.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ tier.tier_score }}%"></div>
+                                            </div>
+                                            <ul class="space-y-1.5 text-xs text-slate-400">
+                                                {% for h in tier.highlights %}
+                                                <li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">•</span><span>{{ h }}</span></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                        {% endwith %}
+                                        {% with tier=tiers|get_tier:"top_20" %}
+                                        {% if tier %}
+                                        <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-sm font-bold text-white">Top 20</span>
+                                                    <span class="text-lg font-bold {% if tier.tier_score <= 15 %}text-emerald-400{% elif tier.tier_score <= 35 %}text-green-400{% elif tier.tier_score <= 55 %}text-yellow-400{% elif tier.tier_score <= 75 %}text-orange-400{% elif tier.tier_score <= 90 %}text-red-400{% else %}text-red-300{% endif %}">{{ tier.tier_score }}</span>
+                                                    <span class="text-slate-600 text-xs">/100</span>
+                                                </div>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold {% if tier.label == 'Very Easy' %}bg-emerald-500/20 text-emerald-400{% elif tier.label == 'Easy' %}bg-green-500/20 text-green-400{% elif tier.label == 'Moderate' %}bg-yellow-500/20 text-yellow-400{% elif tier.label == 'Hard' %}bg-orange-500/20 text-orange-400{% elif tier.label == 'Very Hard' %}bg-red-500/20 text-red-400{% else %}bg-red-700/20 text-red-300{% endif %}">{{ tier.label }}</span>
+                                            </div>
+                                            <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
+                                                <div class="h-1.5 rounded-full {% if tier.tier_score <= 15 %}bg-emerald-500{% elif tier.tier_score <= 35 %}bg-green-500{% elif tier.tier_score <= 55 %}bg-yellow-500{% elif tier.tier_score <= 75 %}bg-orange-500{% elif tier.tier_score <= 90 %}bg-red-500{% else %}bg-red-700{% endif %}" style="width: {{ tier.tier_score }}%"></div>
+                                            </div>
+                                            <ul class="space-y-1.5 text-xs text-slate-400">
+                                                {% for h in tier.highlights %}
+                                                <li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">•</span><span>{{ h }}</span></li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endwith %}
+                                {% with dl=result.difficulty_breakdown.download_estimates %}
+                                {% if dl %}
+                                <div id="dl-chart-{{ result.id }}" class="mb-4"></div>
+                                <script>
+                                setTimeout(function() {
+                                    var el = document.getElementById('dl-chart-{{ result.id }}');
+                                    if (el && typeof window.renderDownloadChart === 'function') {
+                                        el.innerHTML = window.renderDownloadChart(
+                                            {{ dl|to_json }},
+                                            {{ result.app_rank|default:"null" }}
+                                        );
+                                    }
+                                }, 0);
+                                </script>
+                                {% endif %}
+                                {% endwith %}
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="border-b border-white/5">
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">#</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500">App</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Rating</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Ratings</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Genre</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Price</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Released</th>
+                                                <th class="text-left px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Updated</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for comp in result.competitors_data %}
+                                            <tr class="border-b border-white/5">
+                                                <td class="px-2 py-1.5 text-slate-500 whitespace-nowrap">{{ forloop.counter }}</td>
+                                                <td class="px-2 py-1.5">
+                                                    <div class="flex items-center gap-2">
+                                                        {% if comp.artworkUrl100 %}
+                                                        <img src="{{ comp.artworkUrl100 }}" alt="" class="w-7 h-7 rounded-lg flex-shrink-0" onerror="this.style.display='none'">
+                                                        {% endif %}
+                                                        <div class="min-w-0">
+                                                            <a href="{{ comp.trackViewUrl }}" target="_blank" rel="noopener"
+                                                               class="text-white hover:text-purple-400 transition-colors">
+                                                                {{ comp.trackName|highlight_keyword:result.keyword.keyword }}
+                                                            </a>
+                                                            <span class="text-slate-500 block text-xs">{{ comp.sellerName }}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">
+                                                    {% if comp.averageUserRating %}⭐ {{ comp.averageUserRating|floatformat:1 }}{% else %}—{% endif %}
+                                                </td>
+                                                <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">{{ comp.userRatingCount|default:"0" }}</td>
+                                                <td class="px-2 py-1.5 text-slate-400 whitespace-nowrap">{{ comp.primaryGenreName }}</td>
+                                                <td class="px-2 py-1.5 text-slate-400 whitespace-nowrap">{{ comp.formattedPrice }}</td>
+                                                <td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap">
+                                                    {% if comp.releaseDate %}{{ comp.releaseDate|format_release_date }}{% else %}—{% endif %}
+                                                </td>
+                                                <td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap">
+                                                    {% if comp.currentVersionReleaseDate %}{{ comp.currentVersionReleaseDate|format_release_date }}{% elif comp.releaseDate %}{{ comp.releaseDate|format_release_date }}{% else %}—{% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div class="flex items-center justify-center gap-2 mt-3">
+            {% if has_prev %}
+            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"-1" }}"
+               class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
+                ← Prev
+            </a>
+            {% endif %}
+            <span class="text-xs text-slate-500">Page {{ page }} of {{ total_pages }}</span>
+            {% if has_next %}
+            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"1" }}"
+               class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
+                Next →
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
+            <svg class="w-10 h-10 text-slate-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h3 class="text-white text-sm font-medium mt-3">No search history yet</h3>
+            <p class="text-slate-400 text-xs mt-1.5">Search for keywords above to start analyzing the App Store.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const csrfToken = '{{ csrf_token }}';
+const selectedApp = {{ selected_app|default:"null" }};
+const showRank = {{ show_rank|yesno:"true,false" }};
+
+// Country code → flag emoji + name
+const COUNTRY_NAMES = {
+    us:'United States',gb:'United Kingdom',ca:'Canada',au:'Australia',de:'Germany',
+    fr:'France',jp:'Japan',kr:'South Korea',cn:'China',br:'Brazil',in:'India',
+    mx:'Mexico',es:'Spain',it:'Italy',nl:'Netherlands',se:'Sweden',no:'Norway',
+    dk:'Denmark',fi:'Finland',ru:'Russia',pt:'Portugal',tr:'Türkiye',pl:'Poland',
+    id:'Indonesia',th:'Thailand',ph:'Philippines',my:'Malaysia',sg:'Singapore',
+    tw:'Taiwan',hk:'Hong Kong',nz:'New Zealand',at:'Austria',be:'Belgium',
+    ch:'Switzerland',ie:'Ireland',za:'South Africa',ar:'Argentina',cl:'Chile',
+    co:'Colombia',pe:'Peru',sa:'Saudi Arabia',ae:'UAE',il:'Israel',eg:'Egypt',
+    ng:'Nigeria',ke:'Kenya',cz:'Czechia',ro:'Romania',hu:'Hungary',gr:'Greece',
+    ua:'Ukraine',vn:'Vietnam',pk:'Pakistan',bd:'Bangladesh',lk:'Sri Lanka',
+    np:'Nepal',kh:'Cambodia',mm:'Myanmar',la:'Laos',mn:'Mongolia',kz:'Kazakhstan',
+    uz:'Uzbekistan',ge:'Georgia',am:'Armenia',az:'Azerbaijan',jo:'Jordan',
+    lb:'Lebanon',kw:'Kuwait',qa:'Qatar',bh:'Bahrain',om:'Oman',iq:'Iraq',
+    hr:'Croatia',bg:'Bulgaria',rs:'Serbia',si:'Slovenia',sk:'Slovakia',
+    ee:'Estonia',lv:'Latvia',lt:'Lithuania',lu:'Luxembourg',mt:'Malta',
+    cy:'Cyprus',is:'Iceland',gt:'Guatemala',hn:'Honduras',sv:'El Salvador',
+    ni:'Nicaragua',cr:'Costa Rica',pa:'Panama',do:'Dominican Republic',
+    jm:'Jamaica',tt:'Trinidad & Tobago',py:'Paraguay',uy:'Uruguay',
+    bo:'Bolivia',ec:'Ecuador',ve:'Venezuela',gy:'Guyana',sr:'Suriname',
+    bz:'Belize',bb:'Barbados',bs:'Bahamas',tz:'Tanzania',ug:'Uganda',
+    rw:'Rwanda',gh:'Ghana',sn:'Senegal',ci:'Ivory Coast',cm:'Cameroon',
+    dz:'Algeria',tn:'Tunisia',ma:'Morocco',ly:'Libya',sd:'Sudan'
+};
+
+function countryFlag(code) {
+    if (!code || code.length !== 2) return '';
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+function countryDisplayText(code) {
+    if (!code) return '—';
+    const flag = countryFlag(code);
+    const name = COUNTRY_NAMES[code.toLowerCase()] || code.toUpperCase();
+    return `${flag} <span class="ml-0.5">${name}</span>`;
+}
+
+// --- Multi-country selector ---
+const SUPPORTED_COUNTRIES = [
+    'us','gb','ca','au','de','fr','jp','kr','cn','br',
+    'in','mx','es','it','nl','se','no','dk','fi','pt',
+    'ru','tr','sa','ae','sg','th','id','ph','vn','tw'
+];
+let selectedCountries = (function() {
+    try {
+        const saved = localStorage.getItem('aso_countries');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length) return parsed;
+        }
+    } catch(e) {}
+    return ['us'];
+})();
+
+function getSelectedCountries() {
+    return selectedCountries.length ? selectedCountries : ['us'];
+}
+
+function initCountryDropdown() {
+    const btn = document.getElementById('country-btn');
+    const panel = document.getElementById('country-panel');
+    const btnText = document.getElementById('country-btn-text');
+    if (!btn || !panel) return;
+
+    // Build options
+    panel.innerHTML = SUPPORTED_COUNTRIES.map(code => {
+        const flag = countryFlag(code);
+        const name = COUNTRY_NAMES[code] || code.toUpperCase();
+        const checked = selectedCountries.includes(code) ? 'checked' : '';
+        return `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-sm text-white">
+            <input type="checkbox" value="${code}" ${checked} class="country-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0">
+            <span>${flag} ${name}</span>
+        </label>`;
+    }).join('');
+
+    // Toggle panel
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('hidden');
+    });
+
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+        if (!panel.contains(e.target) && e.target !== btn) {
+            panel.classList.add('hidden');
+        }
+    });
+
+    // Handle checkbox changes
+    panel.addEventListener('change', (e) => {
+        if (!e.target.classList.contains('country-cb')) return;
+        const allCbs = panel.querySelectorAll('.country-cb');
+        const checked = Array.from(allCbs).filter(cb => cb.checked);
+
+        // Enforce max 5
+        if (checked.length > 5) {
+            e.target.checked = false;
+            return;
+        }
+
+        selectedCountries = checked.map(cb => cb.value);
+        if (selectedCountries.length === 0) {
+            selectedCountries = ['us'];
+            const usCb = panel.querySelector('.country-cb[value="us"]');
+            if (usCb) usCb.checked = true;
+        }
+        try { localStorage.setItem('aso_countries', JSON.stringify(selectedCountries)); } catch(e) {}
+        updateCountryBtnText();
+    });
+
+    updateCountryBtnText();
+}
+
+function updateCountryBtnText() {
+    const btnText = document.getElementById('country-btn-text');
+    if (!btnText) return;
+    if (selectedCountries.length === 1) {
+        const c = selectedCountries[0];
+        btnText.textContent = `${countryFlag(c)} ${COUNTRY_NAMES[c] || c.toUpperCase()}`;
+    } else {
+        btnText.textContent = selectedCountries.map(c => countryFlag(c)).join(' ') + ` (${selectedCountries.length} countries)`;
+    }
+}
+
+initCountryDropdown();
+
+// --- Sortable Table ---
+let sortCol = -1;
+let sortAsc = true;
+
+function sortTable(colIndex, type, th) {
+    const tbody = document.getElementById('history-body');
+    if (!tbody) return;
+
+    const dataRows = [];
+    const allRows = Array.from(tbody.children);
+
+    for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        if (row.classList.contains('competitor-row')) continue;
+        const next = allRows[i + 1];
+        const compRow = (next && next.classList.contains('competitor-row')) ? next : null;
+        dataRows.push({ row, compRow });
+    }
+
+    if (sortCol === colIndex) {
+        sortAsc = !sortAsc;
+    } else {
+        sortCol = colIndex;
+        sortAsc = true;
+    }
+
+    document.querySelectorAll('.sort-indicator').forEach(s => s.textContent = '');
+    const indicator = th.querySelector('.sort-indicator');
+    if (indicator) indicator.textContent = sortAsc ? ' ▲' : ' ▼';
+
+    dataRows.sort((a, b) => {
+        const cellA = a.row.children[colIndex];
+        const cellB = b.row.children[colIndex];
+        let valA = (cellA ? cellA.textContent : '').trim();
+        let valB = (cellB ? cellB.textContent : '').trim();
+
+        if (type === 'num') {
+            const isEmptyA = !valA || valA === '—' || valA === 'N/A';
+            const isEmptyB = !valB || valB === '—' || valB === 'N/A';
+            if (isEmptyA && !isEmptyB) return 1;
+            if (!isEmptyA && isEmptyB) return -1;
+            if (isEmptyA && isEmptyB) return 0;
+            const numA = parseFloat(valA.replace(/[^0-9.\-]/g, '')) || 0;
+            const numB = parseFloat(valB.replace(/[^0-9.\-]/g, '')) || 0;
+            return sortAsc ? numA - numB : numB - numA;
+        } else if (type === 'date') {
+            const dA = new Date(valA) || 0;
+            const dB = new Date(valB) || 0;
+            return sortAsc ? dA - dB : dB - dA;
+        } else {
+            valA = valA.toLowerCase();
+            valB = valB.toLowerCase();
+            if (valA < valB) return sortAsc ? -1 : 1;
+            if (valA > valB) return sortAsc ? 1 : -1;
+            return 0;
+        }
+    });
+
+    dataRows.forEach(({ row, compRow }) => {
+        tbody.appendChild(row);
+        if (compRow) tbody.appendChild(compRow);
+    });
+}
+
+// --- Convert UTC dates to local timezone ---
+function convertDatesToLocal() {
+    document.querySelectorAll('#history-body time[datetime]').forEach(el => {
+        const d = new Date(el.getAttribute('datetime'));
+        if (!isNaN(d)) {
+            const month = d.toLocaleString('en', { month: 'short' });
+            const day = d.getDate().toString().padStart(2, '0');
+            const year = d.getFullYear();
+            el.textContent = `${month} ${day}, ${year}`;
+        }
+    });
+}
+convertDatesToLocal();
+
+// --- Auto-refresh history section after search ---
+async function refreshHistorySection() {
+    try {
+        // Build the same URL the page was loaded with (preserves ?app= filter)
+        const currentUrl = window.location.href.split('#')[0];
+        const resp = await fetch(currentUrl, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!resp.ok) return;
+
+        const html = await resp.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newHistory = doc.getElementById('history-section');
+        if (newHistory) {
+            const oldHistory = document.getElementById('history-section');
+            oldHistory.replaceWith(newHistory);
+            // Re-run date conversion on the new content
+            convertDatesToLocal();
+            // Execute inline scripts (e.g. download chart renderers)
+            // DOMParser doesn't execute <script> tags, so we re-create them
+            document.getElementById('history-section').querySelectorAll('script').forEach(oldScript => {
+                const newScript = document.createElement('script');
+                newScript.textContent = oldScript.textContent;
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+        }
+    } catch (e) {
+        // Silently fail — user can still manually reload
+        console.warn('History auto-refresh failed:', e);
+    }
+}
+
+// --- History table actions ---
+function toggleCompetitors(btn) {
+    const row = btn.closest('tr');
+    const competitorRow = row.nextElementSibling;
+    if (competitorRow && competitorRow.classList.contains('competitor-row')) {
+        competitorRow.classList.toggle('hidden');
+        btn.textContent = competitorRow.classList.contains('hidden')
+            ? btn.textContent.replace('▴', '▾')
+            : btn.textContent.replace('▾', '▴');
+    }
+}
+
+async function deleteResult(resultId, btn) {
+    const ok = await showConfirm('Delete this search result?', {type: 'danger', title: 'Delete Result', confirmLabel: 'Delete', confirmStyle: 'danger'});
+    if (!ok) return;
+    try {
+        const resp = await fetch(`/results/${resultId}/delete/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken},
+        });
+        if (resp.ok) location.reload();
+    } catch (e) {
+        showAlert('Failed to delete result.', {type: 'danger', title: 'Error'});
+    }
+}
+
+async function refreshKeyword(keywordId, btn) {
+    const row = btn.closest('tr');
+    row.classList.add('animate-pulse');
+    const country = getSelectedCountries()[0] || 'us';
+    try {
+        const resp = await fetch(`/keywords/${keywordId}/refresh/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `country=${encodeURIComponent(country)}`,
+        });
+        if (resp.ok) {
+            row.classList.remove('animate-pulse');
+            setTimeout(() => location.reload(), 300);
+        }
+    } catch (e) {
+        row.classList.remove('animate-pulse');
+        showAlert('Failed to refresh keyword.', {type: 'danger', title: 'Error'});
+    }
+}
+
+async function bulkRefresh() {
+    const resultCount = {{ total_count|default:"0" }};
+    const ok = await showConfirm(`Refresh all ${resultCount} keywords? This may take a while.`, {type: 'alert', title: 'Bulk Refresh'});
+    if (!ok) return;
+
+    const btn = document.getElementById('bulk-refresh-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Refreshing rankings...`;
+
+    try {
+        const resp = await fetch('{% url "aso:keywords_bulk_refresh" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({app_id: selectedApp, country: getSelectedCountries()[0] || 'us'}),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            await showAlert(`Refreshed ${data.refreshed} keywords.`, {type: 'success', title: 'Done'});
+            location.reload();
+        }
+    } catch (e) {
+        showAlert('Bulk refresh failed.', {type: 'danger', title: 'Error'});
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function bulkDelete() {
+    const scope = selectedApp ? 'for this app' : '(all)';
+    const ok = await showConfirm(`Delete all keywords ${scope} and their search results?`, {type: 'danger', title: 'Bulk Delete', confirmLabel: 'Delete All', confirmStyle: 'danger'});
+    if (!ok) return;
+
+    try {
+        const resp = await fetch('{% url "aso:keywords_bulk_delete" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({app_id: selectedApp}),
+        });
+        if (resp.ok) location.reload();
+    } catch (e) {
+        showAlert('Bulk delete failed.', {type: 'danger', title: 'Error'});
+    }
+}
+
+// --- Global render functions (must be before DOMContentLoaded so inline scripts can use them) ---
+window.renderDownloadChart = function(estimates, appRank) {
+    if (!estimates || !estimates.positions) return '';
+    const positions = estimates.positions;
+    const maxDl = Math.max(...positions.map(p => p.downloads_high), 1);
+    const dailySearches = estimates.daily_searches || 0;
+
+    const W = 680, H = 220, PAD_L = 55, PAD_R = 15, PAD_T = 25, PAD_B = 35;
+    const chartW = W - PAD_L - PAD_R;
+    const chartH = H - PAD_T - PAD_B;
+    const barW = Math.floor(chartW / 20) - 3;
+    const barGap = Math.floor(chartW / 20);
+
+    function fmt(n) {
+        if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'K';
+        return Math.round(n).toString();
+    }
+
+    let yTicks = [];
+    const yStep = maxDl / 4;
+    for (let i = 0; i <= 4; i++) {
+        const val = Math.round(yStep * i);
+        const y = PAD_T + chartH - (chartH * val / maxDl);
+        yTicks.push(`<text x="${PAD_L - 8}" y="${y + 3}" fill="rgba(148,163,184,0.7)" text-anchor="end" font-size="10">${fmt(val)}</text>`);
+        yTicks.push(`<line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3,3"/>`);
+    }
+
+    const zoneX1 = PAD_L, zoneX2 = PAD_L + 5 * barGap, zoneX3 = PAD_L + 10 * barGap, zoneX4 = PAD_L + 20 * barGap;
+    const zones = `
+        <rect x="${zoneX1}" y="${PAD_T}" width="${zoneX2 - zoneX1}" height="${chartH}" fill="rgba(139,92,246,0.06)" rx="4"/>
+        <rect x="${zoneX2}" y="${PAD_T}" width="${zoneX3 - zoneX2}" height="${chartH}" fill="rgba(59,130,246,0.04)" rx="4"/>
+        <rect x="${zoneX3}" y="${PAD_T}" width="${zoneX4 - zoneX3}" height="${chartH}" fill="rgba(100,116,139,0.03)" rx="4"/>`;
+    const zoneLabels = `
+        <text x="${(zoneX1 + zoneX2) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(167,139,250,0.6)" text-anchor="middle" font-weight="600">TOP 5</text>
+        <text x="${(zoneX2 + zoneX3) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(96,165,250,0.5)" text-anchor="middle" font-weight="600">TOP 6\u201310</text>
+        <text x="${(zoneX3 + zoneX4) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(148,163,184,0.4)" text-anchor="middle" font-weight="600">TOP 11\u201320</text>`;
+
+    let bars = '';
+    positions.forEach((p, i) => {
+        const x = PAD_L + i * barGap + (barGap - barW) / 2;
+        const hHigh = (p.downloads_high / maxDl) * chartH;
+        const hLow = (p.downloads_low / maxDl) * chartH;
+        const yHigh = PAD_T + chartH - hHigh;
+        const yLow = PAD_T + chartH - hLow;
+        const hRange = hHigh - hLow;
+        const isAppPos = appRank && appRank === p.pos;
+        let barColor, solidOpacity, rangeOpacity;
+        if (p.pos <= 5) { barColor = 'rgb(139,92,246)'; solidOpacity = isAppPos ? 1 : 0.8; rangeOpacity = isAppPos ? 0.35 : 0.22; }
+        else if (p.pos <= 10) { barColor = 'rgb(59,130,246)'; solidOpacity = isAppPos ? 1 : 0.7; rangeOpacity = isAppPos ? 0.3 : 0.18; }
+        else { barColor = 'rgb(100,116,139)'; solidOpacity = isAppPos ? 0.9 : 0.5; rangeOpacity = isAppPos ? 0.25 : 0.12; }
+
+        // Optimistic range segment (downloads_low → downloads_high) — lighter top portion
+        if (hRange > 0.5) {
+            bars += `<rect x="${x}" y="${yHigh}" width="${barW}" height="${hRange}" fill="${barColor}" opacity="${rangeOpacity}" rx="2"/>`;
+        }
+        // Conservative base segment (0 → downloads_low) — solid bottom portion
+        if (hLow > 0.5) {
+            bars += `<rect x="${x}" y="${yLow}" width="${barW}" height="${hLow}" fill="${barColor}" opacity="${solidOpacity}" rx="2"/>`;
+        }
+
+        // Download value label above bar for key positions
+        if (p.downloads_high > 0 && (p.pos <= 5 || p.pos === 10 || p.pos === 15 || p.pos === 20 || isAppPos)) {
+            const labelY = yHigh - (isAppPos ? 16 : 5);
+            bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}\u2013${fmt(p.downloads_high)}</text>`;
+        }
+
+        // "YOU" marker for your app position
+        if (isAppPos) {
+            bars += `<rect x="${x - 2}" y="${yHigh - 2}" width="${barW + 4}" height="${hHigh + 4}" rx="3" fill="none" stroke="rgb(250,204,21)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="700" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
+        }
+
+        // Position number on x-axis
+        bars += `<text x="${x + barW/2}" y="${PAD_T + chartH + 14}" font-size="9" fill="${isAppPos ? 'rgb(250,204,21)' : 'rgba(148,163,184,0.7)'}" ${isAppPos ? 'font-weight="bold"' : ''} text-anchor="middle">${p.pos}</text>`;
+    });
+
+    const axisLabels = `
+        <text x="${PAD_L + chartW/2}" y="${H - 2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle">Ranking Position</text>
+        <text x="12" y="${PAD_T + chartH/2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle" transform="rotate(-90, 12, ${PAD_T + chartH/2})">Downloads / day</text>`;
+
+    // Per-position tier cards (not averages — show what each position actually gets)
+    function posRow(pos, p, isBold) {
+        const cls = isBold ? 'font-semibold' : 'opacity-80';
+        return '<div style="display:flex;justify-content:space-between;font-size:0.75rem;"><span style="color:#94a3b8;">#' + pos + '</span><span class="' + cls + '">' + fmt(p.downloads_low) + '\u2013' + fmt(p.downloads_high) + '/day</span></div>';
+    }
+    const p1 = positions[0], p3 = positions[2], p5 = positions[4];
+    const p6 = positions[5], p8 = positions[7], p10 = positions[9];
+    const p11 = positions[10], p15 = positions[14], p20 = positions[19];
+
+    const tierCards = `
+        <div class="grid grid-cols-3 gap-3 mt-3">
+            <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5 — per position</p>
+                <div class="space-y-1 text-purple-300">
+                    ${posRow(1, p1, true)}
+                    ${posRow(3, p3, false)}
+                    ${posRow(5, p5, false)}
+                </div>
+            </div>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310 — per position</p>
+                <div class="space-y-1 text-blue-300">
+                    ${posRow(6, p6, true)}
+                    ${posRow(8, p8, false)}
+                    ${posRow(10, p10, false)}
+                </div>
+            </div>
+            <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
+                <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320 — per position</p>
+                <div class="space-y-1 text-slate-300">
+                    ${posRow(11, p11, true)}
+                    ${posRow(15, p15, false)}
+                    ${posRow(20, p20, false)}
+                </div>
+            </div>
+        </div>`;
+
+    return `
+        <div class="mb-4">
+            <div class="flex items-center gap-2 mb-2">
+                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Estimated Downloads by Position</h4>
+                <span class="relative group/dlinfo">
+                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on \u2248${fmt(dailySearches)} estimated daily searches for this keyword. The solid bar shows conservative downloads (35% conversion), the lighter extension shows optimistic downloads (55% conversion). Actual results vary by app quality and metadata.</span>
+                </span>
+            </div>
+            <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3 overflow-x-auto">
+                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:500px;max-width:700px">
+                    ${zones}
+                    ${zoneLabels}
+                    ${yTicks.join('')}
+                    ${bars}
+                    <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${PAD_T + chartH}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.1)"/>
+                    ${axisLabels}
+                </svg>
+                <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> Conservative</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Optimistic</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-2 rounded-sm" style="border:1px dashed rgb(250,204,21);"></span> Your Position</span>
+                </div>
+                ${tierCards}
+            </div>
+        </div>`;
+};
+
+window.renderRankingTiers = function(tiers) {
+    if (!tiers) return '';
+    const tierDefs = [
+        { key: 'top_5', label: 'Top 5' },
+        { key: 'top_10', label: 'Top 10' },
+        { key: 'top_20', label: 'Top 20' },
+    ];
+    const labelColors = {
+        'Very Easy': 'bg-emerald-500/20 text-emerald-400',
+        'Easy': 'bg-green-500/20 text-green-400',
+        'Moderate': 'bg-yellow-500/20 text-yellow-400',
+        'Hard': 'bg-orange-500/20 text-orange-400',
+        'Very Hard': 'bg-red-500/20 text-red-400',
+        'Extreme': 'bg-red-700/20 text-red-300',
+    };
+    function tierBarColor(score) {
+        if (score <= 15) return 'bg-emerald-500';
+        if (score <= 35) return 'bg-green-500';
+        if (score <= 55) return 'bg-yellow-500';
+        if (score <= 75) return 'bg-orange-500';
+        if (score <= 90) return 'bg-red-500';
+        return 'bg-red-700';
+    }
+    function tierTextColor(score) {
+        if (score <= 15) return 'text-emerald-400';
+        if (score <= 35) return 'text-green-400';
+        if (score <= 55) return 'text-yellow-400';
+        if (score <= 75) return 'text-orange-400';
+        if (score <= 90) return 'text-red-400';
+        return 'text-red-300';
+    }
+    let cards = '';
+    for (const { key, label } of tierDefs) {
+        const t = tiers[key];
+        if (!t) continue;
+        const score = t.tier_score || 0;
+        const lc = labelColors[t.label] || 'bg-slate-500/20 text-slate-400';
+        const barColor = tierBarColor(score);
+        const txtColor = tierTextColor(score);
+        const highlightItems = (t.highlights || []).map(h =>
+            `<li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">\u2022</span><span>${h}</span></li>`
+        ).join('');
+        cards += `
+            <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-white">${label}</span>
+                        <span class="text-lg font-bold ${txtColor}">${score}</span>
+                        <span class="text-slate-600 text-xs">/100</span>
+                    </div>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold ${lc}">${t.label}</span>
+                </div>
+                <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
+                    <div class="h-1.5 rounded-full ${barColor}" style="width:${Math.min(score,100)}%"></div>
+                </div>
+                <ul class="space-y-1.5 text-xs text-slate-400">${highlightItems}</ul>
+            </div>`;
+    }
+    if (!cards) return '';
+    return `
+        <div class="mb-4">
+            <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">How Hard Is It to Rank?</h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">${cards}</div>
+        </div>`;
+};
+
+// --- Search Form & Result Cards ---
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('search-form');
+    const resultsContainer = document.getElementById('results-container');
+    const loadingState = document.getElementById('loading-state');
+    const loadingText = document.getElementById('loading-text');
+    const searchBtn = document.getElementById('search-btn');
+    const globalApp = document.getElementById('global-app');
+
+    // App filter: reload page with ?app= param to filter history
+    // Restore app selection from localStorage if no ?app= param
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('app')) {
+        const savedApp = localStorage.getItem('aso_app');
+        if (savedApp && globalApp.querySelector(`option[value="${savedApp}"]`)) {
+            globalApp.value = savedApp;
+            // Redirect to apply the filter
+            window.location.href = `?app=${savedApp}`;
+            return;
+        }
+    }
+    globalApp.addEventListener('change', function() {
+        const appId = this.value;
+        try {
+            if (appId) {
+                localStorage.setItem('aso_app', appId);
+            } else {
+                localStorage.removeItem('aso_app');
+            }
+        } catch(e) {}
+        window.location.href = appId ? `?app=${appId}` : '{% url "aso:dashboard" %}';
+    });
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const keywords = formData.get('keywords');
+        if (!keywords || !keywords.trim()) return;
+
+        // Append shared filter values
+        formData.set('app_id', globalApp.value);
+        formData.set('countries', getSelectedCountries().join(','));
+
+        resultsContainer.classList.add('hidden');
+        resultsContainer.innerHTML = '';
+        loadingState.classList.remove('hidden');
+        window.searchInProgress = true;
+
+        // Disable button with spinner
+        searchBtn.disabled = true;
+        searchBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        const searchBtnOriginalHTML = searchBtn.innerHTML;
+        searchBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Searching…`;
+
+        const keywordList = keywords.split(',').map(k => k.trim()).filter(k => k);
+        const countryCount = getSelectedCountries().length;
+        const totalCalls = keywordList.length * countryCount;
+        loadingText.textContent = `Analyzing ${keywordList.length} keyword${keywordList.length > 1 ? 's' : ''} × ${countryCount} countr${countryCount > 1 ? 'ies' : 'y'}... (~${totalCalls * 2}s)`;
+
+        try {
+            const response = await fetch('{% url "aso:search" %}', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Search failed');
+            }
+
+            const data = await response.json();
+            loadingState.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+
+            // Show warning for skipped keywords
+            if (data.warning) {
+                const warn = document.createElement('div');
+                warn.className = 'bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-3 text-yellow-200 text-sm flex items-start gap-2';
+                warn.innerHTML = `<span class="text-yellow-400 flex-shrink-0">⚠️</span><span>${data.warning}</span>`;
+                resultsContainer.appendChild(warn);
+            }
+
+            const countries = data.countries || [];
+            const resultsByCountry = data.results_by_country || {};
+
+            // Show opportunity ranking when multiple countries
+            if (data.opportunity_ranking && data.opportunity_ranking.length > 0) {
+                resultsContainer.appendChild(renderOpportunityRanking(data.opportunity_ranking));
+            }
+
+            // Show country tabs when >1 country, else show results directly
+            if (countries.length > 1) {
+                resultsContainer.appendChild(renderCountryTabs(countries, resultsByCountry));
+            } else {
+                const singleCountry = countries[0] || 'us';
+                const results = resultsByCountry[singleCountry] || [];
+                results.forEach(result => {
+                    resultsContainer.appendChild(createResultCard(result));
+                });
+            }
+
+            const hasResults = countries.some(c => (resultsByCountry[c] || []).length > 0);
+            if (hasResults) {
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                refreshHistorySection();
+            }
+
+        } catch (error) {
+            loadingState.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+            resultsContainer.innerHTML = `
+                <div class="bg-red-900/30 border border-red-500/30 rounded-xl p-4 text-red-200">
+                    <strong>Error:</strong> ${error.message}
+                </div>`;
+        }
+
+        // Re-enable button
+        window.searchInProgress = false;
+        searchBtn.disabled = false;
+        searchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        searchBtn.innerHTML = searchBtnOriginalHTML;
+    });
+
+    function getAppRankDisplay(result) {
+        if (!result.app_name) return '';
+
+        if (result.app_rank !== null && result.app_rank !== undefined) {
+            const rankNum = result.app_rank;
+            let rankColor, rankBg, rankLabel;
+            if (rankNum <= 10) {
+                rankColor = 'text-green-400'; rankBg = 'bg-green-900/30 border-green-500/30'; rankLabel = 'Excellent';
+            } else if (rankNum <= 30) {
+                rankColor = 'text-emerald-400'; rankBg = 'bg-emerald-900/20 border-emerald-500/20'; rankLabel = 'Strong';
+            } else if (rankNum <= 100) {
+                rankColor = 'text-yellow-400'; rankBg = 'bg-yellow-900/20 border-yellow-500/20'; rankLabel = 'Moderate';
+            } else {
+                rankColor = 'text-orange-400'; rankBg = 'bg-orange-900/20 border-orange-500/20'; rankLabel = 'Low';
+            }
+
+            const iconHtml = result.app_icon
+                ? `<img src="${result.app_icon}" alt="" class="w-6 h-6 rounded-md flex-shrink-0">`
+                : '';
+
+            return `
+                <div class="${rankBg} border rounded-lg p-2.5">
+                    <p class="text-xs text-slate-400 mb-1 uppercase tracking-wide">Your App Rank</p>
+                    <div class="flex items-center gap-2">
+                        ${iconHtml}
+                        <div>
+                            <span class="text-2xl font-bold ${rankColor}">#${rankNum}</span>
+                            <span class="text-slate-500 text-xs ml-1">${rankLabel}</span>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-[10px] mt-1">${result.app_name}</p>
+                </div>`;
+        } else {
+            return `
+                <div class="bg-slate-800/50 border border-white/5 rounded-lg p-2.5">
+                    <p class="text-xs text-slate-400 mb-1 uppercase tracking-wide">Your App Rank</p>
+                    <p class="text-sm text-slate-500">Not in top 200</p>
+                    <p class="text-slate-600 text-[10px] mt-1">${result.app_name}</p>
+                </div>`;
+        }
+    }
+
+    function getTargetingAdvice(result) {
+        const diff = result.difficulty_score;
+        const pop = result.popularity_score;
+        let icon, color, title, advice;
+
+        if (pop !== null) {
+            if (pop >= 40 && diff <= 40) { icon = '🎯'; color = 'green'; title = 'Sweet Spot'; advice = 'High popularity + low difficulty — ideal keyword to target with good ASO.'; }
+            else if (pop >= 40 && diff <= 60) { icon = '✅'; color = 'green'; title = 'Good Target'; advice = 'Solid popularity with manageable difficulty.'; }
+            else if (pop >= 40 && diff > 60) { icon = '⚔️'; color = 'yellow'; title = 'Worth Competing'; advice = 'High demand but tough competition. Consider long-tail variants.'; }
+            else if (pop >= 30 && pop < 40 && diff <= 40) { icon = '💎'; color = 'blue'; title = 'Hidden Gem'; advice = 'Moderate volume with little competition. Good for niche apps.'; }
+            else if (pop >= 30 && pop < 40 && diff <= 60) { icon = '👍'; color = 'slate'; title = 'Decent Option'; advice = 'Moderate demand and competition. Can work as a supporting keyword.'; }
+            else if (pop < 30 && diff <= 30) { icon = '🔍'; color = 'slate'; title = 'Low Volume'; advice = 'Easy to rank but few people search for this. Best as a supporting keyword.'; }
+            else if (pop < 30 && diff > 30) { icon = '🚫'; color = 'red'; title = 'Avoid'; advice = 'Low search volume with notable competition.'; }
+            else { icon = '⚔️'; color = 'yellow'; title = 'Challenging'; advice = 'Strong competition. Focus on long-tail variants.'; }
+        } else {
+            if (diff <= 25) { icon = '🟢'; color = 'green'; title = 'Easy to Rank'; advice = 'Low competition — a well-optimized app can rank quickly.'; }
+            else if (diff <= 50) { icon = '🟡'; color = 'yellow'; title = 'Moderate Competition'; advice = 'Achievable with strong ASO.'; }
+            else if (diff <= 75) { icon = '🟠'; color = 'orange'; title = 'Competitive'; advice = 'Consider long-tail variants.'; }
+            else { icon = '🔴'; color = 'red'; title = 'Very Competitive'; advice = 'Dominated by established apps. Target easier keywords first.'; }
+        }
+
+        const colorMap = {
+            green: 'bg-green-900/20 border-green-500/20 text-green-300',
+            yellow: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300',
+            blue: 'bg-blue-900/20 border-blue-500/20 text-blue-300',
+            orange: 'bg-orange-900/20 border-orange-500/20 text-orange-300',
+            red: 'bg-red-900/20 border-red-500/20 text-red-300',
+            slate: 'bg-slate-800 border-white/10 text-slate-300',
+        };
+
+        return `
+            <div class="${colorMap[color]} border rounded-lg p-2.5">
+                <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
+                <p class="text-xs font-medium">${icon} ${title}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${advice}</p>
+            </div>`;
+    }
+
+    // renderDownloadChart and renderRankingTiers are now defined before DOMContentLoaded (above)
+
+    function renderOpportunityRanking(ranking) {
+        const div = document.createElement('div');
+        div.className = 'bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden';
+        let rows = '';
+        ranking.forEach(item => {
+            const best = item.best_country;
+            const bestData = item.countries[best];
+            const cells = Object.entries(item.countries).map(([c, d]) => {
+                const isBest = c === best;
+                const cls = isBest ? 'text-green-400 font-bold' : 'text-slate-400';
+                return `<td class="px-3 py-1.5 text-center text-xs ${cls}">${countryFlag(c)} ${d.opportunity}</td>`;
+            }).join('');
+            rows += `<tr class="border-b border-white/5 hover:bg-white/5"><td class="px-3 py-1.5 text-white text-sm font-medium">${item.keyword}</td><td class="px-3 py-1.5 text-center"><span class="text-green-400 font-bold text-sm">${countryFlag(best)} ${COUNTRY_NAMES[best] || best.toUpperCase()}</span><span class="text-slate-500 text-xs ml-1">(${item.best_score})</span></td>${cells}</tr>`;
+        });
+        const countryHeaders = Object.keys(ranking[0].countries).map(c =>
+            `<th class="px-3 py-2 text-center text-xs font-medium text-slate-400">${countryFlag(c)} ${c.toUpperCase()}</th>`
+        ).join('');
+        div.innerHTML = `
+            <div class="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+                <span class="text-lg">🏆</span>
+                <div>
+                    <h3 class="text-sm font-semibold text-white">Country Opportunity Comparison</h3>
+                    <p class="text-xs text-slate-500">Opportunity = Popularity × (100 − Difficulty) / 100. Higher is better.</p>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead><tr class="border-b border-white/10">
+                        <th class="px-3 py-2 text-left text-xs font-medium text-slate-400">Keyword</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-slate-400">Best Country</th>
+                        ${countryHeaders}
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        return div;
+    }
+
+    function renderCountryTabs(countries, resultsByCountry) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'space-y-4';
+
+        // Tab bar
+        const tabBar = document.createElement('div');
+        tabBar.className = 'flex gap-1 bg-[#1e293b] border border-white/10 rounded-xl p-1 overflow-x-auto';
+        countries.forEach((code, i) => {
+            const btn = document.createElement('button');
+            btn.className = `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${i === 0 ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`;
+            btn.textContent = `${countryFlag(code)} ${COUNTRY_NAMES[code] || code.toUpperCase()} (${(resultsByCountry[code] || []).length})`;
+            btn.addEventListener('click', () => {
+                tabBar.querySelectorAll('button').forEach(b => {
+                    b.className = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-slate-400 hover:text-white hover:bg-white/5';
+                });
+                btn.className = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-purple-600 text-white';
+                panes.forEach((p, j) => p.classList.toggle('hidden', j !== i));
+            });
+            tabBar.appendChild(btn);
+        });
+        wrapper.appendChild(tabBar);
+
+        // Tab panes
+        const panes = [];
+        countries.forEach((code, i) => {
+            const pane = document.createElement('div');
+            pane.className = `space-y-4 ${i > 0 ? 'hidden' : ''}`;
+            const results = resultsByCountry[code] || [];
+            results.forEach(result => {
+                pane.appendChild(createResultCard(result));
+            });
+            if (results.length === 0) {
+                pane.innerHTML = '<p class="text-slate-500 text-sm text-center py-4">No results for this country.</p>';
+            }
+            panes.push(pane);
+            wrapper.appendChild(pane);
+        });
+
+        return wrapper;
+    }
+
+    function createResultCard(result) {
+        const card = document.createElement('div');
+        card.className = 'bg-[#1e293b] border border-white/10 rounded-xl p-4 animate-fade-in';
+
+        const popularityDisplay = result.popularity_score !== null
+            ? `<span class="text-2xl font-bold text-purple-400">${result.popularity_score}</span><span class="text-slate-500 text-xs ml-1">/ 100</span>`
+            : `<span class="text-slate-500 text-xs">Not available</span>`;
+
+        const difficultyColorClass = result.difficulty_color;
+        const overrideNote = (result.difficulty_breakdown.override_reason && result.difficulty_breakdown.raw_total !== result.difficulty_score)
+            ? `<p class="text-slate-600 text-[10px] mt-0.5">Raw: <s>${result.difficulty_breakdown.raw_total}</s> → adjusted</p>`
+            : '';
+
+        function highlightKeyword(title, keyword) {
+            if (!keyword || !title) return title || '';
+            const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const words = keyword.trim().split(/\s+/).filter(Boolean);
+            if (!words.length) return escHtml(title);
+
+            const titleLower = title.toLowerCase();
+            const kwLower = keyword.trim().toLowerCase();
+            const present = words.filter(w => titleLower.includes(w.toLowerCase()));
+            const hasExactPhrase = words.length > 1 && titleLower.includes(kwLower);
+            const allPresent = present.length === words.length;
+
+            // Tier colours: exact phrase → green, all scattered → amber, partial → slate
+            const CLS_EXACT = 'bg-green-500/25 text-green-300 rounded px-0.5';
+            const CLS_ALL   = 'bg-amber-500/25 text-amber-300 rounded px-0.5';
+            const CLS_PART  = 'bg-slate-400/20 text-slate-300 rounded px-0.5';
+
+            if (hasExactPhrase) {
+                const re = new RegExp(`(${esc(keyword.trim())})`, 'gi');
+                return title.replace(re, `<mark class="${CLS_EXACT}">$1</mark>`);
+            }
+            if (!present.length) return escHtml(title);
+
+            let cls;
+            if (words.length === 1) cls = CLS_EXACT;
+            else if (allPresent) cls = CLS_ALL;
+            else cls = CLS_PART;
+
+            const re = new RegExp(`(${present.map(w => esc(w)).join('|')})`, 'gi');
+            return title.replace(re, `<mark class="${cls}">$1</mark>`);
+        }
+
+        let competitorsRows = '';
+        result.competitors.forEach((app, i) => {
+            const stars = app.averageUserRating ? '⭐ ' + app.averageUserRating.toFixed(1) : '—';
+            const ratings = app.userRatingCount ? app.userRatingCount.toLocaleString() : '0';
+            const releaseDate = app.releaseDate ? new Date(app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
+            const updatedDate = (app.currentVersionReleaseDate || app.releaseDate) ? new Date(app.currentVersionReleaseDate || app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
+            const highlightedName = highlightKeyword(app.trackName, result.keyword);
+            competitorsRows += `
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td class="px-2 py-2 text-slate-500 text-sm whitespace-nowrap">${i + 1}</td>
+                    <td class="px-2 py-2">
+                        <div class="flex items-center gap-2">
+                            <img src="${app.artworkUrl100}" alt="" class="w-7 h-7 rounded-lg flex-shrink-0" onerror="this.style.display='none'">
+                            <div class="min-w-0">
+                                <a href="${app.trackViewUrl}" target="_blank" rel="noopener"
+                                   class="text-white text-sm font-medium hover:text-purple-400 transition-colors">${highlightedName}</a>
+                                <p class="text-slate-500 text-xs">${app.sellerName}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-2 py-2 text-sm text-slate-300 whitespace-nowrap">${stars}</td>
+                    <td class="px-2 py-2 text-sm text-slate-300 whitespace-nowrap">${ratings}</td>
+                    <td class="px-2 py-2 text-sm text-slate-400 whitespace-nowrap">${app.primaryGenreName}</td>
+                    <td class="px-2 py-2 text-sm text-slate-400 whitespace-nowrap">${app.formattedPrice}</td>
+                    <td class="px-2 py-2 text-sm text-slate-500 whitespace-nowrap">${releaseDate}</td>
+                    <td class="px-2 py-2 text-sm text-slate-500 whitespace-nowrap">${updatedDate}</td>
+                </tr>`;
+        });
+
+        const rankingTiersHtml = window.renderRankingTiers(result.difficulty_breakdown.ranking_tiers);
+        const downloadChartHtml = window.renderDownloadChart(
+            result.difficulty_breakdown.download_estimates,
+            result.app_rank
+        );
+
+        card.innerHTML = `
+            <div class="flex flex-col lg:flex-row gap-4">
+                <div class="flex gap-4 lg:w-1/3">
+                    <div class="flex-1">
+                        <h3 class="text-base font-bold text-white mb-1">${result.keyword}</h3>
+                        ${result.country ? `<p class="text-xs text-slate-500 mb-2">${countryFlag(result.country)} ${COUNTRY_NAMES[result.country] || result.country.toUpperCase()}</p>` : ''}
+                        <div class="space-y-2">
+                            <div class="bg-slate-800 rounded-lg p-2.5">
+                                <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide inline-flex items-center gap-1">Popularity
+                                    <span class="relative group/ptip">
+                                        <svg class="w-3 h-3 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/ptip:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal">Estimated from competitor data (5–100). Reflects relative search volume for this keyword. Higher = more people searching.</span>
+                                    </span>
+                                </p>
+                                ${popularityDisplay}
+                            </div>
+                            <div class="bg-slate-800 rounded-lg p-2.5">
+                                <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide inline-flex items-center gap-1">Overall Difficulty
+                                    <span class="relative group/dtip">
+                                        <svg class="w-3 h-3 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dtip:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal">Weighted score across all competitors: rating volume, growth speed, brand strength, title relevance, ratings, maturity &amp; diversity.</span>
+                                    </span>
+                                </p>
+                                <span class="text-2xl font-bold ${difficultyColorClass}">${result.difficulty_score}</span>
+                                <span class="text-slate-500 text-xs ml-1">/ 100</span>
+                                <p class="${difficultyColorClass} text-xs mt-0.5 font-medium">${result.difficulty_label}</p>
+                                ${overrideNote}
+                            </div>
+                            ${getAppRankDisplay(result)}
+                            ${getTargetingAdvice(result)}
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-x-auto">
+                    ${rankingTiersHtml}
+                    ${downloadChartHtml}
+                    <h4 class="text-xs font-medium text-slate-400 mb-2">Top ${result.competitors.length} Competitors</h4>
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-white/10">
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">#</th>
+                                <th class="px-2 py-2 text-xs text-slate-500">App</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Rating</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Ratings</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Genre</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Price</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Released</th>
+                                <th class="px-2 py-2 text-xs text-slate-500 whitespace-nowrap">Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>${competitorsRows}</tbody>
+                    </table>
+                </div>
+            </div>
+            <details class="mt-3">
+                <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">
+                    Difficulty breakdown &amp; insights
+                </summary>
+                <div class="mt-2 space-y-3">
+                    ${(result.difficulty_breakdown.insights && result.difficulty_breakdown.insights.length > 0) ? `
+                    <div class="space-y-1.5">
+                        ${result.difficulty_breakdown.insights.map(insight => `
+                            <div class="flex items-start gap-2 text-xs ${insight.type === 'barrier' ? 'text-red-400' : insight.type === 'opportunity' ? 'text-green-400' : 'text-slate-400'}">
+                                <span class="flex-shrink-0">${insight.icon}</span>
+                                <span>${insight.text}</span>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
+                    ${(result.difficulty_breakdown.opportunity_signals && result.difficulty_breakdown.opportunity_signals.length > 0) ? `
+                    <div class="bg-green-900/20 border border-green-500/20 rounded-lg p-3">
+                        <p class="text-xs font-medium text-green-400 mb-2">Opportunity Signals</p>
+                        <div class="space-y-2">
+                            ${result.difficulty_breakdown.opportunity_signals.map(sig => `
+                                <div class="flex items-start gap-2 text-xs">
+                                    <span class="flex-shrink-0">${sig.icon}</span>
+                                    <div>
+                                        <span class="text-green-300 font-medium">${sig.signal}</span>
+                                        <span class="text-slate-500 ml-1">(${sig.strength})</span>
+                                        <p class="text-slate-400 mt-0.5">${sig.detail}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+                        ${[{k:'rating_volume',    label:'Rating count',        w:30, tip:'Measures total rating count of top competitors. More ratings = harder to outrank.'},
+                           {k:'review_velocity',   label:'Rating growth speed', w:10, tip:'How fast competitors gain new ratings. Fast growth means they are actively maintained and harder to compete with.'},
+                           {k:'dominant_players',   label:'Big-brand presence',  w:20, tip:'Whether big-name apps dominate the results. Big brands are harder to displace.'},
+                           {k:'title_relevance',    label:'Keyword in titles',   w:10, tip:'How many competitor apps use this exact keyword in their title. More usage = more competitive.'},
+                           {k:'rating_quality',     label:'Competitor ratings',  w:10, tip:'Average star ratings of competitors. Highly-rated apps are harder to displace.'},
+                           {k:'market_age',         label:'Market maturity',     w:10, tip:'How long competitors have been on the App Store. Older apps are more entrenched.'},
+                           {k:'publisher_diversity', label:'Publisher variety',   w:10, tip:'Whether many different publishers compete, or a few dominate. More variety = healthier market.'}]
+                          .map(({k,label,w,tip}) => {
+                            const val = result.difficulty_breakdown[k];
+                            const lvl = val <= 25 ? 'Low' : val <= 50 ? 'Medium' : val <= 75 ? 'High' : 'Very High';
+                            const barColor = val <= 25 ? 'bg-green-500' : val <= 50 ? 'bg-yellow-500' : val <= 75 ? 'bg-orange-500' : 'bg-red-500';
+                            const textColor = val <= 25 ? 'text-green-400' : val <= 50 ? 'text-yellow-400' : val <= 75 ? 'text-orange-400' : 'text-red-400';
+                            const fullTip = `${tip}<br><br><strong>Score: ${Math.round(val)}/100</strong> — higher means harder competition. This factor contributes <strong>${w}%</strong> to the overall difficulty score.`;
+                            return `<div class="bg-slate-800 rounded p-2 group/tip relative cursor-help">
+                                <p class="text-slate-500">${label}</p>
+                                <p class="${textColor} font-semibold mt-0.5">${lvl}</p>
+                                <div class="w-full bg-slate-700 rounded-full h-1 mt-1">
+                                    <div class="${barColor} h-1 rounded-full" style="width:${Math.min(val,100)}%"></div>
+                                </div>
+                                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-lg">${fullTip}</div>
+                            </div>`;
+                          }).join('')}
+                    </div>
+                </div>
+            </details>`;
+
+        return card;
+    }
+});
+</script>
+{% endblock %}
