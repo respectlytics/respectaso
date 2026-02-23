@@ -55,6 +55,9 @@ docker compose up -d
 
 Visit **[http://localhost](http://localhost)** in your browser — that's it.
 
+> **Tip:** First startup takes a few seconds (database migration + static files).
+> Run `docker compose logs -f` to see the "RespectASO is ready!" message, then open your browser.
+
 On first launch, the tool automatically:
 - Generates a secure Django secret key
 - Runs database migrations
