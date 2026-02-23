@@ -48,15 +48,12 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 ```bash
 git clone https://github.com/respectlytics/respectaso.git
 cd respectaso
-docker compose up -d
+docker compose up
 ```
 
-### 2. Open the dashboard
+When you see **"RespectASO is ready! → http://localhost"** in the terminal, open that URL in your browser.
 
-Visit **[http://localhost](http://localhost)** in your browser — that's it.
-
-> **Tip:** First startup takes a few seconds (database migration + static files).
-> Run `docker compose logs -f` to see the "RespectASO is ready!" message, then open your browser.
+> **Want to run in the background?** Use `docker compose up -d`, then `docker compose logs -f` to see the ready message.
 
 On first launch, the tool automatically:
 - Generates a secure Django secret key
