@@ -238,7 +238,7 @@
                                 {% endif %}
                             </td>
                             {% if show_rank %}
-                            <td class="px-3 py-2 text-center text-sm font-semibold">
+                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.app_rank|default:'999999' }}">
                                 {% if result.app_rank %}
                                 <span class="text-white">#{{ result.app_rank }}</span>{{ result.rank_delta|trend_arrow }}
                                 {% else %}
@@ -246,7 +246,7 @@
                                 {% endif %}
                             </td>
                             {% endif %}
-                            <td class="px-3 py-2 text-center text-sm font-semibold">
+                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.popularity_score|default:'-1' }}">
                                 {% if result.popularity_score is not None %}
                                 <span class="text-purple-400 relative group/pop cursor-help">{{ result.popularity_score }}
                                     <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/pop:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal">Estimated from competitor data (5–100). Reflects relative search volume for this keyword. Higher = more people searching. <a href="{% url 'aso:methodology' %}" class="text-purple-400 hover:underline">How we estimate this →</a></span>
@@ -255,7 +255,7 @@
                                 <span class="text-slate-500 text-xs font-normal">N/A</span>
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 text-center">
+                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_score|default:'-1' }}">
                                 <div class="text-sm font-semibold">
                                     <span class="{{ result.difficulty_color }}">{{ result.difficulty_score }}</span>{{ result.difficulty_delta|trend_arrow:"lower_better" }}
                                 </div>
@@ -735,13 +735,15 @@ function sortTable(colIndex, type, th) {
         let valB = (cellB ? cellB.textContent : '').trim();
 
         if (type === 'num') {
-            const isEmptyA = !valA || valA === '—' || valA === 'N/A';
-            const isEmptyB = !valB || valB === '—' || valB === 'N/A';
+            const rawA = cellA && cellA.dataset.sortValue !== undefined ? cellA.dataset.sortValue : valA;
+            const rawB = cellB && cellB.dataset.sortValue !== undefined ? cellB.dataset.sortValue : valB;
+            const isEmptyA = !rawA || rawA === '—' || rawA === 'N/A';
+            const isEmptyB = !rawB || rawB === '—' || rawB === 'N/A';
             if (isEmptyA && !isEmptyB) return 1;
             if (!isEmptyA && isEmptyB) return -1;
             if (isEmptyA && isEmptyB) return 0;
-            const numA = parseFloat(valA.replace(/[^0-9.\-]/g, '')) || 0;
-            const numB = parseFloat(valB.replace(/[^0-9.\-]/g, '')) || 0;
+            const numA = parseFloat(rawA.replace(/[^0-9.\-]/g, '')) || 0;
+            const numB = parseFloat(rawB.replace(/[^0-9.\-]/g, '')) || 0;
             return sortAsc ? numA - numB : numB - numA;
         } else if (type === 'date') {
             const dA = new Date(valA) || 0;
