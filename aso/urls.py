@@ -9,7 +9,6 @@ urlpatterns = [
     path("methodology/", views.methodology_view, name="methodology"),
     path("setup/", views.setup_view, name="setup"),
     path("search/", views.search_view, name="search"),
-    path("history/", views.history_view, name="history"),
     path("opportunity/", views.opportunity_view, name="opportunity"),
     path("opportunity/search/", views.opportunity_search_view, name="opportunity_search"),
     path("opportunity/save/", views.opportunity_save_view, name="opportunity_save"),

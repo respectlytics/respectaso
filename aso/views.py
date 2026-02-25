@@ -44,7 +44,7 @@ def dashboard_view(request):
     apps = App.objects.all()
     search_form = KeywordSearchForm()
 
-    # --- History table (merged from history_view) ---
+    # --- History table ---
     app_id = request.GET.get("app")
     results_qs = SearchResult.objects.select_related("keyword", "keyword__app")
 
@@ -262,15 +262,6 @@ def search_view(request):
             + ". Use Refresh to update them."
         )
     return JsonResponse(response_data)
-
-
-def history_view(request):
-    """Redirect to dashboard — history is now merged into the main page."""
-    params = request.GET.urlencode()
-    url = "/"
-    if params:
-        url += f"?{params}"
-    return redirect(url)
 
 
 def opportunity_view(request):
