@@ -21,4 +21,5 @@ urlpatterns = [
     path("keywords/bulk-delete/", views.keywords_bulk_delete_view, name="keywords_bulk_delete"),
     path("keywords/<int:keyword_id>/refresh/", views.keyword_refresh_view, name="keyword_refresh"),
     path("keywords/bulk-refresh/", views.keywords_bulk_refresh_view, name="keywords_bulk_refresh"),
+    path("version-check/", views.version_check_view, name="version_check"),
 ]

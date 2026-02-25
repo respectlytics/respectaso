@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Current version — update on each release
+VERSION = "1.0.3"
+
 # Load .env from persistent data volume (auto-generated SECRET_KEY lives there)
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)

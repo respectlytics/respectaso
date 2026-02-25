@@ -3,7 +3,9 @@ import json
 import logging
 import re
 import time
+import urllib.request
 
+from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -760,3 +762,29 @@ def keywords_bulk_refresh_view(request):
         })
 
     return JsonResponse({"success": True, "results": results, "refreshed": len(results)})
+
+
+def version_check_view(request):
+    """Check GitHub for a newer release. Returns JSON with update info."""
+    current = settings.VERSION
+    try:
+        url = "https://api.github.com/repos/respectlytics/respectaso/releases/latest"
+        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.v3+json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        latest = data.get("tag_name", "").lstrip("v")
+        if not latest:
+            return JsonResponse({"update_available": False, "current": current})
+        # Simple semver comparison
+        current_parts = [int(x) for x in current.split(".")]
+        latest_parts = [int(x) for x in latest.split(".")]
+        update_available = latest_parts > current_parts
+        return JsonResponse({
+            "update_available": update_available,
+            "current": current,
+            "latest": latest,
+            "release_url": data.get("html_url", ""),
+        })
+    except Exception:
+        # Network error, GitHub down, etc. — silently fail
+        return JsonResponse({"update_available": False, "current": current})

@@ -6,6 +6,27 @@
 
 {% block content %}
 <div class="space-y-5">
+    <!-- Update Banner (populated by JS) -->
+    <div id="update-banner" class="hidden animate-fade-in">
+        <div class="bg-purple-900/30 border border-purple-500/30 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </div>
+                <p class="text-sm text-slate-300">
+                    <span class="text-purple-300 font-medium">RespectASO <span id="update-version"></span></span> is available
+                    <span class="text-slate-500">(you're on <span id="current-version"></span>)</span>
+                </p>
+            </div>
+            <a href="{% url 'aso:setup' %}#updating"
+               class="flex-shrink-0 text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
+                Update instructions →
+            </a>
+        </div>
+    </div>
+
     <!-- Header -->
     <div>
         <h1 class="text-xl font-bold text-white">Keyword Research</h1>
@@ -1528,5 +1549,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return card;
     }
 });
+
+// --- Version update check ---
+(function() {
+    fetch('{% url "aso:version_check" %}')
+        .then(r => r.json())
+        .then(data => {
+            if (data.update_available) {
+                document.getElementById('update-version').textContent = 'v' + data.latest;
+                document.getElementById('current-version').textContent = 'v' + data.current;
+                document.getElementById('update-banner').classList.remove('hidden');
+            }
+        })
+        .catch(() => {}); // Silently fail
+})();
 </script>
 {% endblock %}
