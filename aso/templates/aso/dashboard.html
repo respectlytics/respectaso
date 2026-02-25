@@ -238,25 +238,27 @@
                                 {% endif %}
                             </td>
                             {% if show_rank %}
-                            <td class="px-3 py-2 text-center">
+                            <td class="px-3 py-2 text-center text-sm font-semibold">
                                 {% if result.app_rank %}
-                                <span class="text-white text-sm font-semibold">#{{ result.app_rank }}</span>{{ result.rank_delta|trend_arrow }}
+                                <span class="text-white">#{{ result.app_rank }}</span>{{ result.rank_delta|trend_arrow }}
                                 {% else %}
-                                <span class="text-slate-500 text-xs" title="Not in top 200">—</span>
+                                <span class="text-slate-500 text-xs font-normal" title="Not in top 200">—</span>
                                 {% endif %}
                             </td>
                             {% endif %}
-                            <td class="px-3 py-2 text-center">
+                            <td class="px-3 py-2 text-center text-sm font-semibold">
                                 {% if result.popularity_score is not None %}
-                                <span class="text-purple-400 text-sm font-semibold relative group/pop cursor-help">{{ result.popularity_score }}{{ result.popularity_delta|trend_arrow }}
+                                <span class="text-purple-400 relative group/pop cursor-help">{{ result.popularity_score }}
                                     <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/pop:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal">Estimated from competitor data (5–100). Reflects relative search volume for this keyword. Higher = more people searching. <a href="{% url 'aso:methodology' %}" class="text-purple-400 hover:underline">How we estimate this →</a></span>
-                                </span>
+                                </span>{{ result.popularity_delta|trend_arrow }}
                                 {% else %}
-                                <span class="text-slate-500 text-xs">N/A</span>
+                                <span class="text-slate-500 text-xs font-normal">N/A</span>
                                 {% endif %}
                             </td>
                             <td class="px-3 py-2 text-center">
-                                <span class="{{ result.difficulty_color }} text-sm font-semibold">{{ result.difficulty_score }}</span>{{ result.difficulty_delta|trend_arrow:"lower_better" }}
+                                <div class="text-sm font-semibold">
+                                    <span class="{{ result.difficulty_color }}">{{ result.difficulty_score }}</span>{{ result.difficulty_delta|trend_arrow:"lower_better" }}
+                                </div>
                                 <span class="text-slate-500 text-xs block">{{ result.difficulty_label }}</span>
                             </td>
                             <td class="px-3 py-2">
@@ -1590,6 +1592,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // --- Trend detail toggle & mini chart ---
+function closeTrendPanel(keywordId, country) {
+    const row = document.querySelector(`.trend-row[data-keyword-id="${keywordId}"][data-country="${country}"]`);
+    if (row) row.classList.add('hidden');
+}
+
 async function toggleTrend(keywordId, country, btn) {
     // Find the trend row for this keyword+country
     const dataRow = btn.closest('tr');
@@ -1600,7 +1607,7 @@ async function toggleTrend(keywordId, country, btn) {
     }
     if (!trendRow || !trendRow.classList.contains('trend-row')) return;
 
-    // Toggle visibility
+    // Toggle visibility — if already open, close it
     if (!trendRow.classList.contains('hidden')) {
         trendRow.classList.add('hidden');
         return;
@@ -1630,12 +1637,9 @@ function renderTrendPanel(data, keywordId, country) {
         return '<p class="text-slate-500 text-sm text-center py-2">Not enough data points for a trend chart yet.</p>';
     }
 
-    // Build mini SVG line chart
-    const W = 600, H = 160, PAD_L = 45, PAD_R = 15, PAD_T = 20, PAD_B = 30;
-    const chartW = W - PAD_L - PAD_R;
-    const chartH = H - PAD_T - PAD_B;
-
-    // Extract series
+    // Build SVG line chart — generous sizing for readability
+    const W = 720, H = 280, PAD_L = 55, PAD_T = 25, PAD_B = 50;
+    // Extract series first to decide if we need right axis
     const dates = points.map(p => p.date);
     const popularity = points.map(p => p.popularity);
     const difficulty = points.map(p => p.difficulty);
@@ -1643,55 +1647,131 @@ function renderTrendPanel(data, keywordId, country) {
     const hasRank = ranks.some(r => r !== null);
     const hasPop = popularity.some(p => p !== null);
 
-    function makeLine(values, color, yMin, yMax) {
+    const PAD_R = hasRank ? 55 : 20;
+    const chartW = W - PAD_L - PAD_R;
+    const chartH = H - PAD_T - PAD_B;
+
+    // Combine popularity + difficulty for shared left Y range
+    const allVals = [...difficulty.filter(v => v !== null), ...popularity.filter(v => v !== null)];
+    const rawMin = Math.min(...allVals);
+    const rawMax = Math.max(...allVals);
+
+    // Nice Y-axis ticks: round down/up to nearest 5, then step by 5 or 10
+    let yMin = Math.max(0, Math.floor(rawMin / 5) * 5 - 5);
+    let yMax = Math.min(100, Math.ceil(rawMax / 5) * 5 + 5);
+    if (yMax - yMin < 10) { yMin = Math.max(0, yMin - 5); yMax = Math.min(100, yMax + 5); }
+
+    const yRange = yMax - yMin || 1;
+    const yStep = yRange <= 30 ? 5 : 10;
+    const yTicks = [];
+    for (let v = yMin; v <= yMax; v += yStep) yTicks.push(v);
+
+    function makeLine(values, color) {
         const validPoints = values.map((v, i) => v !== null ? { x: i, y: v } : null).filter(Boolean);
         if (validPoints.length < 2) return '';
-        const range = yMax - yMin || 1;
         const pathParts = validPoints.map((p, i) => {
             const x = PAD_L + (p.x / (values.length - 1)) * chartW;
-            const y = PAD_T + chartH - ((p.y - yMin) / range) * chartH;
+            const y = PAD_T + chartH - ((p.y - yMin) / yRange) * chartH;
             return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
         });
-        // Draw dots
         const dots = validPoints.map(p => {
             const x = PAD_L + (p.x / (values.length - 1)) * chartW;
-            const y = PAD_T + chartH - ((p.y - yMin) / range) * chartH;
-            return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}" opacity="0.9"/>`;
+            const y = PAD_T + chartH - ((p.y - yMin) / yRange) * chartH;
+            return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="rgba(15,23,42,0.6)" stroke-width="1.5"/>`;
         }).join('');
-        return `<path d="${pathParts.join('')}" fill="none" stroke="${color}" stroke-width="2" opacity="0.8"/>${dots}`;
+        return `<path d="${pathParts.join('')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
     }
 
-    // Compute Y ranges
-    const allDiff = difficulty.filter(v => v !== null);
-    const diffMin = Math.max(0, Math.min(...allDiff) - 5);
-    const diffMax = Math.min(100, Math.max(...allDiff) + 5);
+    const popLine = hasPop ? makeLine(popularity, 'rgb(192,132,252)') : '';
+    const diffLine = makeLine(difficulty, 'rgb(251,191,36)');
 
-    let popLine = '';
-    if (hasPop) {
-        const allPop = popularity.filter(v => v !== null);
-        const popMin = Math.max(0, Math.min(...allPop) - 5);
-        const popMax = Math.min(100, Math.max(...allPop) + 5);
-        popLine = makeLine(popularity, 'rgb(192,132,252)', popMin, popMax);
-    }
+    // Rank line — inverted Y-axis (rank 1 at top, higher ranks at bottom)
+    let rankLine = '';
+    let rankAxisHTML = '';
+    if (hasRank) {
+        const validRanks = ranks.filter(r => r !== null);
+        let rMin = Math.min(...validRanks);
+        let rMax = Math.max(...validRanks);
+        // Add padding and nice rounding
+        const rPad = Math.max(1, Math.ceil((rMax - rMin) * 0.15));
+        rMin = Math.max(1, rMin - rPad);
+        rMax = rMax + rPad;
+        if (rMax - rMin < 5) { rMin = Math.max(1, rMin - 2); rMax = rMax + 2; }
+        const rRange = rMax - rMin || 1;
 
-    const diffLine = makeLine(difficulty, 'rgb(251,191,36)', diffMin, diffMax);
+        // Rank ticks on right Y-axis
+        const rStep = rRange <= 20 ? (rRange <= 10 ? 1 : 2) : (rRange <= 50 ? 5 : 10);
+        const rTicks = [];
+        const rStart = Math.ceil(rMin / rStep) * rStep;
+        for (let v = rStart; v <= rMax; v += rStep) rTicks.push(v);
+        if (rTicks.length === 0) rTicks.push(rMin, rMax);
 
-    // X-axis labels (show first, middle, last)
-    const xLabels = [];
-    [0, Math.floor(dates.length / 2), dates.length - 1].forEach(i => {
-        if (i < dates.length) {
-            const x = PAD_L + (i / (dates.length - 1)) * chartW;
-            const d = new Date(dates[i]);
-            const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            xLabels.push(`<text x="${x}" y="${H - 5}" fill="rgba(148,163,184,0.7)" text-anchor="middle" font-size="9">${label}</text>`);
+        rankAxisHTML = rTicks.map(v => {
+            // Inverted: rank 1 (best) at top
+            const y = PAD_T + ((v - rMin) / rRange) * chartH;
+            return `<text x="${W - PAD_R + 8}" y="${(y + 3).toFixed(1)}" fill="rgba(52,211,153,0.6)" text-anchor="start" font-size="13" font-family="system-ui">#${v}</text>`;
+        }).join('');
+
+        // Right axis label (vertical)
+        rankAxisHTML += `<text x="${W - 8}" y="${PAD_T + chartH / 2}" fill="rgba(52,211,153,0.7)" text-anchor="middle" font-size="13" font-family="system-ui" transform="rotate(90, ${W - 8}, ${PAD_T + chartH / 2})">Rank</text>`;
+
+        // Build rank path — inverted (lower rank number = higher on chart)
+        const validPts = ranks.map((v, i) => v !== null ? { x: i, y: v } : null).filter(Boolean);
+        if (validPts.length >= 2) {
+            const pathParts = validPts.map((p, i) => {
+                const x = PAD_L + (p.x / (ranks.length - 1)) * chartW;
+                const y = PAD_T + ((p.y - rMin) / rRange) * chartH;
+                return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+            });
+            const dots = validPts.map(p => {
+                const x = PAD_L + (p.x / (ranks.length - 1)) * chartW;
+                const y = PAD_T + ((p.y - rMin) / rRange) * chartH;
+                return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="rgb(52,211,153)" stroke="rgba(15,23,42,0.6)" stroke-width="1.5"/>`;
+            }).join('');
+            rankLine = `<path d="${pathParts.join('')}" fill="none" stroke="rgb(52,211,153)" stroke-width="2" stroke-dasharray="6,3" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>${dots}`;
         }
-    });
+    }
+
+    // Left Y-axis labels + horizontal grid lines
+    const yAxisHTML = yTicks.map(v => {
+        const y = PAD_T + chartH - ((v - yMin) / yRange) * chartH;
+        return `
+            <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.07)" stroke-dasharray="4,3"/>
+            <text x="${PAD_L - 8}" y="${(y + 3).toFixed(1)}" fill="rgba(148,163,184,0.7)" text-anchor="end" font-size="13" font-family="system-ui">${v}</text>`;
+    }).join('');
+
+    // Left axis title (vertical)
+    const leftAxisTitle = `<text x="12" y="${PAD_T + chartH / 2}" fill="rgba(148,163,184,0.5)" text-anchor="middle" font-size="13" font-family="system-ui" transform="rotate(-90, 12, ${PAD_T + chartH / 2})">Popularity / Difficulty</text>`;
+
+    // X-axis labels — show every date if ≤ 10, otherwise pick smart ticks
+    const maxXLabels = 10;
+    let xIndices;
+    if (dates.length <= maxXLabels) {
+        xIndices = dates.map((_, i) => i);
+    } else {
+        const step = Math.ceil(dates.length / maxXLabels);
+        xIndices = [];
+        for (let i = 0; i < dates.length; i += step) xIndices.push(i);
+        if (xIndices[xIndices.length - 1] !== dates.length - 1) xIndices.push(dates.length - 1);
+    }
+    const xLabels = xIndices.map(i => {
+        const x = PAD_L + (i / (dates.length - 1)) * chartW;
+        const d = new Date(dates[i]);
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `
+            <line x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${PAD_T}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.04)"/>
+            <text x="${x.toFixed(1)}" y="${H - PAD_B + 20}" fill="rgba(148,163,184,0.7)" text-anchor="middle" font-size="13" font-family="system-ui">${label}</text>`;
+    }).join('');
+
+    // Chart border
+    const border = `<rect x="${PAD_L}" y="${PAD_T}" width="${chartW}" height="${chartH}" fill="none" stroke="rgba(255,255,255,0.08)" rx="2"/>`;
 
     // Legend
     const legend = `
-        <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
-            ${hasPop ? '<span class="flex items-center gap-1.5"><span class="inline-block w-3 h-0.5 rounded" style="background:rgb(192,132,252)"></span> Popularity</span>' : ''}
-            <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-0.5 rounded" style="background:rgb(251,191,36)"></span> Difficulty</span>
+        <div class="flex items-center justify-center gap-6 mt-3 text-xs text-slate-400">
+            ${hasPop ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(192,132,252)"></span> Popularity</span>' : ''}
+            <span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(251,191,36)"></span> Difficulty</span>
+            ${hasRank ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(52,211,153);border-top:1px dashed rgb(52,211,153)"></span> Rank</span>' : ''}
         </div>`;
 
     // History table
@@ -1700,40 +1780,54 @@ function renderTrendPanel(data, keywordId, country) {
         const d = new Date(p.date);
         const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         historyRows += `
-            <tr class="border-b border-white/5">
-                <td class="px-2 py-1 text-slate-500 text-xs">${dateStr}</td>
-                <td class="px-2 py-1 text-center text-sm ${p.popularity !== null ? 'text-purple-400' : 'text-slate-600'}">${p.popularity !== null ? p.popularity : '—'}</td>
-                <td class="px-2 py-1 text-center text-sm text-amber-400">${p.difficulty}</td>
-                <td class="px-2 py-1 text-center text-sm ${p.rank !== null ? 'text-white' : 'text-slate-600'}">${p.rank !== null ? '#' + p.rank : '—'}</td>
+            <tr class="border-b border-white/5 hover:bg-white/[0.02]">
+                <td class="px-3 py-1.5 text-slate-400 text-xs">${dateStr}</td>
+                <td class="px-3 py-1.5 text-center text-sm font-medium ${p.popularity !== null ? 'text-purple-400' : 'text-slate-600'}">${p.popularity !== null ? p.popularity : '—'}</td>
+                <td class="px-3 py-1.5 text-center text-sm font-medium text-amber-400">${p.difficulty}</td>
+                <td class="px-3 py-1.5 text-center text-sm font-medium ${p.rank !== null ? 'text-emerald-400' : 'text-slate-600'}">${p.rank !== null ? '#' + p.rank : '—'}</td>
             </tr>`;
     });
 
+    // Find the trend row via traversal — closeTrendPanel uses keywordId+country
     return `
-        <div class="flex flex-col md:flex-row gap-4">
-            <div class="flex-1">
-                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Trend (last ${points.length} data points)</h4>
-                <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3">
-                    <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:300px;max-width:600px">
-                        <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${PAD_T + chartH}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.1)"/>
-                        ${popLine}
-                        ${diffLine}
-                        ${xLabels.join('')}
-                    </svg>
-                    ${legend}
+        <div class="relative">
+            <button onclick="closeTrendPanel(${keywordId}, '${country}')"
+                    class="absolute top-0 right-0 p-1.5 text-slate-500 hover:text-slate-300 hover:bg-white/10 rounded-lg transition-colors"
+                    title="Close">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+            <div class="flex flex-col lg:flex-row gap-6 pr-8">
+                <div class="flex-1 min-w-0">
+                    <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">Trend (last ${points.length} data points)</h4>
+                    <div class="bg-slate-900/60 border border-white/5 rounded-xl p-4">
+                        <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-height:220px">
+                            ${border}
+                            ${leftAxisTitle}
+                            ${yAxisHTML}
+                            ${rankAxisHTML}
+                            ${xLabels}
+                            ${popLine}
+                            ${diffLine}
+                            ${rankLine}
+                        </svg>
+                        ${legend}
+                    </div>
                 </div>
-            </div>
-            <div class="w-full md:w-64 flex-shrink-0">
-                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">History</h4>
-                <div class="bg-slate-900/60 border border-white/5 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                    <table class="w-full text-sm">
-                        <thead><tr class="border-b border-white/10">
-                            <th class="px-2 py-1 text-left text-[10px] text-slate-500">Date</th>
-                            <th class="px-2 py-1 text-center text-[10px] text-slate-500">Pop</th>
-                            <th class="px-2 py-1 text-center text-[10px] text-slate-500">Diff</th>
-                            <th class="px-2 py-1 text-center text-[10px] text-slate-500">Rank</th>
-                        </tr></thead>
-                        <tbody>${historyRows}</tbody>
-                    </table>
+                <div class="w-full lg:w-72 flex-shrink-0">
+                    <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-3">History</h4>
+                    <div class="bg-slate-900/60 border border-white/5 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                        <table class="w-full text-sm">
+                            <thead class="sticky top-0 bg-slate-800/90 backdrop-blur"><tr class="border-b border-white/10">
+                                <th class="px-3 py-2 text-left text-xs text-slate-500 font-medium">Date</th>
+                                <th class="px-3 py-2 text-center text-xs text-slate-500 font-medium">Pop</th>
+                                <th class="px-3 py-2 text-center text-xs text-slate-500 font-medium">Diff</th>
+                                <th class="px-3 py-2 text-center text-xs text-slate-500 font-medium">Rank</th>
+                            </tr></thead>
+                            <tbody>${historyRows}</tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>`;

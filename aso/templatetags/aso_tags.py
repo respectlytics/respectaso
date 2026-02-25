@@ -37,7 +37,7 @@ def trend_arrow(delta, metric="higher_better"):
     except (TypeError, ValueError):
         return ""
     if delta == 0:
-        return mark_safe('<span class="text-[10px] text-slate-500">=</span>')
+        return ""
 
     # Determine if the change is positive or negative
     if metric == "lower_better":
@@ -48,7 +48,7 @@ def trend_arrow(delta, metric="higher_better"):
     color = "text-green-400" if is_good else "text-red-400"
     arrow = "↑" if delta > 0 else "↓"
     return mark_safe(
-        f'<span class="text-[10px] {color} ml-0.5" title="Change from previous">{arrow}{abs(delta)}</span>'
+        f'<span class="{color} ml-1.5" title="Change from previous">({arrow}{abs(delta)})</span>'
     )
 
 # ISO 3166-1 alpha-2 → country name (covers all App Store countries)
