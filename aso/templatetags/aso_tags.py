@@ -11,6 +11,46 @@ def to_json(value):
     """Serialize a Python value to a JSON string (safe for embedding in <script>)."""
     return mark_safe(json.dumps(value))
 
+
+@register.filter
+def abs_val(value):
+    """Return the absolute value.  Usage: {{ delta|abs_val }}"""
+    try:
+        return abs(value)
+    except (TypeError, ValueError):
+        return value
+
+
+@register.filter(is_safe=True)
+def trend_arrow(delta, metric="higher_better"):
+    """Render a coloured ↑/↓ arrow for a delta value.
+
+    Usage:
+        {{ result.popularity_delta|trend_arrow }}           → green ↑ / red ↓
+        {{ result.difficulty_delta|trend_arrow:"lower_better" }} → green ↓ / red ↑
+        {{ result.rank_delta|trend_arrow }}                 → positive = improved
+    """
+    if delta is None:
+        return ""
+    try:
+        delta = int(delta)
+    except (TypeError, ValueError):
+        return ""
+    if delta == 0:
+        return mark_safe('<span class="text-[10px] text-slate-500">=</span>')
+
+    # Determine if the change is positive or negative
+    if metric == "lower_better":
+        is_good = delta < 0
+    else:
+        is_good = delta > 0
+
+    color = "text-green-400" if is_good else "text-red-400"
+    arrow = "↑" if delta > 0 else "↓"
+    return mark_safe(
+        f'<span class="text-[10px] {color} ml-0.5" title="Change from previous">{arrow}{abs(delta)}</span>'
+    )
+
 # ISO 3166-1 alpha-2 → country name (covers all App Store countries)
 COUNTRY_NAMES = {
     "ad": "Andorra",

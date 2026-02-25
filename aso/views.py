@@ -40,18 +40,38 @@ def dashboard_view(request):
     """
     Main dashboard with keyword search bar, results, and full search history.
 
-    The history table replaces the old "Recent Searches" section and the
-    separate History page.  It supports filtering by app and pagination.
+    Shows only the latest result per keyword+country pair.  Each result
+    is annotated with trend data (comparison to previous result) for
+    inline ↑↓ indicators.
     """
     apps = App.objects.all()
     search_form = KeywordSearchForm()
 
-    # --- History table ---
+    # --- History table (latest result per keyword+country) ---
     app_id = request.GET.get("app")
-    results_qs = SearchResult.objects.select_related("keyword", "keyword__app")
 
+    # Get the latest result ID for each keyword+country pair
+    from django.db.models import Max
+
+    latest_filter = {}
     if app_id:
-        results_qs = results_qs.filter(keyword__app_id=app_id)
+        latest_filter["keyword__app_id"] = app_id
+
+    latest_ids_qs = (
+        SearchResult.objects
+        .filter(**latest_filter)
+        .values("keyword_id", "country")
+        .annotate(latest_id=Max("id"))
+        .values_list("latest_id", flat=True)
+    )
+    latest_ids = list(latest_ids_qs)
+
+    results_qs = (
+        SearchResult.objects
+        .filter(id__in=latest_ids)
+        .select_related("keyword", "keyword__app")
+        .order_by("-searched_at")
+    )
 
     # Count unique keywords for the toolbar
     keyword_qs = Keyword.objects.all()
@@ -72,6 +92,44 @@ def dashboard_view(request):
     page = min(page, total_pages)
     start = (page - 1) * per_page
     history_results = list(results_qs[start : start + per_page])
+
+    # Annotate each result with trend data (previous result comparison)
+    for result in history_results:
+        prev = (
+            SearchResult.objects
+            .filter(
+                keyword_id=result.keyword_id,
+                country=result.country,
+                searched_at__lt=result.searched_at,
+            )
+            .order_by("-searched_at")
+            .first()
+        )
+        history_count = SearchResult.objects.filter(
+            keyword_id=result.keyword_id, country=result.country
+        ).count()
+        result.has_history = history_count > 1
+        if prev:
+            result.prev_popularity = prev.popularity_score
+            result.prev_difficulty = prev.difficulty_score
+            result.prev_rank = prev.app_rank
+            # Calculate deltas
+            if result.popularity_score is not None and prev.popularity_score is not None:
+                result.popularity_delta = result.popularity_score - prev.popularity_score
+            else:
+                result.popularity_delta = None
+            result.difficulty_delta = result.difficulty_score - prev.difficulty_score
+            if result.app_rank is not None and prev.app_rank is not None:
+                result.rank_delta = prev.app_rank - result.app_rank  # Lower rank = better = positive delta
+            else:
+                result.rank_delta = None
+        else:
+            result.prev_popularity = None
+            result.prev_difficulty = None
+            result.prev_rank = None
+            result.popularity_delta = None
+            result.difficulty_delta = None
+            result.rank_delta = None
 
     # Show rank column when filtering by an app that has a track_id
     show_rank = False
@@ -164,7 +222,7 @@ def search_view(request):
                 app=app,
             )
 
-            # Skip only if this keyword already has results for the SAME country
+            # Skip if this keyword already has results for the SAME country today
             if not created and keyword_obj.results.filter(country=country).exists():
                 skipped.append(f"{kw_text} ({country.upper()})")
                 continue
@@ -191,10 +249,7 @@ def search_view(request):
             download_estimates = download_est.estimate(popularity or 0, len(competitors))
             breakdown["download_estimates"] = download_estimates
 
-            # Remove any existing result for this keyword+country to prevent duplicates
-            SearchResult.objects.filter(keyword=keyword_obj, country=country).delete()
-
-            # Save result
+            # Save result (historical results are preserved for trend tracking)
             search_result = SearchResult.objects.create(
                 keyword=keyword_obj,
                 popularity_score=popularity,
@@ -587,9 +642,6 @@ def keyword_refresh_view(request, keyword_id):
     keyword_obj = get_object_or_404(Keyword, id=keyword_id)
     country = request.POST.get("country", "us")
 
-    # Delete old results for this keyword AND country only
-    SearchResult.objects.filter(keyword=keyword_obj, country=country).delete()
-
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
     popularity_est = PopularityEstimator()
@@ -734,9 +786,6 @@ def keywords_bulk_refresh_view(request):
         download_estimates = download_est.estimate(popularity or 0, len(competitors))
         breakdown["download_estimates"] = download_estimates
 
-        # Delete old results for this keyword AND country only
-        SearchResult.objects.filter(keyword=kw, country=country).delete()
-
         search_result = SearchResult.objects.create(
             keyword=kw,
             popularity_score=popularity,
@@ -788,3 +837,42 @@ def version_check_view(request):
     except Exception:
         # Network error, GitHub down, etc. — silently fail
         return JsonResponse({"update_available": False, "current": current})
+
+
+def auto_refresh_status_view(request):
+    """Return the current auto-refresh progress as JSON."""
+    from .scheduler import get_status
+    return JsonResponse(get_status())
+
+
+def keyword_trend_view(request, keyword_id):
+    """
+    Return historical trend data for a keyword across all countries.
+
+    Query param: ?country=us (optional, defaults to all)
+    Returns JSON with date-series data for charting.
+    """
+    keyword_obj = get_object_or_404(Keyword, id=keyword_id)
+    country = request.GET.get("country")
+
+    qs = SearchResult.objects.filter(keyword=keyword_obj).order_by("searched_at")
+    if country:
+        qs = qs.filter(country=country)
+
+    data_points = []
+    for r in qs:
+        data_points.append({
+            "date": r.searched_at.strftime("%Y-%m-%d"),
+            "date_display": r.searched_at.strftime("%b %d"),
+            "popularity": r.popularity_score,
+            "difficulty": r.difficulty_score,
+            "rank": r.app_rank,
+            "country": r.country,
+        })
+
+    return JsonResponse({
+        "keyword": keyword_obj.keyword,
+        "keyword_id": keyword_obj.pk,
+        "app_name": keyword_obj.app.name if keyword_obj.app else None,
+        "data_points": data_points,
+    })
