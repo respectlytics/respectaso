@@ -161,7 +161,16 @@
                 </p>
                 {% endif %}
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+                {% if available_countries|length > 1 %}
+                <select id="history-country-filter"
+                        class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <option value="">All Countries</option>
+                    {% for cc in available_countries %}
+                    <option value="{{ cc }}" {% if selected_country == cc %}selected{% endif %}>{{ cc|country_flag }} {{ cc|country_name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
                 <button onclick="location.reload()" title="Reload history table"
                         class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,29 +179,27 @@
                     Reload
                 </button>
                 {% if history_results %}
-                <a href="{% url 'aso:export_history_csv' %}{% if selected_app %}?app={{ selected_app }}{% endif %}" title="Export all search history as CSV"
+                <a href="{% url 'aso:export_history_csv' %}?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}{% endif %}" title="Export all search history as CSV"
                    class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     Export CSV
                 </a>
-                <div class="flex items-center gap-2">
-                    <button onclick="bulkRefresh()" id="bulk-refresh-btn"
-                            class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                        </svg>
-                        Refresh Rankings
-                    </button>
-                    <button onclick="bulkDelete()" id="bulk-delete-btn"
-                            class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                        Delete All
-                    </button>
-                </div>
+                <button onclick="bulkRefresh()" id="bulk-refresh-btn"
+                        class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Refresh Rankings
+                </button>
+                <button onclick="bulkDelete()" id="bulk-delete-btn"
+                        class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete All
+                </button>
                 {% endif %}
             </div>
         </div>
@@ -514,14 +521,14 @@
         {% if total_pages > 1 %}
         <div class="flex items-center justify-center gap-2 mt-3">
             {% if has_prev %}
-            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"-1" }}"
+            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}page={{ page|add:"-1" }}"
                class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
                 ← Prev
             </a>
             {% endif %}
             <span class="text-xs text-slate-500">Page {{ page }} of {{ total_pages }}</span>
             {% if has_next %}
-            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}page={{ page|add:"1" }}"
+            <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}page={{ page|add:"1" }}"
                class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
                 Next →
             </a>
@@ -1142,8 +1149,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.removeItem('aso_app');
             }
         } catch(e) {}
-        window.location.href = appId ? `?app=${appId}` : '{% url "aso:dashboard" %}';
+        // Preserve country filter when changing app
+        const params = new URLSearchParams();
+        if (appId) params.set('app', appId);
+        const currentCountry = urlParams.get('country');
+        if (currentCountry) params.set('country', currentCountry);
+        const qs = params.toString();
+        window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
     });
+
+    // History country filter
+    const historyCountryFilter = document.getElementById('history-country-filter');
+    if (historyCountryFilter) {
+        // Restore from localStorage if no ?country= param
+        if (!urlParams.has('country')) {
+            const savedCountry = localStorage.getItem('aso_history_country');
+            if (savedCountry && historyCountryFilter.querySelector(`option[value="${savedCountry}"]`)) {
+                historyCountryFilter.value = savedCountry;
+                const params = new URLSearchParams(window.location.search);
+                params.set('country', savedCountry);
+                window.location.href = `?${params.toString()}`;
+                return;
+            }
+        }
+        historyCountryFilter.addEventListener('change', function() {
+            const country = this.value;
+            try {
+                if (country) {
+                    localStorage.setItem('aso_history_country', country);
+                } else {
+                    localStorage.removeItem('aso_history_country');
+                }
+            } catch(e) {}
+            const params = new URLSearchParams(window.location.search);
+            if (country) {
+                params.set('country', country);
+            } else {
+                params.delete('country');
+            }
+            params.delete('page'); // Reset to page 1 on filter change
+            const qs = params.toString();
+            window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+        });
+    }
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();

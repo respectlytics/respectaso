@@ -49,6 +49,7 @@ def dashboard_view(request):
 
     # --- History table (latest result per keyword+country) ---
     app_id = request.GET.get("app")
+    country_filter = request.GET.get("country", "")
 
     # Get the latest result ID for each keyword+country pair
     from django.db.models import Max
@@ -56,6 +57,8 @@ def dashboard_view(request):
     latest_filter = {}
     if app_id:
         latest_filter["keyword__app_id"] = app_id
+    if country_filter:
+        latest_filter["country"] = country_filter.lower()
 
     latest_ids_qs = (
         SearchResult.objects
@@ -63,6 +66,18 @@ def dashboard_view(request):
         .values("keyword_id", "country")
         .annotate(latest_id=Max("id"))
         .values_list("latest_id", flat=True)
+    )
+
+    # Distinct countries that have results (for the history country filter)
+    country_base_filter = {}
+    if app_id:
+        country_base_filter["keyword__app_id"] = app_id
+    available_countries = (
+        SearchResult.objects
+        .filter(**country_base_filter)
+        .values_list("country", flat=True)
+        .distinct()
+        .order_by("country")
     )
     latest_ids = list(latest_ids_qs)
 
@@ -152,6 +167,8 @@ def dashboard_view(request):
             "keyword_count": keyword_count,
             "selected_app": int(app_id) if app_id else None,
             "selected_app_name": selected_app_name,
+            "selected_country": country_filter,
+            "available_countries": list(available_countries),
             "show_rank": show_rank,
             "page": page,
             "total_pages": total_pages,
@@ -708,11 +725,14 @@ def export_history_csv_view(request):
     Supports optional ?app= filter to limit to one app.
     """
     app_id = request.GET.get("app")
+    country = request.GET.get("country")
     results_qs = SearchResult.objects.select_related("keyword", "keyword__app").order_by(
         "-searched_at"
     )
     if app_id:
         results_qs = results_qs.filter(keyword__app_id=app_id)
+    if country:
+        results_qs = results_qs.filter(country=country.lower())
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = 'attachment; filename="respectaso-search-history.csv"'
