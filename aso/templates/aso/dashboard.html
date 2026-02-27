@@ -804,6 +804,22 @@ function convertDatesToLocal() {
 convertDatesToLocal();
 
 // --- Auto-refresh history section after search ---
+function clearSearchResults() {
+    const container = document.getElementById('results-container');
+    container.classList.add('hidden');
+    container.innerHTML = '';
+}
+
+// Escape clears search results
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const container = document.getElementById('results-container');
+        if (!container.classList.contains('hidden')) {
+            clearSearchResults();
+        }
+    }
+});
+
 async function refreshHistorySection() {
     try {
         // Build the same URL the page was loaded with (preserves ?app= filter)
@@ -1253,6 +1269,39 @@ document.addEventListener('DOMContentLoaded', function() {
             loadingState.classList.add('hidden');
             resultsContainer.classList.remove('hidden');
 
+            // Clear search field after successful search
+            document.getElementById('id_keywords').value = '';
+
+            const countries = data.countries || [];
+            const resultsByCountry = data.results_by_country || {};
+
+            // Flatten all results into a single array
+            const allResults = [];
+            countries.forEach(c => {
+                (resultsByCountry[c] || []).forEach(r => allResults.push(r));
+            });
+
+            // Results panel header with dismiss button
+            const header = document.createElement('div');
+            header.className = 'bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between';
+            header.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-lg">🔎</span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-white">Search Results</h3>
+                        <p class="text-xs text-slate-500">${allResults.length} result${allResults.length !== 1 ? 's' : ''} · Saved to your search history below</p>
+                    </div>
+                </div>
+                <button onclick="clearSearchResults()"
+                        class="text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                        title="Dismiss results (Esc)">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Done
+                </button>`;
+            resultsContainer.appendChild(header);
+
             // Show warning for skipped keywords
             if (data.warning) {
                 const warn = document.createElement('div');
@@ -1261,27 +1310,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 resultsContainer.appendChild(warn);
             }
 
-            const countries = data.countries || [];
-            const resultsByCountry = data.results_by_country || {};
-
             // Show opportunity ranking when multiple countries
             if (data.opportunity_ranking && data.opportunity_ranking.length > 0) {
                 resultsContainer.appendChild(renderOpportunityRanking(data.opportunity_ranking));
             }
 
-            // Show country tabs when >1 country, else show results directly
-            if (countries.length > 1) {
-                resultsContainer.appendChild(renderCountryTabs(countries, resultsByCountry));
-            } else {
-                const singleCountry = countries[0] || 'us';
-                const results = resultsByCountry[singleCountry] || [];
-                results.forEach(result => {
-                    resultsContainer.appendChild(createResultCard(result));
-                });
+            // Tabbed results: one tab per keyword+country, show one at a time
+            if (allResults.length > 1) {
+                resultsContainer.appendChild(renderResultTabs(allResults));
+            } else if (allResults.length === 1) {
+                resultsContainer.appendChild(createResultCard(allResults[0]));
             }
 
-            const hasResults = countries.some(c => (resultsByCountry[c] || []).length > 0);
-            if (hasResults) {
+            if (allResults.length > 0) {
                 resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 refreshHistorySection();
             }
@@ -1459,6 +1500,48 @@ document.addEventListener('DOMContentLoaded', function() {
             panes.push(pane);
             wrapper.appendChild(pane);
         });
+
+        return wrapper;
+    }
+
+    function renderResultTabs(results) {
+        const wrapper = document.createElement('div');
+
+        // Tab bar — horizontally scrollable keyword+country pills
+        const tabBar = document.createElement('div');
+        tabBar.className = 'flex gap-1 bg-[#1e293b] border border-white/10 rounded-xl p-1 overflow-x-auto';
+
+        const ACTIVE_CLS = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 bg-purple-600 text-white';
+        const INACTIVE_CLS = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 text-slate-400 hover:text-white hover:bg-white/5';
+
+        // Pre-create all result cards (hidden)
+        const cards = results.map(result => {
+            const card = createResultCard(result);
+            card.classList.add('hidden');
+            return card;
+        });
+        // Show first card
+        if (cards.length > 0) cards[0].classList.remove('hidden');
+
+        results.forEach((result, i) => {
+            const btn = document.createElement('button');
+            const flag = result.country ? countryFlag(result.country) : '';
+            btn.textContent = flag ? `${flag} ${result.keyword}` : result.keyword;
+            btn.className = i === 0 ? ACTIVE_CLS : INACTIVE_CLS;
+            btn.addEventListener('click', () => {
+                tabBar.querySelectorAll('button').forEach(b => b.className = INACTIVE_CLS);
+                btn.className = ACTIVE_CLS;
+                cards.forEach((card, j) => card.classList.toggle('hidden', j !== i));
+            });
+            tabBar.appendChild(btn);
+        });
+        wrapper.appendChild(tabBar);
+
+        // Card container
+        const contentArea = document.createElement('div');
+        contentArea.className = 'mt-4';
+        cards.forEach(card => contentArea.appendChild(card));
+        wrapper.appendChild(contentArea);
 
         return wrapper;
     }
