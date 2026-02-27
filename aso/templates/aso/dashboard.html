@@ -1034,6 +1034,19 @@ if (filterDiffInput) {
     });
 }
 
+// Sync JS state from browser-restored form values on page load
+(function syncFiltersOnLoad() {
+    // Reset checkboxes so browser-restored state doesn't create a mismatch
+    document.querySelectorAll('.insight-cb').forEach(cb => { cb.checked = false; });
+    updateInsightDropdownText();
+
+    // Reset selects to default
+    if (filterPopInput) filterPopInput.selectedIndex = 0;
+    if (filterDiffInput) filterDiffInput.selectedIndex = 0;
+
+    // Variables are already null/empty from declaration — no filters active
+})();
+
 // --- Auto-refresh history section after search ---
 function clearSearchResults() {
     const container = document.getElementById('results-container');
