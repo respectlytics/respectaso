@@ -205,6 +205,47 @@
         </div>
 
         {% if history_results %}
+        <!-- Filter Bar -->
+        <div id="filter-bar" class="mb-3">
+            <div class="flex items-center gap-2 flex-wrap">
+                <button id="filter-toggle" onclick="toggleFilterPanel()" class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                    Filters
+                </button>
+                <span id="filter-count" class="text-xs text-slate-500 hidden"></span>
+                <button id="filter-clear" onclick="clearAllFilters()" class="text-xs text-purple-400 hover:text-purple-300 transition-colors hidden">Clear all</button>
+            </div>
+            <div id="filter-panel" class="hidden mt-2 bg-[#1e293b] border border-white/10 rounded-xl p-3 animate-fade-in">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <!-- Insight chips -->
+                    <div class="flex-1">
+                        <label class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Insight</label>
+                        <div class="flex flex-wrap gap-1" id="insight-chips">
+                            <button type="button" data-insight="Sweet Spot" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-green-500/40 hover:text-green-300">🎯 Sweet Spot</button>
+                            <button type="button" data-insight="Good Target" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-green-500/40 hover:text-green-300">✅ Good Target</button>
+                            <button type="button" data-insight="Hidden Gem" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-blue-500/40 hover:text-blue-300">💎 Hidden Gem</button>
+                            <button type="button" data-insight="Worth Competing" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-yellow-500/40 hover:text-yellow-300">⚔️ Worth Competing</button>
+                            <button type="button" data-insight="Decent Option" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-slate-500/40 hover:text-slate-300">👍 Decent Option</button>
+                            <button type="button" data-insight="Low Volume" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-slate-500/40 hover:text-slate-300">🔍 Low Volume</button>
+                            <button type="button" data-insight="Avoid" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-red-500/40 hover:text-red-300">🚫 Avoid</button>
+                            <button type="button" data-insight="Challenging" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-yellow-500/40 hover:text-yellow-300">⚔️ Challenging</button>
+                        </div>
+                    </div>
+                    <!-- Threshold inputs -->
+                    <div class="flex items-end gap-3 flex-shrink-0">
+                        <div>
+                            <label for="filter-pop-min" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Pop ≥</label>
+                            <input type="number" id="filter-pop-min" min="0" max="100" placeholder="—" class="w-16 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div>
+                            <label for="filter-diff-max" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Diff ≤</label>
+                            <input type="number" id="filter-diff-max" min="0" max="100" placeholder="—" class="w-16 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full" id="history-table">
@@ -237,7 +278,7 @@
                     </thead>
                     <tbody id="history-body">
                         {% for result in history_results %}
-                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group" data-popularity="{{ result.popularity_score|default:'-1' }}" data-difficulty="{{ result.difficulty_score|default:'-1' }}" data-insight="{{ result.targeting_advice.1 }}">
                             <td class="px-3 py-2">
                                 <span class="text-white text-sm font-medium">{{ result.keyword.keyword }}</span>
                                 {% if result.keyword.app %}
@@ -784,6 +825,126 @@ function convertDatesToLocal() {
     });
 }
 convertDatesToLocal();
+
+// --- History table filtering ---
+let activeInsights = new Set();
+let filterPopMin = null;
+let filterDiffMax = null;
+
+function toggleFilterPanel() {
+    const panel = document.getElementById('filter-panel');
+    panel.classList.toggle('hidden');
+}
+
+function applyFilters() {
+    const tbody = document.getElementById('history-body');
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll('tr:not(.competitor-row):not(.trend-row)');
+    let shown = 0;
+    let total = 0;
+
+    rows.forEach(row => {
+        const pop = parseFloat(row.dataset.popularity);
+        const diff = parseFloat(row.dataset.difficulty);
+        const insight = row.dataset.insight || '';
+        total++;
+
+        let visible = true;
+
+        // Insight filter (multi-select OR)
+        if (activeInsights.size > 0 && !activeInsights.has(insight)) {
+            visible = false;
+        }
+
+        // Popularity >= threshold
+        if (visible && filterPopMin !== null && (pop < filterPopMin || pop === -1)) {
+            visible = false;
+        }
+
+        // Difficulty <= threshold
+        if (visible && filterDiffMax !== null && (diff > filterDiffMax || diff === -1)) {
+            visible = false;
+        }
+
+        row.style.display = visible ? '' : 'none';
+        // Also hide associated competitor/trend rows
+        let next = row.nextElementSibling;
+        while (next && (next.classList.contains('competitor-row') || next.classList.contains('trend-row'))) {
+            next.style.display = visible ? '' : 'none';
+            next = next.nextElementSibling;
+        }
+
+        if (visible) shown++;
+    });
+
+    // Update count badge
+    const countEl = document.getElementById('filter-count');
+    const clearEl = document.getElementById('filter-clear');
+    const hasFilters = activeInsights.size > 0 || filterPopMin !== null || filterDiffMax !== null;
+
+    if (hasFilters) {
+        countEl.textContent = `${shown} of ${total} shown`;
+        countEl.classList.remove('hidden');
+        clearEl.classList.remove('hidden');
+    } else {
+        countEl.classList.add('hidden');
+        clearEl.classList.add('hidden');
+    }
+}
+
+function clearAllFilters() {
+    activeInsights.clear();
+    filterPopMin = null;
+    filterDiffMax = null;
+
+    // Reset UI
+    document.querySelectorAll('.insight-chip').forEach(chip => {
+        chip.classList.remove('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
+        chip.classList.add('bg-transparent', 'text-slate-400', 'border-white/10');
+    });
+    const popInput = document.getElementById('filter-pop-min');
+    const diffInput = document.getElementById('filter-diff-max');
+    if (popInput) popInput.value = '';
+    if (diffInput) diffInput.value = '';
+
+    applyFilters();
+}
+
+// Wire up insight chips
+document.querySelectorAll('.insight-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        const insight = chip.dataset.insight;
+        if (activeInsights.has(insight)) {
+            activeInsights.delete(insight);
+            chip.classList.remove('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
+            chip.classList.add('bg-transparent', 'text-slate-400', 'border-white/10');
+        } else {
+            activeInsights.add(insight);
+            chip.classList.add('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
+            chip.classList.remove('bg-transparent', 'text-slate-400', 'border-white/10');
+        }
+        applyFilters();
+    });
+});
+
+// Wire up threshold inputs
+const filterPopInput = document.getElementById('filter-pop-min');
+const filterDiffInput = document.getElementById('filter-diff-max');
+if (filterPopInput) {
+    filterPopInput.addEventListener('input', () => {
+        const val = filterPopInput.value.trim();
+        filterPopMin = val !== '' ? parseFloat(val) : null;
+        applyFilters();
+    });
+}
+if (filterDiffInput) {
+    filterDiffInput.addEventListener('input', () => {
+        const val = filterDiffInput.value.trim();
+        filterDiffMax = val !== '' ? parseFloat(val) : null;
+        applyFilters();
+    });
+}
 
 // --- Auto-refresh history section after search ---
 function clearSearchResults() {
