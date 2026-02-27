@@ -2,7 +2,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-purple.svg)](https://github.com/respectlytics/respectaso/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/github/v/release/respectlytics/respectaso?color=purple&label=version)](https://github.com/respectlytics/respectaso/releases/latest)
 
 **Free, open-source ASO keyword research tool — self-hosted via Docker. No API keys. No accounts. No data leaves your machine.**
 
