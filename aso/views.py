@@ -758,7 +758,7 @@ def export_history_csv_view(request):
 
     # Respectlytics attribution row
     writer.writerow([])
-    writer.writerow(["https://respectlytics.com"])
+    writer.writerow(["Privacy-first mobile analytics — https://respectlytics.com"])
 
     return response
 
