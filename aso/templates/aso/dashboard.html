@@ -147,6 +147,24 @@
         </div>
     </details>
 
+    <!-- Respectlytics CTA — shown when user has search history (has gotten value) -->
+    {% if history_results %}
+    <div class="border border-purple-500/20 bg-purple-900/10 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+            <span class="text-2xl flex-shrink-0">📊</span>
+            <div>
+                <p class="text-sm text-white font-medium">Track how your keywords perform over time</p>
+                <p class="text-xs text-slate-400 mt-0.5">Respectlytics gives you privacy-first analytics for your iOS &amp; Android apps — session-based, no personal data collected.</p>
+            </div>
+        </div>
+        <a href="https://respectlytics.com/?utm_source=respectaso&utm_medium=dashboard_cta&utm_campaign=oss"
+           target="_blank" rel="noopener"
+           class="flex-shrink-0 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+            Start Free Trial →
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Search History -->
     <div id="history-section">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
