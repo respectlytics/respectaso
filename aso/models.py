@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.db import models
 from django.db.models import Manager
+from django.utils import timezone
 
 
 class App(models.Model):
@@ -134,6 +137,24 @@ class SearchResult(models.Model):
 
     def __str__(self):
         return f"{self.keyword.keyword} — {self.searched_at:%Y-%m-%d %H:%M}"
+
+    @classmethod
+    def upsert_today(cls, keyword, country, **fields):
+        """
+        Create or replace today's result for a keyword+country pair.
+
+        If a result already exists for today, delete it and create a fresh one.
+        This ensures exactly one data point per keyword per country per day.
+        """
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        cls.objects.filter(
+            keyword=keyword,
+            country=country,
+            searched_at__gte=today_start,
+            searched_at__lt=today_end,
+        ).delete()
+        return cls.objects.create(keyword=keyword, country=country, **fields)
 
     @property
     def difficulty_label(self):

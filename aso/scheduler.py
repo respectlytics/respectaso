@@ -71,7 +71,7 @@ def _needs_refresh_today():
         )
         if latest and latest.searched_at < today_start:
             return True
-    return bool(pairs) and pairs.exists()
+    return False
 
 
 def _get_pairs_to_refresh():
@@ -130,7 +130,7 @@ def _refresh_pair(keyword_obj, country):
     download_estimates = download_est.estimate(popularity or 0, len(competitors))
     breakdown["download_estimates"] = download_estimates
 
-    return SearchResult.objects.create(
+    return SearchResult.upsert_today(
         keyword=keyword_obj,
         popularity_score=popularity,
         difficulty_score=difficulty_score,

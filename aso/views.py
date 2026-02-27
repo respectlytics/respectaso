@@ -7,6 +7,7 @@ import urllib.request
 
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
+from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -240,7 +241,10 @@ def search_view(request):
             )
 
             # Skip if this keyword already has results for the SAME country today
-            if not created and keyword_obj.results.filter(country=country).exists():
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            if not created and keyword_obj.results.filter(
+                country=country, searched_at__gte=today_start
+            ).exists():
                 skipped.append(f"{kw_text} ({country.upper()})")
                 continue
 
@@ -266,8 +270,8 @@ def search_view(request):
             download_estimates = download_est.estimate(popularity or 0, len(competitors))
             breakdown["download_estimates"] = download_estimates
 
-            # Save result (historical results are preserved for trend tracking)
-            search_result = SearchResult.objects.create(
+            # Save result (one entry per keyword+country per day)
+            search_result = SearchResult.upsert_today(
                 keyword=keyword_obj,
                 popularity_score=popularity,
                 difficulty_score=difficulty_score,
@@ -468,9 +472,8 @@ def opportunity_save_view(request):
 
     for item in selected:
         country = item.get("country", "us")
-        # Delete existing result for this keyword+country to prevent duplicates
-        SearchResult.objects.filter(keyword=keyword_obj, country=country).delete()
-        SearchResult.objects.create(
+        # One entry per keyword+country per day (preserves historical trend data)
+        SearchResult.upsert_today(
             keyword=keyword_obj,
             popularity_score=item.get("popularity", 0),
             difficulty_score=item.get("difficulty", 0),
@@ -689,8 +692,8 @@ def keyword_refresh_view(request, keyword_id):
     download_estimates = download_est.estimate(popularity or 0, len(competitors))
     breakdown["download_estimates"] = download_estimates
 
-    # Save new result (app_rank persisted from top-200 search)
-    search_result = SearchResult.objects.create(
+    # Save new result (one entry per keyword+country per day)
+    search_result = SearchResult.upsert_today(
         keyword=keyword_obj,
         popularity_score=popularity,
         difficulty_score=difficulty_score,
@@ -810,7 +813,7 @@ def keywords_bulk_refresh_view(request):
         download_estimates = download_est.estimate(popularity or 0, len(competitors))
         breakdown["download_estimates"] = download_estimates
 
-        search_result = SearchResult.objects.create(
+        search_result = SearchResult.upsert_today(
             keyword=kw,
             popularity_score=popularity,
             difficulty_score=difficulty_score,
