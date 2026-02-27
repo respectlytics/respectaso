@@ -215,43 +215,62 @@
                 <button id="filter-clear" onclick="clearAllFilters()" class="text-xs text-purple-400 hover:text-purple-300 transition-colors hidden">Clear all</button>
             </div>
             <div id="filter-panel" class="hidden mt-2 bg-[#1e293b] border border-white/10 rounded-xl p-3 animate-fade-in">
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <!-- Insight chips -->
-                    <div class="flex-1">
+                <div class="flex items-end gap-3">
+                    <!-- Insight multi-select dropdown -->
+                    <div class="relative" id="insight-dropdown-wrap">
                         <label class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Insight</label>
-                        <div class="flex flex-wrap gap-1" id="insight-chips">
-                            <button type="button" data-insight="Sweet Spot" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-green-500/40 hover:text-green-300">🎯 Sweet Spot</button>
-                            <button type="button" data-insight="Good Target" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-green-500/40 hover:text-green-300">✅ Good Target</button>
-                            <button type="button" data-insight="Hidden Gem" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-blue-500/40 hover:text-blue-300">💎 Hidden Gem</button>
-                            <button type="button" data-insight="Worth Competing" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-yellow-500/40 hover:text-yellow-300">⚔️ Worth Competing</button>
-                            <button type="button" data-insight="Decent Option" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-slate-500/40 hover:text-slate-300">👍 Decent Option</button>
-                            <button type="button" data-insight="Low Volume" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-slate-500/40 hover:text-slate-300">🔍 Low Volume</button>
-                            <button type="button" data-insight="Avoid" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-red-500/40 hover:text-red-300">🚫 Avoid</button>
-                            <button type="button" data-insight="Challenging" class="insight-chip px-2 py-1 rounded-md text-[11px] border transition-colors bg-transparent text-slate-400 border-white/10 hover:border-yellow-500/40 hover:text-yellow-300">⚔️ Challenging</button>
+                        <button type="button" id="insight-dropdown-btn" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[160px] justify-between">
+                            <span id="insight-dropdown-text" class="truncate">Any</span>
+                            <svg class="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="insight-dropdown-panel" class="hidden absolute top-full left-0 mt-1 bg-slate-800 border border-white/10 rounded-lg py-1 z-50 shadow-xl min-w-[200px] max-h-64 overflow-y-auto">
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Sweet Spot" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> 🎯 Sweet Spot
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Good Target" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> ✅ Good Target
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Hidden Gem" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> 💎 Hidden Gem
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Worth Competing" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> ⚔️ Worth Competing
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Decent Option" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> 👍 Decent Option
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Low Volume" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> 🔍 Low Volume
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Avoid" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> 🚫 Avoid
+                            </label>
+                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
+                                <input type="checkbox" value="Challenging" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0"> ⚔️ Challenging
+                            </label>
                         </div>
                     </div>
-                    <!-- Threshold dropdowns -->
-                    <div class="flex items-end gap-3 flex-shrink-0">
-                        <div>
-                            <label for="filter-pop-min" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Popularity ≥</label>
-                            <select id="filter-pop-min" class="bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <option value="">Any</option>
-                                <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option>
-                                <option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option>
-                                <option value="55">55</option><option value="60">60</option><option value="65">65</option><option value="70">70</option><option value="75">75</option>
-                                <option value="80">80</option><option value="85">85</option><option value="90">90</option><option value="95">95</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="filter-diff-max" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Difficulty ≤</label>
-                            <select id="filter-diff-max" class="bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <option value="">Any</option>
-                                <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option>
-                                <option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option>
-                                <option value="55">55</option><option value="60">60</option><option value="65">65</option><option value="70">70</option><option value="75">75</option>
-                                <option value="80">80</option><option value="85">85</option><option value="90">90</option><option value="95">95</option><option value="100">100</option>
-                            </select>
-                        </div>
+                    <!-- Popularity dropdown -->
+                    <div>
+                        <label for="filter-pop-min" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Popularity ≥</label>
+                        <select id="filter-pop-min" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Any</option>
+                            <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option>
+                            <option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option>
+                            <option value="55">55</option><option value="60">60</option><option value="65">65</option><option value="70">70</option><option value="75">75</option>
+                            <option value="80">80</option><option value="85">85</option><option value="90">90</option><option value="95">95</option>
+                        </select>
+                    </div>
+                    <!-- Difficulty dropdown -->
+                    <div>
+                        <label for="filter-diff-max" class="block text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">Difficulty ≤</label>
+                        <select id="filter-diff-max" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="">Any</option>
+                            <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option>
+                            <option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option>
+                            <option value="55">55</option><option value="60">60</option><option value="65">65</option><option value="70">70</option><option value="75">75</option>
+                            <option value="80">80</option><option value="85">85</option><option value="90">90</option><option value="95">95</option><option value="100">100</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -908,37 +927,58 @@ function clearAllFilters() {
     filterDiffMax = null;
 
     // Reset UI
-    document.querySelectorAll('.insight-chip').forEach(chip => {
-        chip.classList.remove('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
-        chip.classList.add('bg-transparent', 'text-slate-400', 'border-white/10');
-    });
+    document.querySelectorAll('.insight-cb').forEach(cb => cb.checked = false);
+    updateInsightDropdownText();
     const popInput = document.getElementById('filter-pop-min');
     const diffInput = document.getElementById('filter-diff-max');
-    if (popInput) popInput.value = '';
-    if (diffInput) diffInput.value = '';
-    // Also reset the select elements visually
     if (popInput) popInput.selectedIndex = 0;
     if (diffInput) diffInput.selectedIndex = 0;
 
     applyFilters();
 }
 
-// Wire up insight chips
-document.querySelectorAll('.insight-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-        const insight = chip.dataset.insight;
-        if (activeInsights.has(insight)) {
-            activeInsights.delete(insight);
-            chip.classList.remove('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
-            chip.classList.add('bg-transparent', 'text-slate-400', 'border-white/10');
-        } else {
-            activeInsights.add(insight);
-            chip.classList.add('bg-purple-600/20', 'border-purple-500/40', 'text-white', 'font-semibold');
-            chip.classList.remove('bg-transparent', 'text-slate-400', 'border-white/10');
-        }
+// Wire up insight multi-select dropdown
+function updateInsightDropdownText() {
+    const textEl = document.getElementById('insight-dropdown-text');
+    if (!textEl) return;
+    if (activeInsights.size === 0) {
+        textEl.textContent = 'Any';
+        textEl.classList.add('text-slate-400');
+        textEl.classList.remove('text-white');
+    } else if (activeInsights.size === 1) {
+        textEl.textContent = [...activeInsights][0];
+        textEl.classList.remove('text-slate-400');
+        textEl.classList.add('text-white');
+    } else {
+        textEl.textContent = `${activeInsights.size} selected`;
+        textEl.classList.remove('text-slate-400');
+        textEl.classList.add('text-white');
+    }
+}
+
+(function initInsightDropdown() {
+    const btn = document.getElementById('insight-dropdown-btn');
+    const panel = document.getElementById('insight-dropdown-panel');
+    const wrap = document.getElementById('insight-dropdown-wrap');
+    if (!btn || !panel) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) panel.classList.add('hidden');
+    });
+
+    panel.addEventListener('change', (e) => {
+        if (!e.target.classList.contains('insight-cb')) return;
+        activeInsights.clear();
+        panel.querySelectorAll('.insight-cb:checked').forEach(cb => activeInsights.add(cb.value));
+        updateInsightDropdownText();
         applyFilters();
     });
-});
+})();
 
 // Wire up threshold dropdowns
 const filterPopInput = document.getElementById('filter-pop-min');
