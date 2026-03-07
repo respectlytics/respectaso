@@ -229,11 +229,6 @@ def search_view(request):
     for country in countries:
         country_results = []
         for kw_text in keywords:
-            # Rate limit between API calls
-            if call_count > 0:
-                time.sleep(2)
-            call_count += 1
-
             # Get or create keyword
             keyword_obj, created = Keyword.objects.get_or_create(
                 keyword=kw_text.lower(),
@@ -247,6 +242,11 @@ def search_view(request):
             ).exists():
                 skipped.append(f"{kw_text} ({country.upper()})")
                 continue
+
+            # Rate limit between API calls
+            if call_count > 0:
+                time.sleep(2)
+            call_count += 1
 
             # iTunes Search
             competitors = itunes_service.search_apps(kw_text, country=country, limit=25)
