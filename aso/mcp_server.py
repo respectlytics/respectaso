@@ -38,37 +38,45 @@ def list_keywords(app_id: int | None = None) -> list[dict]:
     from django.db.models import Max
     from .models import Keyword, SearchResult
 
-    qs = Keyword.objects.select_related("app").all()
+    qs = list(Keyword.objects.select_related("app").all())
     if app_id is not None:
-        qs = qs.filter(app_id=app_id)
+        qs = [kw for kw in qs if kw.app_id == app_id]
 
-    results = []
-    for kw in qs:
-        # Latest result ID per country for this keyword
-        latest_ids = (
-            SearchResult.objects.filter(keyword=kw)
-            .values("country")
-            .annotate(latest_id=Max("id"))
-            .values_list("latest_id", flat=True)
-        )
-        latest_results = SearchResult.objects.filter(id__in=latest_ids).order_by("country")
-        results.append({
+    if not qs:
+        return []
+
+    kw_ids = [kw.id for kw in qs]
+
+    # Single batch query: latest result ID per (keyword, country) across all keywords
+    latest_ids = list(
+        SearchResult.objects.filter(keyword_id__in=kw_ids)
+        .values("keyword_id", "country")
+        .annotate(latest_id=Max("id"))
+        .values_list("latest_id", flat=True)
+    )
+
+    # Fetch all latest results in one query, group by keyword_id
+    from collections import defaultdict
+    grouped: dict[int, list] = defaultdict(list)
+    for r in SearchResult.objects.filter(id__in=latest_ids).order_by("keyword_id", "country"):
+        grouped[r.keyword_id].append({
+            "country": r.country,
+            "popularity_score": r.popularity_score,
+            "difficulty_score": r.difficulty_score,
+            "difficulty_label": r.difficulty_label,
+            "searched_at": r.searched_at.isoformat(),
+        })
+
+    return [
+        {
             "id": kw.id,
             "keyword": kw.keyword,
             "app_id": kw.app_id,
             "app_name": kw.app.name if kw.app else None,
-            "results": [
-                {
-                    "country": r.country,
-                    "popularity_score": r.popularity_score,
-                    "difficulty_score": r.difficulty_score,
-                    "difficulty_label": r.difficulty_label,
-                    "searched_at": r.searched_at.isoformat(),
-                }
-                for r in latest_results
-            ],
-        })
-    return results
+            "results": grouped[kw.id],
+        }
+        for kw in qs
+    ]
 
 
 @mcp.tool()
@@ -88,7 +96,7 @@ def get_keyword_scores(keyword_id: int, country: str | None = None) -> dict:
 
     qs = SearchResult.objects.filter(keyword=kw)
     if country:
-        qs = qs.filter(country=country)
+        qs = qs.filter(country=country.lower())
 
     result = qs.order_by("-searched_at").first()
     if not result:
@@ -124,7 +132,7 @@ def get_keyword_trend(keyword_id: int, country: str | None = None) -> list[dict]
 
     qs = SearchResult.objects.filter(keyword=kw).order_by("searched_at")
     if country:
-        qs = qs.filter(country=country)
+        qs = qs.filter(country=country.lower())
 
     return [
         {

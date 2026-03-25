@@ -11,12 +11,24 @@ class ListAppsToolTest(TestCase):
         self.assertEqual(result, [])
 
     def test_returns_app_fields(self):
-        App.objects.create(name="My App", bundle_id="com.test.app", track_id=123456)
+        App.objects.create(
+            name="My App",
+            bundle_id="com.test.app",
+            track_id=123456,
+            store_url="https://apps.apple.com/app/id123456",
+            icon_url="https://example.com/icon.png",
+            seller_name="Test Dev",
+        )
         result = list_apps()
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["name"], "My App")
-        self.assertEqual(result[0]["bundle_id"], "com.test.app")
-        self.assertIn("id", result[0])
+        app = result[0]
+        self.assertIn("id", app)
+        self.assertEqual(app["name"], "My App")
+        self.assertEqual(app["bundle_id"], "com.test.app")
+        self.assertEqual(app["track_id"], 123456)
+        self.assertEqual(app["store_url"], "https://apps.apple.com/app/id123456")
+        self.assertEqual(app["icon_url"], "https://example.com/icon.png")
+        self.assertEqual(app["seller_name"], "Test Dev")
 
 
 class ListKeywordsToolTest(TestCase):
@@ -108,6 +120,11 @@ class GetKeywordTrendToolTest(TestCase):
     def test_not_found(self):
         result = get_keyword_trend(keyword_id=99999)
         self.assertIn("error", result[0])
+
+    def test_empty_results_returns_empty_list(self):
+        kw = Keyword.objects.create(keyword="empty_keyword")
+        result = get_keyword_trend(keyword_id=kw.id)
+        self.assertEqual(result, [])
 
 
 class GetSearchHistoryToolTest(TestCase):
