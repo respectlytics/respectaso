@@ -14,7 +14,7 @@ class AddAppToolTest(TestCase):
     def test_duplicate_track_id_returns_error(self):
         App.objects.create(name="Existing", track_id=999)
         result = add_app(name="Duplicate", track_id=999)
-        self.assertIn("error", result)
+        self.assertEqual(result["error"], "An app with this track_id already exists")
         self.assertEqual(App.objects.count(), 1)
 
     def test_no_track_id_is_fine(self):
