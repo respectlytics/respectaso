@@ -7,6 +7,20 @@ from .services import ITunesSearchService  # module-level — required for test 
 mcp = FastMCP("RespectASO")
 
 
+def _difficulty_label(score: int) -> str:
+    if score <= 15:
+        return "Very Easy"
+    if score <= 35:
+        return "Easy"
+    if score <= 55:
+        return "Moderate"
+    if score <= 75:
+        return "Hard"
+    if score <= 90:
+        return "Very Hard"
+    return "Extreme"
+
+
 # ---------------------------------------------------------------------------
 # Read Tools
 # ---------------------------------------------------------------------------
@@ -260,7 +274,9 @@ def search_keywords(
             kw_obj, created = Keyword.objects.get_or_create(
                 keyword=kw_text.lower(), app=app
             )
-            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_start = timezone.make_aware(
+                timezone.datetime.combine(timezone.localdate(), timezone.datetime.min.time())
+            )
             if not created and kw_obj.results.filter(
                 country=country, searched_at__gte=today_start
             ).exists():
@@ -330,7 +346,9 @@ def search_keywords(
             })
         opportunity_ranking.sort(key=lambda x: x["best_score"], reverse=True)
 
-    response: dict = {"results_by_country": results_by_country, "opportunity_ranking": opportunity_ranking}
+    response: dict = {"results_by_country": results_by_country}
+    if opportunity_ranking:
+        response["opportunity_ranking"] = opportunity_ranking
     if skipped:
         response["skipped"] = skipped
     return response
@@ -385,14 +403,7 @@ def opportunity_search(keyword: str, app_id: int | None = None) -> dict:
             "country": country_code,
             "popularity": popularity,
             "difficulty": difficulty_score,
-            "difficulty_label": (
-                "Very Easy" if difficulty_score <= 15
-                else "Easy" if difficulty_score <= 35
-                else "Moderate" if difficulty_score <= 55
-                else "Hard" if difficulty_score <= 75
-                else "Very Hard" if difficulty_score <= 90
-                else "Extreme"
-            ),
+            "difficulty_label": _difficulty_label(difficulty_score),
             "opportunity": opportunity,
             "app_rank": app_rank,
             "competitor_count": len(competitors),
@@ -469,11 +480,11 @@ def bulk_refresh_keywords(app_id: int | None = None, country: str = "us") -> dic
     from .services import DifficultyCalculator, PopularityEstimator, DownloadEstimator
 
     if app_id is not None:
-        keywords = Keyword.objects.filter(app_id=app_id).select_related("app")
+        keywords = list(Keyword.objects.filter(app_id=app_id).select_related("app"))
     else:
-        keywords = Keyword.objects.filter(app__isnull=True)
+        keywords = list(Keyword.objects.filter(app__isnull=True))
 
-    if not keywords.exists():
+    if not keywords:
         return {"success": True, "results": [], "refreshed": 0}
 
     itunes = ITunesSearchService()

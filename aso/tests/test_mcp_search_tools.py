@@ -31,16 +31,16 @@ def _mock_itunes():
 
 
 class SearchKeywordsToolTest(TestCase):
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_creates_search_result(self, _mock):
         result = search_keywords(keywords="fitness", countries=["us"])
         self.assertIn("us", result["results_by_country"])
         self.assertEqual(len(result["results_by_country"]["us"]), 1)
         self.assertEqual(result["results_by_country"]["us"][0]["keyword"], "fitness")
-        # Verify DB was written
         self.assertEqual(SearchResult.objects.count(), 1)
+        self.assertNotIn("opportunity_ranking", result)  # single-country: no ranking key
 
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_rejects_more_than_20_keywords(self, _mock):
         result = search_keywords(keywords=",".join(f"kw{i}" for i in range(25)), countries=["us"])
         # Should process exactly 20 (capped at 20, no prior results to skip in clean DB)
@@ -48,7 +48,7 @@ class SearchKeywordsToolTest(TestCase):
             sum(len(v) for v in result["results_by_country"].values()), 20
         )
 
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_multi_country_produces_opportunity_ranking(self, _mock):
         result = search_keywords(keywords="fitness", countries=["us", "gb"])
         self.assertIn("opportunity_ranking", result)
@@ -57,7 +57,7 @@ class SearchKeywordsToolTest(TestCase):
 
 class OpportunitySearchToolTest(TestCase):
     @patch("aso.mcp_server.COUNTRY_CHOICES", [("us", "United States"), ("gb", "United Kingdom")])
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_returns_country_ranking(self, _mock):
         result = opportunity_search(keyword="yoga")
         self.assertEqual(result["keyword"], "yoga")
@@ -70,7 +70,7 @@ class RefreshKeywordToolTest(TestCase):
     def setUp(self):
         self.kw = Keyword.objects.create(keyword="running")
 
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_creates_new_result(self, _mock):
         result = refresh_keyword(keyword_id=self.kw.id)
         self.assertTrue(result["success"])
@@ -88,13 +88,13 @@ class BulkRefreshKeywordsToolTest(TestCase):
         Keyword.objects.create(keyword="yoga", app=self.app)
         Keyword.objects.create(keyword="meditation", app=self.app)
 
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_refreshes_all_for_app(self, _mock):
         result = bulk_refresh_keywords(app_id=self.app.id)
         self.assertTrue(result["success"])
         self.assertEqual(result["refreshed"], 2)
 
-    @patch("aso.mcp_server.ITunesSearchService", return_value=_mock_itunes())
+    @patch("aso.mcp_server.ITunesSearchService", side_effect=lambda: _mock_itunes())
     def test_unassigned_only_when_no_app_id(self, _mock):
         Keyword.objects.create(keyword="unassigned_kw")  # no app
         result = bulk_refresh_keywords()
