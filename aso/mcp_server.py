@@ -527,3 +527,63 @@ def bulk_refresh_keywords(app_id: int | None = None, country: str = "us") -> dic
         })
 
     return {"success": True, "results": results, "refreshed": len(results)}
+
+
+# ---------------------------------------------------------------------------
+# Management Tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def add_app(
+    name: str,
+    bundle_id: str = "",
+    track_id: int | None = None,
+    store_url: str = "",
+    icon_url: str = "",
+    seller_name: str = "",
+) -> dict:
+    """Add a new app for keyword tracking. track_id must be unique if provided."""
+    from .models import App
+
+    if track_id is not None and App.objects.filter(track_id=track_id).exists():
+        return {"error": "An app with this track_id already exists"}
+
+    app = App.objects.create(
+        name=name,
+        bundle_id=bundle_id,
+        track_id=track_id,
+        store_url=store_url,
+        icon_url=icon_url,
+        seller_name=seller_name,
+    )
+    return {"id": app.id, "name": app.name}
+
+
+@mcp.tool()
+def delete_keyword(keyword_id: int) -> dict:
+    """Delete a keyword and all its search results."""
+    from .models import Keyword
+
+    try:
+        kw = Keyword.objects.get(id=keyword_id)
+    except Keyword.DoesNotExist:
+        return {"error": f"Keyword {keyword_id} not found"}
+
+    name = kw.keyword
+    kw.delete()
+    return {"success": True, "deleted": name}
+
+
+@mcp.tool()
+def delete_app(app_id: int) -> dict:
+    """Delete an app. Keywords linked to this app are preserved (their app field is set to null)."""
+    from .models import App
+
+    try:
+        app = App.objects.get(id=app_id)
+    except App.DoesNotExist:
+        return {"error": f"App {app_id} not found"}
+
+    name = app.name
+    app.delete()
+    return {"success": True, "deleted": name}
