@@ -299,9 +299,7 @@ def search_keywords(
             kw_obj, created = Keyword.objects.get_or_create(
                 keyword=kw_text.lower(), app=app
             )
-            today_start = timezone.make_aware(
-                timezone.datetime.combine(timezone.localdate(), timezone.datetime.min.time())
-            )
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
             if not created and kw_obj.results.filter(
                 country=country, searched_at__gte=today_start
             ).exists():

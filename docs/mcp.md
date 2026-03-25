@@ -42,8 +42,8 @@ services:
 - From your host machine: `http://localhost/mcp`
   (port 80 on the host maps to 8080 inside the container)
 
-> **Note:** Use the path without a trailing slash. `POST /mcp/` redirects to `/mcp`
-> which some HTTP clients do not follow for non-GET requests.
+> **Note:** Both `/mcp` and `/mcp/` are handled by the server. For best compatibility
+> with HTTP clients that do not follow redirects on POST, use `/mcp` (no trailing slash).
 
 ---
 
@@ -285,7 +285,9 @@ Search a single keyword across all 30 App Store countries.
 
 **Returns:** Countries ranked by opportunity score (popularity × (100 - difficulty) / 100).
 
-**Notes:** ~60 seconds runtime (30 iTunes calls at 2s each).
+**Notes:**
+- ~60 seconds runtime (30 iTunes calls at 2s each).
+- Results are **not persisted** to the database. Use `search_keywords` if you want results saved to history.
 
 ---
 
@@ -298,6 +300,24 @@ Re-run scoring for a single keyword+country.
 |-----------|------|----------|-------|
 | `keyword_id` | integer | Yes | |
 | `country` | string | No | Default: `"us"` |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "result": {
+    "keyword": "fitness tracker",
+    "keyword_id": 1,
+    "result_id": 42,
+    "popularity_score": 65,
+    "difficulty_score": 72,
+    "difficulty_label": "Hard",
+    "country": "us",
+    "searched_at": "2026-03-25T10:00:00+00:00",
+    "app_rank": 14
+  }
+}
+```
 
 ---
 
@@ -312,6 +332,24 @@ Re-run scoring for all keywords under an app (or all unassigned keywords).
 | `country` | string | No | Default: `"us"` |
 
 To refresh all keywords across all apps, call once per app.
+
+**Returns:**
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "keyword": "fitness tracker",
+      "keyword_id": 1,
+      "result_id": 42,
+      "popularity_score": 65,
+      "difficulty_score": 72,
+      "country": "us"
+    }
+  ],
+  "refreshed": 1
+}
+```
 
 ---
 
