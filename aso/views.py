@@ -1043,78 +1043,52 @@ def export_history_csv_view(request):
 @require_POST
 def keywords_bulk_refresh_view(request):
     """
-    Re-run difficulty for all keywords under an app.
+    Refresh keyword+country pairs that already have results, scoped by
+    the user's current app and country filters.  Runs in a background
+    thread so the user can navigate away safely.  The dashboard progress
+    bar polls ``auto_refresh_status`` to show live progress.
 
-    POST body: {"app_id": int|null, "country": "us"}
-    Returns JSON with all new results.
+    POST body: {"app_id": int|null, "country": str|""}
+      - app_id=null  → all keywords (every app + unassigned)
+      - app_id=<int> → only keywords linked to that app
+      - country=""   → all countries
+      - country="fr"  → only that country
     """
     body = json.loads(request.body)
     app_id = body.get("app_id")
-    country = body.get("country", "us")
+    country = (body.get("country") or "").strip().lower()
 
+    from django.db.models import Max
+
+    # Find every keyword+country pair that already has at least one
+    # SearchResult.  This prevents the bug where keywords from other
+    # countries get scored in the wrong country.
+    base_qs = SearchResult.objects.all()
     if app_id:
-        keywords = Keyword.objects.filter(app_id=app_id)
-    else:
-        keywords = Keyword.objects.filter(app__isnull=True)
+        base_qs = base_qs.filter(keyword__app_id=app_id)
+    # app_id=null means "all" — no app filter applied
 
-    if not keywords.exists():
-        return JsonResponse({"success": True, "results": [], "refreshed": 0})
+    if country:
+        base_qs = base_qs.filter(country=country)
 
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
-    download_est = DownloadEstimator()
+    pairs = list(
+        base_qs
+        .values("keyword_id", "country")
+        .annotate(_latest=Max("id"))
+        .values_list("keyword_id", "country")
+    )
 
-    results = []
-    for i, kw in enumerate(keywords):
-        if i > 0:
-            time.sleep(2)
+    if not pairs:
+        return JsonResponse({"success": True, "started": False, "total": 0})
 
-        competitors = itunes_service.search_apps(kw.keyword, country=country, limit=25)
-        difficulty_score, breakdown = difficulty_calc.calculate(
-            competitors, keyword=kw.keyword
-        )
+    from .scheduler import get_status, run_manual_refresh
 
-        app_rank = None
-        if kw.app and kw.app.track_id:
-            app_rank = itunes_service.find_app_rank(
-                kw.keyword, kw.app.track_id, country=country
-            )
+    status = get_status()
+    if status["running"]:
+        return JsonResponse({"success": False, "error": "A refresh is already in progress."})
 
-        popularity = popularity_est.estimate(competitors, kw.keyword)
-
-        # Download estimates
-        download_estimates = download_est.estimate(
-            popularity or 0,
-            country=country,
-        )
-        breakdown["download_estimates"] = download_estimates
-
-        search_result = SearchResult.upsert_today(
-            keyword=kw,
-            popularity_score=popularity,
-            difficulty_score=difficulty_score,
-            difficulty_breakdown=breakdown,
-            competitors_data=competitors,
-            app_rank=app_rank,
-            country=country,
-        )
-
-        results.append({
-            "keyword": kw.keyword,
-            "keyword_id": kw.pk,
-            "result_id": search_result.pk,
-            "popularity_score": popularity,
-            "difficulty_score": difficulty_score,
-            "difficulty_label": search_result.difficulty_label,
-            "difficulty_color": search_result.difficulty_color,
-            "country": country,
-            "searched_at": search_result.searched_at.strftime("%b %d, %H:%M"),
-            "app_rank": app_rank,
-            "app_name": kw.app.name if kw.app else None,
-        })
-
-    return JsonResponse({"success": True, "results": results, "refreshed": len(results)})
+    run_manual_refresh(pairs)
+    return JsonResponse({"success": True, "started": True, "total": len(pairs)})
 
 
 def version_check_view(request):

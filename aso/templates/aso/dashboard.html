@@ -178,7 +178,7 @@
     </details>
 
     <!-- Search History -->
-    <div id="history-section">
+    <div id="history-section" class="mt-10">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <div>
                 <h2 class="text-base font-semibold text-white">
@@ -1167,28 +1167,40 @@ async function refreshKeyword(keywordId, btn) {
 }
 
 async function bulkRefresh() {
-    const resultCount = {{ total_count|default:"0" }};
-    const ok = await showConfirm(`Refresh all ${resultCount} keywords? This may take a while.`, {type: 'alert', title: 'Bulk Refresh'});
+    const ok = await showConfirm('Refresh all tracked keywords across all countries? This runs in the background — you can navigate away safely.', {type: 'alert', title: 'Bulk Refresh'});
     if (!ok) return;
 
     const btn = document.getElementById('bulk-refresh-btn');
     btn.disabled = true;
-    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Refreshing rankings...`;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Starting…`;
 
     try {
+        const countryEl = document.getElementById('history-country-filter');
+        const countryVal = countryEl ? countryEl.value : '';
         const resp = await fetch('{% url "aso:keywords_bulk_refresh" %}', {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
-            body: JSON.stringify({app_id: selectedApp, country: getSelectedCountries()[0] || 'us'}),
+            body: JSON.stringify({app_id: selectedApp, country: countryVal}),
         });
-        if (resp.ok) {
-            const data = await resp.json();
-            await showAlert(`Refreshed ${data.refreshed} keywords.`, {type: 'success', title: 'Done'});
-            location.reload();
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            // Background thread started — the auto-refresh progress bar
+            // (polled every 5 s) will show live progress and reload the
+            // history section when finished.
+            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
+            btn.disabled = false;
+            if (data.total === 0) {
+                await showAlert('No keywords to refresh.', {type: 'info', title: 'Nothing to do'});
+            }
+            // Progress bar will appear automatically via the existing poller
+        } else {
+            await showAlert(data.error || 'Could not start refresh.', {type: 'danger', title: 'Error'});
+            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
+            btn.disabled = false;
         }
     } catch (e) {
         showAlert('Bulk refresh failed.', {type: 'danger', title: 'Error'});
-    } finally {
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
         btn.disabled = false;
     }
 }
