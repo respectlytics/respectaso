@@ -2,7 +2,7 @@
 Opportunity tools — opportunity scoring and multi-country comparison.
 """
 
-from mcp_server.src.app import mcp
+from mcp_server.src import mcp
 
 
 @mcp.tool()

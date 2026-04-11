@@ -42,11 +42,11 @@ logger = logging.getLogger(__name__)
 # Importing a module that calls @mcp.tool() registers its tools automatically.
 # ---------------------------------------------------------------------------
 
-from mcp_server.src.app import mcp  # noqa: E402
+from mcp_server.src import mcp  # noqa: E402
 
-import mcp_server.src.tools.health          # noqa: F401, E402
+import mcp_server.src.tools.health  # noqa: F401, E402
 import mcp_server.src.tools.keyword_search  # noqa: F401, E402
-import mcp_server.src.tools.opportunity     # noqa: F401, E402
+import mcp_server.src.tools.opportunity  # noqa: F401, E402
 
 # ---------------------------------------------------------------------------
 # Entry point
