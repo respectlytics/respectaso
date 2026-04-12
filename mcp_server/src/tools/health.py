@@ -2,7 +2,7 @@
 Health tool — server liveness check.
 """
 
-from fastmcp import FastMCP
+from mcp_server.src import mcp
 
 
 
