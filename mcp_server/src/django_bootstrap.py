@@ -46,7 +46,7 @@ def bootstrap_django(
         data_dir: Optional explicit data directory path. If omitted, we use:
             1) Existing `DATA_DIR` env var (if already set), otherwise
             2) `RESPECTASO_DATA_DIR` env var (if provided), otherwise
-            3) Django's own default from `core.settings`.
+            3) Native macOS app default: `~/Library/Application Support/RespectASO/`
 
     Returns:
         The repository root path used for module import resolution.
@@ -65,18 +65,18 @@ def bootstrap_django(
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
 
         if "DATA_DIR" not in os.environ:
-            resolved_data_dir: Path | None = None
-
             if data_dir is not None:
                 resolved_data_dir = Path(data_dir).expanduser()
             else:
                 env_data_dir = os.environ.get("RESPECTASO_DATA_DIR")
                 if env_data_dir:
                     resolved_data_dir = Path(env_data_dir).expanduser()
+                else:
+                    # Fallback to the native macOS desktop app data directory
+                    resolved_data_dir = Path.home() / "Library" / "Application Support" / "RespectASO"
 
-            if resolved_data_dir is not None:
-                resolved_data_dir.mkdir(parents=True, exist_ok=True)
-                os.environ["DATA_DIR"] = str(resolved_data_dir)
+            resolved_data_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["DATA_DIR"] = str(resolved_data_dir)
 
         import django
 
