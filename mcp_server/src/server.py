@@ -42,11 +42,28 @@ logger = logging.getLogger(__name__)
 # Importing a module that calls @mcp.tool() registers its tools automatically.
 # ---------------------------------------------------------------------------
 
-from mcp_server.src import mcp  # noqa: E402
+from mcp_server.src import mcp
 
-import mcp_server.src.tools.health  # noqa: F401, E402
-import mcp_server.src.tools.keyword_search  # noqa: F401, E402
-import mcp_server.src.tools.opportunity  # noqa: F401, E402
+import mcp_server.src.tools.health
+import mcp_server.src.tools.keyword_search
+import mcp_server.src.tools.opportunity
+import mcp_server.src.tools.saved_keywords
+
+# ---------------------------------------------------------------------------
+# ResourcesAsTools transform
+#
+# saved_keywords.py registers an @mcp.resource() — this only works for MCP
+# clients that natively support `resources/read`. Most LLM integrations
+# (Claude Desktop, Cursor, etc.) only support *tools*, not resources.
+#
+# ResourcesAsTools auto-generates two tool wrappers — `list_resources` and
+# `read_resource` — so that tool-only clients can still discover and read
+# the saved keywords resource without any extra code.
+# ---------------------------------------------------------------------------
+
+from fastmcp.server.transforms import ResourcesAsTools
+
+mcp.add_transform(ResourcesAsTools(mcp))
 
 # ---------------------------------------------------------------------------
 # Entry point

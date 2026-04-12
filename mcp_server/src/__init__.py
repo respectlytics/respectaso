@@ -5,7 +5,7 @@ Tool modules should import `mcp` from this package and decorate functions
 with `@mcp.tool(...)`.
 """
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 mcp = FastMCP(
     name="RespectASO",
