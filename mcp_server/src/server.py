@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 from mcp_server.src import mcp
 
+import mcp_server.src.tools.get_app_id_from_name
 import mcp_server.src.tools.health
 import mcp_server.src.tools.keyword_search
 import mcp_server.src.tools.opportunity

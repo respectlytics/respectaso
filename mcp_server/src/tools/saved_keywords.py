@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
         "Read the user's saved keyword search history from the local database. "
         "Returns the latest search result per keyword+country pair — the same "
         "data shown on the RespectASO Dashboard. Optionally filter by app_id "
-        "or country code."
+        "or country code. If the user only gives an app title, resolve it with "
+        "get_app_id_from_name first, then pass app_id."
     ),
     mime_type="application/json",
 )
@@ -35,6 +36,8 @@ async def get_saved_keywords(app_id: str = "", country: str = "") -> str:
 
     Args:
         app_id: Optional app ID to filter keywords linked to a specific app.
+            If user only provides app title/name, resolve it first using
+            get_app_id_from_name and pass the resolved ID here.
         country: Optional two-letter country code to filter results.
 
     Returns:
@@ -62,8 +65,21 @@ def _fetch_saved_keywords(app_id: str, country: str) -> str:
     # Build the same "latest result per keyword+country" query used by
     # dashboard_view in aso/views.py (lines 99-134).
     filters = {}
-    if app_id:
-        filters["keyword__app_id"] = int(app_id)
+    raw_app_id = (app_id or "").strip()
+    if raw_app_id:
+        try:
+            filters["keyword__app_id"] = int(raw_app_id)
+        except (TypeError, ValueError):
+            return json.dumps(
+                {
+                    "error": "invalid_app_id",
+                    "message": "app_id must be a numeric app ID.",
+                    "hint": (
+                        "Call resolve_app_id_by_name first when the user only "
+                        "provides an app title."
+                    ),
+                }
+            )
     if country:
         filters["country"] = country.strip().lower()
 
@@ -109,7 +125,7 @@ def _fetch_saved_keywords(app_id: str, country: str) -> str:
     return json.dumps({
         "total_keywords": len(keywords),
         "filters_applied": {
-            "app_id": app_id or None,
+            "app_id": raw_app_id or None,
             "country": country or None,
         },
         "keywords": keywords,
