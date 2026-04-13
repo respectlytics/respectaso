@@ -58,6 +58,8 @@
             showKeywordCard(progressData);
         } else if (progressData.type === 'ai_thinking') {
             showAIThinking(progressData);
+        } else if (progressData.type === 'idle') {
+            showState('progress-idle');
         }
     }
 

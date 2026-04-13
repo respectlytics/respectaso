@@ -81,6 +81,7 @@ a = Analysis(
         "aso_pro.simulator",
         "aso_pro.agents",
         "aso_pro.constraints",
+        "aso_pro.keyword_pipeline",
         "aso_pro.prompts",
         "aso_pro.schemas",
         "aso_pro.metadata_evaluator",

@@ -466,8 +466,23 @@ class ITunesSearchService:
             logger.error(f"iTunes lookup failed for id {track_id}: {e}")
             return None
 
-    def lookup_full_description(self, track_id: int, country: str = "us") -> str:
-        """Look up an app and return its full (un-truncated) description."""
+    def lookup_full_description(self, track_id: int, country: str = "us") -> dict:
+        """Look up an app and return its description, genre, and context metadata.
+
+        Returns a dict with keys: description, genre, rating, rating_count,
+        release_date, update_date, price, version, seller.
+        """
+        defaults = {
+            "description": "",
+            "genre": "",
+            "rating": 0,
+            "rating_count": 0,
+            "release_date": "",
+            "update_date": "",
+            "price": "Free",
+            "version": "",
+            "seller": "",
+        }
         try:
             response = requests.get(
                 self.LOOKUP_URL,
@@ -477,10 +492,21 @@ class ITunesSearchService:
             response.raise_for_status()
             results = response.json().get("results", [])
             if results:
-                return results[0].get("description", "")
-            return ""
+                r = results[0]
+                return {
+                    "description": r.get("description", ""),
+                    "genre": r.get("primaryGenreName", ""),
+                    "rating": r.get("averageUserRating", 0),
+                    "rating_count": r.get("userRatingCount", 0),
+                    "release_date": r.get("releaseDate", ""),
+                    "update_date": r.get("currentVersionReleaseDate", ""),
+                    "price": r.get("formattedPrice", "Free"),
+                    "version": r.get("version", ""),
+                    "seller": r.get("sellerName", ""),
+                }
+            return defaults
         except Exception:
-            return ""
+            return defaults
 
     def search_apps(
         self, keyword: str, country: str = "us", limit: int = 10
