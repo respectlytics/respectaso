@@ -119,6 +119,54 @@
 
     <!-- Main Content -->
     <main class="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5">
+        <!-- Update Banner (populated by JS, shown on all pages) -->
+        <div id="update-banner" class="hidden animate-fade-in mb-5">
+            <div class="bg-purple-900/30 border border-purple-500/30 rounded-xl px-4 py-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm text-slate-300">
+                            <span class="text-purple-300 font-medium">RespectASO <span id="update-version"></span></span> is available
+                            <span class="text-slate-500">(you're on <span id="current-version"></span>)</span>
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button id="update-toggle-notes" onclick="document.getElementById('update-notes').classList.toggle('hidden'); this.querySelector('svg').classList.toggle('rotate-180');"
+                                class="text-xs text-slate-400 hover:text-slate-300 transition-colors inline-flex items-center gap-1 hidden">
+                            What's new
+                            <svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <a id="update-download-btn" href="#" target="_blank" rel="noopener"
+                           class="hidden text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
+                            Download Update
+                        </a>
+                        <a id="update-instructions-btn" href="{% url 'aso:setup' %}#updating"
+                           class="hidden text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
+                            Update instructions →
+                        </a>
+                        <button onclick="this.closest('#update-banner').classList.add('hidden'); try{localStorage.setItem('aso_dismiss_update', document.getElementById('update-version').textContent)}catch(e){}"
+                                class="text-slate-500 hover:text-slate-300 transition-colors p-1" title="Dismiss">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Release notes (hidden until toggled) -->
+                <div id="update-notes" class="hidden mt-3 pt-3 border-t border-purple-500/20">
+                    <div id="update-notes-content" class="text-xs text-slate-400 leading-relaxed max-h-48 overflow-y-auto [&_h2]:text-slate-300 [&_h2]:font-semibold [&_h2]:text-sm [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2:first-child]:mt-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_strong]:text-slate-300 [&_p]:mb-1.5"></div>
+                    <a id="update-release-link" href="#" target="_blank" rel="noopener" class="inline-block mt-2 text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                        View full release on GitHub →
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div id="update-check-error" class="hidden text-xs text-slate-500 text-right px-1 mb-2">
+            ⚠ Unable to check for updates
+        </div>
+
         {% block content %}{% endblock %}
     </main>
 
@@ -368,6 +416,77 @@
             }
         });
     });
+    </script>
+
+    <!-- Version update check (runs on every page) -->
+    <script>
+    (function() {
+        function showError() {
+            var el = document.getElementById('update-check-error');
+            if (el) el.classList.remove('hidden');
+        }
+        function formatReleaseNotes(md) {
+            var s = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            var lines = s.split('\n');
+            var html = [];
+            var inList = false;
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trimEnd();
+                var hm = line.match(/^#{1,3}\s+(.+)$/);
+                if (hm) {
+                    if (inList) { html.push('</ul>'); inList = false; }
+                    html.push('<h2>' + hm[1] + '</h2>');
+                    continue;
+                }
+                var lm = line.match(/^[\-\*]\s+(.+)$/);
+                if (lm) {
+                    if (!inList) { html.push('<ul>'); inList = true; }
+                    html.push('<li>' + formatInline(lm[1]) + '</li>');
+                    continue;
+                }
+                if (line.trim() === '') {
+                    if (inList) { html.push('</ul>'); inList = false; }
+                    continue;
+                }
+                if (inList) { html.push('</ul>'); inList = false; }
+                html.push('<p>' + formatInline(line) + '</p>');
+            }
+            if (inList) html.push('</ul>');
+            return html.join('');
+        }
+        function formatInline(text) {
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            text = text.replace(/`(.+?)`/g, '<code class="bg-slate-700/50 px-1 rounded text-slate-300">$1</code>');
+            return text;
+        }
+        fetch('{% url "aso:version_check" %}')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) { showError(); return; }
+                if (!data.update_available) return;
+                var versionLabel = 'v' + data.latest;
+                try { if (localStorage.getItem('aso_dismiss_update') === versionLabel) return; } catch(e) {}
+                document.getElementById('update-version').textContent = versionLabel;
+                document.getElementById('current-version').textContent = 'v' + data.current;
+                if (data.is_native && data.download_url) {
+                    var dlBtn = document.getElementById('update-download-btn');
+                    dlBtn.href = data.download_url;
+                    dlBtn.classList.remove('hidden');
+                } else {
+                    document.getElementById('update-instructions-btn').classList.remove('hidden');
+                }
+                if (data.release_notes) {
+                    document.getElementById('update-toggle-notes').classList.remove('hidden');
+                    document.getElementById('update-notes-content').innerHTML = formatReleaseNotes(data.release_notes);
+                }
+                if (data.release_url) {
+                    document.getElementById('update-release-link').href = data.release_url;
+                }
+                document.getElementById('update-banner').classList.remove('hidden');
+            })
+            .catch(function() { showError(); });
+    })();
     </script>
 </body>
 </html>

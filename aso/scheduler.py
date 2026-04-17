@@ -87,6 +87,7 @@ def _refresh_pair(keyword_obj, country):
         DownloadEstimator,
         ITunesSearchService,
         PopularityEstimator,
+        SearchAPIUnavailableError,
     )
 
     itunes_service = ITunesSearchService()
@@ -94,18 +95,28 @@ def _refresh_pair(keyword_obj, country):
     popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
-    competitors = itunes_service.search_apps(
-        keyword_obj.keyword, country=country, limit=25
-    )
+    try:
+        competitors = itunes_service.search_apps(
+            keyword_obj.keyword, country=country, limit=25
+        )
+    except SearchAPIUnavailableError as e:
+        logger.warning(
+            f"Skipping refresh for {keyword_obj.keyword} ({country}): {e}"
+        )
+        return None
+
     difficulty_score, breakdown = difficulty_calc.calculate(
         competitors, keyword=keyword_obj.keyword
     )
 
     app_rank = None
     if keyword_obj.app and keyword_obj.app.track_id:
-        app_rank = itunes_service.find_app_rank(
-            keyword_obj.keyword, keyword_obj.app.track_id, country=country
-        )
+        try:
+            app_rank = itunes_service.find_app_rank(
+                keyword_obj.keyword, keyword_obj.app.track_id, country=country
+            )
+        except SearchAPIUnavailableError:
+            pass  # Rank is optional
 
     popularity = popularity_est.estimate(competitors, keyword_obj.keyword)
 

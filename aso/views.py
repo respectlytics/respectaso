@@ -21,6 +21,7 @@ from .services import (
     DownloadEstimator,
     ITunesSearchService,
     PopularityEstimator,
+    SearchAPIUnavailableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -377,13 +378,19 @@ def search_view(request):
                 skipped.append(f"{kw_text} ({country.upper()})")
                 continue
 
-            # Rate limit between external iTunes API calls only.
+            # Rate limit between external API calls only.
             if call_count > 0:
                 time.sleep(2)
             call_count += 1
 
-            # iTunes Search
-            competitors = itunes_service.search_apps(kw_text, country=country, limit=25)
+            # Search for competitors
+            try:
+                competitors = itunes_service.search_apps(kw_text, country=country, limit=25)
+            except SearchAPIUnavailableError as e:
+                return JsonResponse(
+                    {"error": str(e)},
+                    status=503,
+                )
 
             # Difficulty Score
             difficulty_score, breakdown = difficulty_calc.calculate(
@@ -393,9 +400,12 @@ def search_view(request):
             # Find user's app rank (if app has a track_id)
             app_rank = None
             if app and app.track_id:
-                app_rank = itunes_service.find_app_rank(
-                    kw_text, app.track_id, country=country
-                )
+                try:
+                    app_rank = itunes_service.find_app_rank(
+                        kw_text, app.track_id, country=country
+                    )
+                except SearchAPIUnavailableError:
+                    pass  # Rank is optional — continue without it
 
             # Popularity (estimated from competitor data)
             popularity = popularity_est.estimate(competitors, kw_text)
@@ -516,7 +526,11 @@ def opportunity_search_country_view(request):
     popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
-    competitors = itunes_service.search_apps(keyword, country=country_code, limit=25)
+    try:
+        competitors = itunes_service.search_apps(keyword, country=country_code, limit=25)
+    except SearchAPIUnavailableError as e:
+        return JsonResponse({"error": str(e)}, status=503)
+
     difficulty_score, breakdown = difficulty_calc.calculate(
         competitors, keyword=keyword
     )
@@ -527,9 +541,12 @@ def opportunity_search_country_view(request):
 
     app_rank = None
     if app and app.track_id:
-        app_rank = itunes_service.find_app_rank(
-            keyword, app.track_id, country=country_code
-        )
+        try:
+            app_rank = itunes_service.find_app_rank(
+                keyword, app.track_id, country=country_code
+            )
+        except SearchAPIUnavailableError:
+            pass  # Rank is optional
 
     if difficulty_score <= 15:
         diff_label = "Very Easy"
@@ -593,11 +610,17 @@ def opportunity_search_view(request):
     download_est = DownloadEstimator()
 
     results = []
+    errors = []
     for i, (country_code, country_name) in enumerate(COUNTRY_CHOICES):
         if i > 0:
             time.sleep(2)
 
-        competitors = itunes_service.search_apps(kw_text, country=country_code, limit=25)
+        try:
+            competitors = itunes_service.search_apps(kw_text, country=country_code, limit=25)
+        except SearchAPIUnavailableError as e:
+            errors.append({"country": country_code, "error": str(e)})
+            continue
+
         difficulty_score, breakdown = difficulty_calc.calculate(
             competitors, keyword=kw_text
         )
@@ -611,9 +634,12 @@ def opportunity_search_view(request):
 
         app_rank = None
         if app and app.track_id:
-            app_rank = itunes_service.find_app_rank(
-                kw_text, app.track_id, country=country_code
-            )
+            try:
+                app_rank = itunes_service.find_app_rank(
+                    kw_text, app.track_id, country=country_code
+                )
+            except SearchAPIUnavailableError:
+                pass  # Rank is optional
 
         # Compute difficulty label from score (same logic as model property)
         if difficulty_score <= 15:
@@ -650,12 +676,16 @@ def opportunity_search_view(request):
 
     results.sort(key=lambda x: x["opportunity"], reverse=True)
 
-    return JsonResponse({
+    response_data = {
         "keyword": kw_text,
         "app_id": app.id if app else None,
         "results": results,
         "total_countries": len(results),
-    })
+    }
+    if errors:
+        response_data["errors"] = errors
+        response_data["error_count"] = len(errors)
+    return JsonResponse(response_data)
 
 
 @require_POST
@@ -748,7 +778,12 @@ def app_lookup_view(request):
         return JsonResponse({"apps": []})
 
     # Otherwise search by name
-    results = itunes_service.search_apps(query, limit=5)
+    try:
+        results = itunes_service.search_apps(query, limit=5)
+    except SearchAPIUnavailableError:
+        return JsonResponse(
+            {"apps": [], "error": "App Store search is temporarily unavailable."}
+        )
     return JsonResponse(
         {
             "apps": [
@@ -890,10 +925,13 @@ def keyword_refresh_view(request, keyword_id):
     popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
-    # Search iTunes
-    competitors = itunes_service.search_apps(
-        keyword_obj.keyword, country=country, limit=25
-    )
+    # Search for competitors
+    try:
+        competitors = itunes_service.search_apps(
+            keyword_obj.keyword, country=country, limit=25
+        )
+    except SearchAPIUnavailableError as e:
+        return JsonResponse({"error": str(e)}, status=503)
 
     # Calculate difficulty
     difficulty_score, breakdown = difficulty_calc.calculate(
@@ -904,9 +942,12 @@ def keyword_refresh_view(request, keyword_id):
     app_rank = None
     app = keyword_obj.app
     if app and app.track_id:
-        app_rank = itunes_service.find_app_rank(
-            keyword_obj.keyword, app.track_id, country=country
-        )
+        try:
+            app_rank = itunes_service.find_app_rank(
+                keyword_obj.keyword, app.track_id, country=country
+            )
+        except SearchAPIUnavailableError:
+            pass  # Rank is optional
 
     # Popularity (estimated from competitor data)
     popularity = popularity_est.estimate(competitors, keyword_obj.keyword)
@@ -1011,27 +1052,72 @@ def export_history_csv_view(request):
 
     results_qs = results_qs.order_by("-searched_at")
 
+    # Determine export mode: summary (default) or with competitor apps
+    include_apps = request.GET.get("include_apps", "").strip().lower()
+    apps_limit = {"top5": 5, "top10": 10}.get(include_apps, 0)
+
+    if apps_limit:
+        filename = "respectaso-search-history-with-apps.csv"
+    else:
+        filename = "respectaso-search-history.csv"
+
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="respectaso-search-history.csv"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     writer = csv.writer(response)
-    writer.writerow([
+
+    base_columns = [
         "Keyword", "App", "Country", "Popularity", "Difficulty",
-        "Difficulty Label", "Rank", "Competitors", "Date",
-    ])
+        "Difficulty Label", "Opportunity", "Insight", "Rank",
+        "Competitors", "Date",
+    ]
+    app_columns = [
+        "Competitor Position", "Competitor App", "Competitor Seller",
+        "Competitor Rating", "Competitor Ratings Count",
+        "Competitor Genre", "Competitor Price",
+        "Competitor App Store URL",
+    ]
+    writer.writerow(base_columns + app_columns if apps_limit else base_columns)
 
     for r in results_qs:
-        writer.writerow([
+        pop = r.popularity_score if r.popularity_score is not None else ""
+        opportunity = (
+            calc_opportunity(r.popularity_score, r.difficulty_score)
+            if r.popularity_score is not None
+            else ""
+        )
+        base_row = [
             r.keyword.keyword,
             r.keyword.app.name if r.keyword.app else "",
             r.country.upper() if r.country else "",
-            r.popularity_score if r.popularity_score is not None else "",
+            pop,
             r.difficulty_score,
             r.difficulty_label,
+            opportunity,
+            r.classification,
             r.app_rank if r.app_rank else "",
             len(r.competitors_data) if r.competitors_data else 0,
             r.searched_at.strftime("%Y-%m-%d %H:%M") if r.searched_at else "",
-        ])
+        ]
+
+        if not apps_limit:
+            writer.writerow(base_row)
+        else:
+            competitors = (r.competitors_data or [])[:apps_limit]
+            if not competitors:
+                writer.writerow(base_row + [""] * len(app_columns))
+            else:
+                for idx, comp in enumerate(competitors, 1):
+                    writer.writerow(base_row + [
+                        idx,
+                        comp.get("trackName", ""),
+                        comp.get("sellerName", ""),
+                        comp.get("averageUserRating", ""),
+                        comp.get("userRatingCount", ""),
+                        comp.get("primaryGenreName", ""),
+                        comp.get("formattedPrice", ""),
+                        comp.get("trackViewUrl", ""),
+                    ])
 
     # Respectlytics attribution row
     writer.writerow([])

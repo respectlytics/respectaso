@@ -8,6 +8,7 @@ Build with:
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import copy_metadata
 
 block_cipher = None
 
@@ -19,28 +20,30 @@ _settings_text = (BASE_DIR / "core" / "settings.py").read_text()
 _version_match = re.search(r'^VERSION\s*=\s*["\']([^"\']+)["\']', _settings_text, re.MULTILINE)
 VERSION = _version_match.group(1) if _version_match else "0.0.0"
 
-a = Analysis(
-    [str(BASE_DIR / "desktop" / "main.py")],
-    pathex=[str(BASE_DIR)],
-    binaries=[],
-    datas=[
-        # Django templates
-        (str(BASE_DIR / "aso" / "templates"), "aso/templates"),
-        (str(BASE_DIR / "aso_pro" / "templates"), "aso_pro/templates"),
-        # Static assets
-        (str(BASE_DIR / "static"), "static"),
-        (str(BASE_DIR / "staticfiles"), "staticfiles"),
-        # Django template tags
-        (str(BASE_DIR / "aso" / "templatetags"), "aso/templatetags"),
-        # Django migrations
-        (str(BASE_DIR / "aso" / "migrations"), "aso/migrations"),
-        (str(BASE_DIR / "aso_pro" / "migrations"), "aso_pro/migrations"),
-        # Core files
-        (str(BASE_DIR / "core"), "core"),
-        # Licensing — Ed25519 public key must be alongside validator.py
-        (str(BASE_DIR / "licensing" / "public_key.pem"), "licensing"),
-    ],
-    hiddenimports=[
+shared_datas = [
+    # Django templates
+    (str(BASE_DIR / "aso" / "templates"), "aso/templates"),
+    (str(BASE_DIR / "aso_pro" / "templates"), "aso_pro/templates"),
+    # Static assets
+    (str(BASE_DIR / "static"), "static"),
+    (str(BASE_DIR / "staticfiles"), "staticfiles"),
+    # Django template tags
+    (str(BASE_DIR / "aso" / "templatetags"), "aso/templatetags"),
+    # Django migrations
+    (str(BASE_DIR / "aso" / "migrations"), "aso/migrations"),
+    (str(BASE_DIR / "aso_pro" / "migrations"), "aso_pro/migrations"),
+    # Core files
+    (str(BASE_DIR / "core"), "core"),
+    # Licensing — Ed25519 public key must be alongside validator.py
+    (str(BASE_DIR / "licensing" / "public_key.pem"), "licensing"),
+    # fakeredis data file required by docket → fakeredis at runtime
+    # commands.json lives at fakeredis/ root; model/__init__.py creates the
+    # model/ directory so that model/../commands.json resolves on disk.
+    (os.path.join(os.path.dirname(__import__("fakeredis").__file__), "commands.json"), "fakeredis"),
+    (os.path.join(os.path.dirname(__import__("fakeredis").__file__), "model", "__init__.py"), "fakeredis/model"),
+] + copy_metadata("fastmcp")
+
+shared_hiddenimports = [
         # Django core
         "django",
         "django.contrib.admin",
@@ -113,7 +116,36 @@ a = Analysis(
         "cryptography.hazmat.primitives.asymmetric.ed25519",
         "cryptography.hazmat.primitives.serialization",
         "httpx",
-    ],
+        # MCP server & its transitive deps (docket → fakeredis → lupa)
+        "fastmcp",
+        "mcp",
+        "docket",
+        "fakeredis",
+        "lupa",
+        "lupa.lua51",
+        "lupa.lua52",
+        "lupa.lua53",
+        "lupa.lua54",
+        "lupa.lua55",
+        "aso_pro.mcp",
+        "aso_pro.mcp.bootstrap",
+        "aso_pro.mcp.server",
+        "aso_pro.mcp.license_gate",
+        "aso_pro.mcp.tools",
+        "aso_pro.mcp.tools.free",
+        "aso_pro.mcp.tools.researcher",
+        "aso_pro.mcp.tools.competitor",
+        "aso_pro.mcp.tools.simulator",
+        "aso_pro.mcp.tools.sessions",
+        "aso_pro.mcp.tools.utilities",
+    ]
+
+a = Analysis(
+    [str(BASE_DIR / "desktop" / "main.py")],
+    pathex=[str(BASE_DIR)],
+    binaries=[],
+    datas=shared_datas,
+    hiddenimports=shared_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -144,11 +176,59 @@ exe = EXE(
     entitlements_file=str(BASE_DIR / "desktop" / "entitlements.plist"),
 )
 
+# --- MCP CLI binary (no GUI, stdio transport) ---
+
+mcp_a = Analysis(
+    [str(BASE_DIR / "desktop" / "mcp_entry.py")],
+    pathex=[str(BASE_DIR)],
+    binaries=[],
+    datas=shared_datas,
+    hiddenimports=shared_hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=["pywebview"],     # MCP binary does not need the GUI toolkit
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
+
+# De-duplicate shared binaries/datas between GUI and MCP analyses
+for d in a.datas:
+    if d not in mcp_a.datas:
+        mcp_a.datas.append(d)
+MERGE((a, "RespectASO", "RespectASO"), (mcp_a, "respectaso-mcp", "respectaso-mcp"))
+
+mcp_pyz = PYZ(mcp_a.pure, mcp_a.zipped_data, cipher=block_cipher)
+
+mcp_exe = EXE(
+    mcp_pyz,
+    mcp_a.scripts,
+    [],
+    exclude_binaries=True,
+    name="respectaso-mcp",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,                # CLI binary — needs console for stdio
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=str(BASE_DIR / "desktop" / "entitlements.plist"),
+)
+
 coll = COLLECT(
     exe,
+    mcp_exe,
     a.binaries,
+    mcp_a.binaries,
     a.zipfiles,
+    mcp_a.zipfiles,
     a.datas,
+    mcp_a.datas,
     strip=False,
     upx=True,
     upx_exclude=[],

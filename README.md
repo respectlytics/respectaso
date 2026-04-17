@@ -45,7 +45,7 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 
 ### 1. Download
 
-**→ [Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+)
+**→ [Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+, Apple Silicon)
 
 ### 2. Install
 
