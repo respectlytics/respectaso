@@ -174,6 +174,24 @@ def main():
                 return save_path
             return None
 
+        def open_external(self, url):
+            """Open a URL (http(s)://, mailto:, etc.) in the default system handler.
+
+            Pywebview's WebKit view blocks mailto: and may swallow target=_blank
+            links. This delegates to Python's webbrowser module, which on macOS
+            uses LaunchServices to route the URL to the right app (browser,
+            Mail.app, etc.).
+            """
+            import webbrowser
+
+            if not isinstance(url, str) or not url:
+                return False
+            try:
+                webbrowser.open(url)
+                return True
+            except Exception:
+                return False
+
     api = Api()
     window = webview.create_window(
         "RespectASO",
@@ -181,6 +199,7 @@ def main():
         width=1280,
         height=860,
         min_size=(900, 600),
+        maximized=True,
         js_api=api,
     )
     webview.start()

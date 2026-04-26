@@ -30,6 +30,64 @@
     // SVG arc constants: circumference of r=23 circle
     var CIRCUMFERENCE = 2 * Math.PI * 23; // ≈ 144.51
 
+    // Live stats state — reset on each start()
+    var elapsedTimer = null;
+    var startedAt = 0;
+    var scoredTerms = Object.create(null);
+    var scoredCount = 0;
+
+    function formatElapsed(ms) {
+        var s = Math.max(0, Math.floor(ms / 1000));
+        var m = Math.floor(s / 60);
+        var rem = s % 60;
+        return m + ':' + (rem < 10 ? '0' + rem : rem);
+    }
+
+    function updateElapsedEl() {
+        var el = document.getElementById('progress-elapsed');
+        if (el) el.textContent = formatElapsed(Date.now() - startedAt);
+    }
+
+    function startElapsed() {
+        startedAt = Date.now();
+        var el = document.getElementById('progress-elapsed');
+        if (el) {
+            el.textContent = '0:00';
+            el.classList.remove('hidden');
+        }
+        if (elapsedTimer) clearInterval(elapsedTimer);
+        elapsedTimer = setInterval(updateElapsedEl, 1000);
+    }
+
+    function stopElapsed() {
+        if (elapsedTimer) {
+            clearInterval(elapsedTimer);
+            elapsedTimer = null;
+        }
+    }
+
+    function resetCounter() {
+        scoredTerms = Object.create(null);
+        scoredCount = 0;
+        var el = document.getElementById('progress-scored-count');
+        if (el) {
+            el.textContent = '';
+            el.classList.add('hidden');
+        }
+    }
+
+    function bumpCounter(keyword) {
+        var key = (keyword || '').trim().toLowerCase();
+        if (!key || scoredTerms[key]) return;
+        scoredTerms[key] = true;
+        scoredCount += 1;
+        var el = document.getElementById('progress-scored-count');
+        if (el) {
+            el.textContent = scoredCount + (scoredCount === 1 ? ' keyword scored' : ' keywords scored');
+            el.classList.remove('hidden');
+        }
+    }
+
     /**
      * Transition a state element to visible, hiding others.
      */
@@ -55,6 +113,7 @@
         if (!progressData || !progressData.type) return;
 
         if (progressData.type === 'keyword_scored') {
+            bumpCounter(progressData.keyword);
             showKeywordCard(progressData);
         } else if (progressData.type === 'ai_thinking') {
             showAIThinking(progressData);
@@ -134,6 +193,10 @@
      * Reset all progress extras to initial idle state. Call on session end.
      */
     function hideProgressExtras() {
+        stopElapsed();
+        var elapsedEl = document.getElementById('progress-elapsed');
+        if (elapsedEl) elapsedEl.classList.add('hidden');
+        resetCounter();
         var ids = ['keyword-ticker', 'ai-thinking', 'progress-idle'];
         for (var i = 0; i < ids.length; i++) {
             var el = document.getElementById(ids[i]);
@@ -158,7 +221,55 @@
 
     // Expose API globally
     window.progressTicker = {
+        start: function() { resetCounter(); startElapsed(); },
         update: updateProgressUI,
         hide: hideProgressExtras
     };
+
+    /**
+     * Format an elapsed-seconds float as M:SS for display.
+     */
+    function formatElapsedSeconds(secs) {
+        if (typeof secs !== 'number' || !isFinite(secs) || secs < 0) return '';
+        var s = Math.round(secs);
+        var m = Math.floor(s / 60);
+        var rem = s % 60;
+        return m + ':' + (rem < 10 ? '0' + rem : rem);
+    }
+
+    /**
+     * Render the per-run stat badges in a results header.
+     *
+     * Reads `elapsed_seconds` and `chain_stats` from the results JSON and
+     * populates `#results-elapsed-badge` and `#results-chain-badge` if present.
+     * Badges are hidden if the data is missing (e.g. legacy sessions without
+     * elapsed_seconds, or single-iteration sessions without a chain).
+     */
+    function renderRunStatsBadges(data) {
+        // Elapsed-time badge — hidden for legacy sessions where this wasn't tracked
+        var elapsedBadge = document.getElementById('results-elapsed-badge');
+        if (elapsedBadge) {
+            var elapsedText = formatElapsedSeconds(data && data.elapsed_seconds);
+            if (elapsedText) {
+                elapsedBadge.textContent = 'took ' + elapsedText;
+                elapsedBadge.classList.remove('hidden');
+            } else {
+                elapsedBadge.classList.add('hidden');
+            }
+        }
+
+        // Chain stats badge — only shown when this run is part of an iteration chain
+        var chainBadge = document.getElementById('results-chain-badge');
+        if (chainBadge) {
+            var stats = (data && data.chain_stats) || null;
+            if (stats && stats.chain_length > 1 && stats.chain_total_unique > 0) {
+                chainBadge.textContent = stats.chain_total_unique +
+                    ' unique across ' + stats.chain_length + ' iterations';
+                chainBadge.classList.remove('hidden');
+            } else {
+                chainBadge.classList.add('hidden');
+            }
+        }
+    }
+    window.renderRunStatsBadges = renderRunStatsBadges;
 })();

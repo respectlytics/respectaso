@@ -857,11 +857,14 @@ function updateCountryBtnText() {
 initCountryDropdown();
 
 // --- History sorting (server-side, across the full dataset) ---
+// Numeric/score columns default to DESC on first click (highest first), text columns default to ASC.
+const HISTORY_NUMERIC_COLUMNS = new Set(['popularity', 'difficulty', 'opportunity', 'rank', 'competitors']);
 function sortHistory(sortKey) {
     const params = new URLSearchParams(window.location.search);
+    const defaultDir = HISTORY_NUMERIC_COLUMNS.has(sortKey) ? 'desc' : 'asc';
     const nextDir = currentHistorySort === sortKey
         ? (currentHistorySortDir === 'asc' ? 'desc' : 'asc')
-        : 'asc';
+        : defaultDir;
 
     params.set('sort', sortKey);
     params.set('dir', nextDir);

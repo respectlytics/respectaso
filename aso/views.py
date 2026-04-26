@@ -63,6 +63,7 @@ def dashboard_view(request):
         "rank",
         "popularity",
         "difficulty",
+        "opportunity",
         "country",
         "competitors",
         "date",
