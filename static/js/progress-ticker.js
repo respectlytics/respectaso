@@ -48,11 +48,22 @@
         if (el) el.textContent = formatElapsed(Date.now() - startedAt);
     }
 
-    function startElapsed() {
-        startedAt = Date.now();
+    function normalizeElapsedSeconds(seconds) {
+        return (typeof seconds === 'number' && isFinite(seconds) && seconds > 0) ? seconds : 0;
+    }
+
+    function syncElapsed(seconds) {
+        var elapsedSeconds = normalizeElapsedSeconds(seconds);
+        if (!elapsedSeconds) return;
+        startedAt = Date.now() - (elapsedSeconds * 1000);
+        updateElapsedEl();
+    }
+
+    function startElapsed(initialElapsedSeconds) {
+        startedAt = Date.now() - (normalizeElapsedSeconds(initialElapsedSeconds) * 1000);
         var el = document.getElementById('progress-elapsed');
         if (el) {
-            el.textContent = '0:00';
+            el.textContent = formatElapsed(Date.now() - startedAt);
             el.classList.remove('hidden');
         }
         if (elapsedTimer) clearInterval(elapsedTimer);
@@ -76,16 +87,42 @@
         }
     }
 
+    function renderCounter() {
+        var el = document.getElementById('progress-scored-count');
+        if (!el) return;
+        if (scoredCount > 0) {
+            el.textContent = scoredCount + (scoredCount === 1 ? ' keyword scored' : ' keywords scored');
+            el.classList.remove('hidden');
+        } else {
+            el.textContent = '';
+            el.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Adopt a server-reported scored count. Server is the floor (survives tab
+     * switches), client never goes backwards. Client may briefly race ahead
+     * via bumpCounter() between polls; we keep whichever is higher.
+     */
+    function syncScoredCount(n) {
+        if (typeof n !== 'number' || !isFinite(n) || n <= scoredCount) return;
+        scoredCount = Math.floor(n);
+        renderCounter();
+    }
+
+    function seedScoredCount(initialScoredCount) {
+        var n = (typeof initialScoredCount === 'number' && isFinite(initialScoredCount) && initialScoredCount > 0)
+            ? Math.floor(initialScoredCount) : 0;
+        scoredCount = n;
+        renderCounter();
+    }
+
     function bumpCounter(keyword) {
         var key = (keyword || '').trim().toLowerCase();
         if (!key || scoredTerms[key]) return;
         scoredTerms[key] = true;
         scoredCount += 1;
-        var el = document.getElementById('progress-scored-count');
-        if (el) {
-            el.textContent = scoredCount + (scoredCount === 1 ? ' keyword scored' : ' keywords scored');
-            el.classList.remove('hidden');
-        }
+        renderCounter();
     }
 
     /**
@@ -221,7 +258,13 @@
 
     // Expose API globally
     window.progressTicker = {
-        start: function() { resetCounter(); startElapsed(); },
+        start: function(initialElapsedSeconds, initialScoredCount) {
+            resetCounter();
+            seedScoredCount(initialScoredCount);
+            startElapsed(initialElapsedSeconds);
+        },
+        syncElapsed: syncElapsed,
+        syncScoredCount: syncScoredCount,
         update: updateProgressUI,
         hide: hideProgressExtras
     };

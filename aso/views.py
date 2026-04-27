@@ -73,15 +73,15 @@ def dashboard_view(request):
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "desc"
 
-    # Show rank column when filtering by an app that has a track_id
-    show_rank = False
+    # Rank column is always visible. Per-result rendering shows the app's
+    # rank for keywords tied to a tracked app, and "—" when the keyword
+    # has no associated app (or the app has no track_id).
+    show_rank = True
     selected_app_name = None
     if app_id:
         selected_app_obj = App.objects.filter(id=app_id).first()
         if selected_app_obj:
             selected_app_name = selected_app_obj.name
-            if selected_app_obj.track_id:
-                show_rank = True
 
     # --- Filter params (insight, popularity, difficulty) ---
     insight_filter = request.GET.getlist("insight")

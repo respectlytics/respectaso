@@ -192,6 +192,25 @@ def main():
             except Exception:
                 return False
 
+        def copy_to_clipboard(self, text):
+            """Copy text to the system clipboard.
+
+            Pywebview's WebKit view blocks both the modern Clipboard API and the
+            legacy document.execCommand('copy') on http://localhost (non-secure
+            context), so JS-side copy fails silently. This native bridge uses
+            macOS NSPasteboard via AppKit, which always works.
+            """
+            if not isinstance(text, str):
+                return False
+            try:
+                from AppKit import NSPasteboard, NSPasteboardTypeString  # type: ignore[import-not-found]
+                pb = NSPasteboard.generalPasteboard()
+                pb.clearContents()
+                pb.setString_forType_(text, NSPasteboardTypeString)
+                return True
+            except Exception:
+                return False
+
     api = Api()
     window = webview.create_window(
         "RespectASO",
