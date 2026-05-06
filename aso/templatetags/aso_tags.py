@@ -280,6 +280,83 @@ def format_number(value):
         return value
 
 
+def _fmt_dl(n):
+    """Mirror the canonical fmt() in static/js/ai-tabs-shared.js.
+
+    Preserves 1 decimal for values < 10 so we never display "<1" or rounded zeros.
+    See scoring-consistency.instructions.md.
+    """
+    try:
+        n = float(n)
+    except (TypeError, ValueError):
+        return "0"
+    if n >= 1000:
+        s = f"{n / 1000:.1f}"
+        return (s[:-2] if s.endswith(".0") else s) + "K"
+    if n < 1:
+        return f"{n:.1f}"
+    if n < 10:
+        s = f"{n:.1f}"
+        return s[:-2] if s.endswith(".0") else s
+    return str(round(n))
+
+
+@register.simple_tag
+def download_cell(estimates, idx=0, total=0):
+    """Render the Est. Downloads cell — rank #1 range with hover tooltip for #1/#5/#10.
+
+    Server-side counterpart of formatDownloadCell() in static/js/ai-tabs-shared.js.
+    Uses positions[0]/[4]/[9] (NOT tier averages) per
+    scoring-consistency.instructions.md.
+
+    `idx` (0-based row index) and `total` (row count) drive tooltip placement —
+    top-half rows show the tooltip below to avoid clipping against the table
+    header; bottom-half rows show it above. Mirrors the JS module.
+    """
+    if not isinstance(estimates, dict):
+        return mark_safe('<span class="text-xs text-slate-500">—</span>')
+    positions = estimates.get("positions") or []
+    if len(positions) < 10:
+        return mark_safe('<span class="text-xs text-slate-500">—</span>')
+    p1, p5, p10 = positions[0], positions[4], positions[9]
+    p1_lo, p1_hi = _fmt_dl(p1.get("downloads_low", 0)), _fmt_dl(p1.get("downloads_high", 0))
+    p5_lo, p5_hi = _fmt_dl(p5.get("downloads_low", 0)), _fmt_dl(p5.get("downloads_high", 0))
+    p10_lo, p10_hi = _fmt_dl(p10.get("downloads_low", 0)), _fmt_dl(p10.get("downloads_high", 0))
+    show_below = total > 0 and idx < total / 2
+    pos_class = "top-full mt-2" if show_below else "bottom-full mb-2"
+    return mark_safe(
+        '<div class="group relative inline-block">'
+        '<span class="text-xs font-mono text-slate-300 cursor-help border-b border-dotted border-slate-600">'
+        f'{p1_lo}–{p1_hi}<span class="text-slate-500">/day</span></span>'
+        f'<div class="hidden group-hover:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
+        '<p class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
+        '<div class="space-y-1.5">'
+        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 font-mono">{p1_lo}–{p1_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 font-mono">{p5_lo}–{p5_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 font-mono">{p10_lo}–{p10_hi}</span></div>'
+        '</div></div></div>'
+    )
+
+
+@register.filter
+def download_sort_value(estimates):
+    """Return positions[0].downloads_high as the sort key (rank #1 high estimate).
+
+    Per scoring-consistency.instructions.md: download sorts must use
+    positions[0].downloads_high, NEVER tier averages.
+    Returns -1 when data is missing so those rows fall to the bottom on desc sort.
+    """
+    if not isinstance(estimates, dict):
+        return -1
+    positions = estimates.get("positions") or []
+    if not positions:
+        return -1
+    try:
+        return float(positions[0].get("downloads_high", -1))
+    except (TypeError, ValueError):
+        return -1
+
+
 @register.filter
 def format_release_date(value):
     """Format an ISO release date string to 'Mon YYYY'. Usage: {{ date_str|format_release_date }}"""

@@ -64,6 +64,8 @@ def dashboard_view(request):
         "popularity",
         "difficulty",
         "opportunity",
+        "est_downloads",
+        "insight",
         "country",
         "competitors",
         "date",
@@ -203,6 +205,30 @@ def dashboard_view(request):
     elif sort_by == "country":
         country_order = "country" if sort_dir == "asc" else "-country"
         results_qs = results_qs.order_by(country_order, "-searched_at")
+    elif sort_by == "insight":
+        insight_order = "classification" if sort_dir == "asc" else "-classification"
+        results_qs = results_qs.order_by(insight_order, "-searched_at")
+    elif sort_by == "est_downloads":
+        # download_estimates lives in the difficulty_breakdown JSONField, so
+        # sort in Python — same pattern as the opportunity/competitors branches.
+        # Per scoring-consistency.instructions.md: sort by positions[0].downloads_high
+        # (rank #1 high estimate), NEVER tier averages.
+        def _dl_high(result):
+            est = (result.difficulty_breakdown or {}).get("download_estimates") or {}
+            positions = est.get("positions") or []
+            if not positions:
+                return -1.0
+            try:
+                return float(positions[0].get("downloads_high", -1))
+            except (TypeError, ValueError):
+                return -1.0
+
+        sorted_results = list(results_qs)
+        reverse = sort_dir == "desc"
+        sorted_results.sort(
+            key=lambda r: (_dl_high(r), r.searched_at.timestamp()),
+            reverse=reverse,
+        )
     elif sort_by == "competitors":
         sorted_results = list(results_qs)
         sorted_results.sort(

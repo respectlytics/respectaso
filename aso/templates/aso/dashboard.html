@@ -296,10 +296,16 @@
                                 </span>
                                 <span class="sort-indicator text-slate-500">{% if current_sort == 'opportunity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
                             </th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('est_downloads')">
+                                <span class="inline-flex items-center gap-1">Est. Downloads
+                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Estimated daily downloads if you rank #1 (hover each cell for the breakdown across rank #1, #5, and #10)."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </span>
+                                <span class="sort-indicator text-slate-500">{% if current_sort == 'est_downloads' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
+                            </th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2">Ranking Difficulty
                                 <svg class="w-3.5 h-3.5 text-slate-500 cursor-help inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Difficulty score computed for reaching the Top 5, Top 10, and Top 20 positions specifically, based on the competitors in each tier."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </th>
-                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2">Insight</th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('insight')">Insight <span class="sort-indicator text-slate-500">{% if current_sort == 'insight' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('country')">Country <span class="sort-indicator text-slate-500">{% if current_sort == 'country' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('competitors')">Competitors <span class="sort-indicator text-slate-500">{% if current_sort == 'competitors' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('date')">Date <span class="sort-indicator text-slate-500">{% if current_sort == 'date' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
@@ -342,6 +348,9 @@
                             </td>
                             <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.opportunity_score }}">
                                 <span class="text-cyan-400">{{ result.opportunity_score }}</span>
+                            </td>
+                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_breakdown.download_estimates|download_sort_value }}">
+                                {% download_cell result.difficulty_breakdown.download_estimates forloop.counter0 history_results|length %}
                             </td>
                             <td class="px-3 py-2">
                                 {% with tiers=result.difficulty_breakdown.ranking_tiers %}
@@ -424,7 +433,7 @@
                         </tr>
                         {% if result.competitors_data %}
                         <tr class="competitor-row hidden">
-                            <td colspan="{% if show_rank %}10{% else %}9{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 {% with advice=result.targeting_advice %}
                                 <div class="{{ advice.2 }} border rounded-lg p-2.5 mb-4">
                                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
@@ -566,7 +575,7 @@
                         {% endif %}
                         <!-- Trend detail row (loaded via AJAX) -->
                         <tr class="trend-row hidden" data-keyword-id="{{ result.keyword.id }}" data-country="{{ result.country }}">
-                            <td colspan="{% if show_rank %}10{% else %}9{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 <div class="trend-content flex items-center justify-center py-4">
                                     <svg class="w-5 h-5 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                     <span class="text-slate-500 text-sm ml-2">Loading trend data…</span>
@@ -859,7 +868,7 @@ initCountryDropdown();
 
 // --- History sorting (server-side, across the full dataset) ---
 // Numeric/score columns default to DESC on first click (highest first), text columns default to ASC.
-const HISTORY_NUMERIC_COLUMNS = new Set(['popularity', 'difficulty', 'opportunity', 'rank', 'competitors']);
+const HISTORY_NUMERIC_COLUMNS = new Set(['popularity', 'difficulty', 'opportunity', 'rank', 'competitors', 'est_downloads']);
 function sortHistory(sortKey) {
     const params = new URLSearchParams(window.location.search);
     const defaultDir = HISTORY_NUMERIC_COLUMNS.has(sortKey) ? 'desc' : 'asc';
