@@ -38,6 +38,19 @@ class SearchAPIUnavailableError(ITunesAPIError):
     pass
 
 
+class ITunesRateLimited(ITunesAPIError):
+    """The iTunes API returned a rate-limit signal (429 or 503 with Retry-After).
+
+    `retry_after` is the server-suggested wait in seconds, or None if the
+    server didn't include the header. Runners feed this into the adaptive
+    rate limiter so the next call waits at least this long before retrying.
+    """
+
+    def __init__(self, message: str = "iTunes API rate-limited", retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 _FINANCE_INTENT_TOKENS = {
     "option",
     "options",
@@ -560,20 +573,81 @@ class ITunesSearchService:
     def _search_itunes(
         self, keyword: str, country: str = "us", limit: int = 10
     ) -> list[dict]:
-        """Search via iTunes API.  Raises on any failure."""
-        response = requests.get(
-            self.SEARCH_URL,
-            params={
-                "term": keyword,
-                "country": country,
-                "entity": "software",
-                "limit": limit,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return [self._parse_app(r) for r in data.get("results", [])]
+        """Search via iTunes API. Tighter timeout + 429/503 detection +
+        single in-line retry on transient errors before giving up.
+
+        Raises:
+            ITunesRateLimited: when the response is 429 or 503. Carries the
+                server's `Retry-After` value if present.
+            HTTPError / RequestException: on other failures (caller falls
+                back to SSR scraping).
+        """
+        params = {
+            "term": keyword,
+            "country": country,
+            "entity": "software",
+            "limit": limit,
+        }
+        # Two attempts: the second one only fires on transient (5xx) errors,
+        # waiting Retry-After (or 5s default) before retrying. Permanent
+        # errors (4xx) raise immediately so SSR fallback can take over.
+        for attempt in range(2):
+            try:
+                response = requests.get(self.SEARCH_URL, params=params, timeout=15)
+            except requests.Timeout:
+                # Tighter timeout failed — let caller try SSR fallback.
+                # No second attempt: timeouts here usually mean Apple's API
+                # is overloaded and SSR may be more responsive.
+                raise
+
+            status = response.status_code
+            if status in (429, 503):
+                retry_after = self._parse_retry_after(response.headers.get("Retry-After"))
+                # First attempt: wait Retry-After (capped at 5s) and try once more.
+                if attempt == 0:
+                    wait = min(5.0, retry_after) if retry_after is not None else 2.0
+                    logger.info(
+                        "iTunes API returned %d; waiting %.1fs before retry "
+                        "(Retry-After=%s, keyword=%r)",
+                        status, wait, retry_after, keyword,
+                    )
+                    time.sleep(wait)
+                    continue
+                # Second attempt also rate-limited — surface it so the runner
+                # can record the failure on the limiter and consider SSR.
+                raise ITunesRateLimited(
+                    f"iTunes API rate-limited ({status})", retry_after=retry_after,
+                )
+
+            # Any other 5xx: retry once with a brief pause; otherwise raise.
+            if 500 <= status < 600:
+                if attempt == 0:
+                    time.sleep(1.5)
+                    continue
+                response.raise_for_status()  # raises HTTPError
+
+            response.raise_for_status()
+            data = response.json()
+            return [self._parse_app(r) for r in data.get("results", [])]
+
+        # Should be unreachable — both attempts return or raise above.
+        raise SearchAPIUnavailableError("iTunes API exhausted retries")
+
+    @staticmethod
+    def _parse_retry_after(value: str | None) -> float | None:
+        """Parse the HTTP `Retry-After` header.
+
+        The header may be either a delta in seconds (e.g. "30") or an
+        HTTP-date. We support the delta form (the common case for iTunes);
+        if it's an HTTP-date we conservatively return None (caller falls
+        back to its own backoff).
+        """
+        if not value:
+            return None
+        try:
+            return float(value.strip())
+        except (TypeError, ValueError):
+            return None
 
     # ── Fallback: App Store SSR ─────────────────────────────────────────
 
@@ -599,7 +673,7 @@ class ITunesSearchService:
                     url,
                     params={"term": keyword},
                     headers=self._SSR_HEADERS,
-                    timeout=45,
+                    timeout=30,
                 )
                 self.__class__._last_ssr_request = time.time()
 
@@ -782,6 +856,12 @@ class ITunesSearchService:
             for app in apps:
                 app["_data_source"] = "itunes"
             return apps
+        except ITunesRateLimited:
+            # Rate-limit signal must propagate so the runner's adaptive
+            # limiter records it and waits the right amount of time before
+            # the next call. SSR isn't a sensible fallback here — Apple
+            # would rate-limit the SSR endpoint too.
+            raise
         except Exception as e:
             logger.warning(
                 f"iTunes Search API failed for '{keyword}' ({country}), "
