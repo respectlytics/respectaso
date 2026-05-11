@@ -80,6 +80,35 @@
                 Keep in mind that popularity is an estimate, not an exact measurement. A score of 60 doesn't mean "60 searches per day" — it
                 means the competitive signals suggest significantly above-average search volume.
             </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Why we don't use Apple Search Ads data</h3>
+                <p class="text-slate-400">
+                    Most ASO tools surface the "popularity" score Apple publishes inside Apple Search Ads (ASA).
+                    It looks authoritative — it comes from Apple — but it's a paid-auction metric designed for ad bidders,
+                    not a measurement of organic search volume. Apple has never published per-keyword search counts to anyone.
+                </p>
+                <p class="text-slate-400">
+                    It's also been visibly unreliable. In late September 2025 the ASA popularity score collapsed 77% in four
+                    days across every tool that reads from Apple's API — MobileAction, AppFigures, Phiture, Astro, Radaso,
+                    and APPlyzer all publicly confirmed the metric broke. Apple issued no acknowledgment or changelog. The same
+                    silent shift happened in June 2024 and again in March 2026. ASA also only covers 91 of 175 storefronts and
+                    requires an Apple Ads account with Admin role and a payment method on file.
+                </p>
+                <p class="text-slate-400">
+                    We chose public iTunes Search API signals instead. The methodology above is fully inspectable, works in
+                    every storefront, and doesn't break when Apple's ad backend silently shifts.
+                </p>
+                <p>
+                    <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
+                       target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors text-xs">
+                        Full write-up: How Apple Search Ads popularity broke
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </a>
+                </p>
+            </div>
         </div>
     </section>
 

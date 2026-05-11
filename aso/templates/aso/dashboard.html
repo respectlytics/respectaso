@@ -140,6 +140,12 @@
                     {{ keyword_count }} keyword{{ keyword_count|pluralize }}{% if total_pages > 1 %} · Page {{ page }} of {{ total_pages }}{% endif %}
                 </p>
                 {% endif %}
+                {% if last_refresh %}
+                <p class="text-slate-500 text-[11px] mt-1 inline-flex items-center gap-1" title="{{ last_refresh|date:'Y-m-d H:i:s' }}">
+                    <svg class="w-3 h-3 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Rankings auto-refreshed {{ last_refresh|timesince }} ago — runs daily in the background while the app is open.
+                </p>
+                {% endif %}
             </div>
             <div class="flex items-center gap-2">
                 {% if available_countries|length > 1 %}
@@ -276,6 +282,58 @@
                 </div>
             </div>
         </div>
+        <details class="group bg-purple-500/5 hover:bg-purple-500/[0.07] open:bg-purple-500/[0.07] border border-purple-500/20 open:border-purple-500/30 rounded-lg mb-3 transition-colors">
+            <summary class="flex items-center gap-2.5 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-xs text-slate-300">
+                    Why our <span class="text-purple-300 font-medium">Popularity</span> scores don't use Apple Search Ads data
+                </span>
+                <span class="ml-auto inline-flex items-center gap-1 text-xs text-purple-400 font-medium">
+                    <span class="group-open:hidden">Read why</span>
+                    <span class="hidden group-open:inline">Hide</span>
+                    <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </span>
+            </summary>
+            <div class="px-4 pb-3 pt-2 border-t border-purple-500/15 text-xs text-slate-400 leading-relaxed space-y-3">
+                <p>
+                    Apple Search Ads "popularity" is a paid-auction metric Apple publishes for ad bidders — not a measurement of organic search volume.
+                    In late September 2025 it <span class="text-slate-200">collapsed 77% in four days</span> across every tool that reads from Apple's API,
+                    and Apple issued no acknowledgment. The same silent shift happened in June 2024 and again in March 2026.
+                </p>
+                <div>
+                    <p class="text-slate-300 mb-1.5">Big ASO companies that <span class="text-emerald-300">avoid ASA passthrough</span> — same approach as us:</p>
+                    <ul class="space-y-0.5 pl-1">
+                        <li><span class="text-white">Sensor Tower</span> <span class="text-slate-500">— proprietary 10M+ consumer panel</span></li>
+                        <li><span class="text-white">Gummicube</span> <span class="text-slate-500">— real mobile data, not Apple's API values</span></li>
+                        <li><span class="text-white">APPlyzer</span> <span class="text-slate-500">— independent dynamic model</span></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-slate-300 mb-1.5">Tools that <span class="text-amber-300">relied on ASA</span> — publicly confirmed the 2025 collapse:</p>
+                    <ul class="space-y-0.5 pl-1">
+                        <li><span class="text-white">MobileAction</span> <span class="text-slate-500">— froze updates during the outage</span></li>
+                        <li><span class="text-white">AppFigures</span> <span class="text-slate-500">— "identified an alternative collection method"</span></li>
+                        <li><span class="text-white">Phiture</span> <span class="text-slate-500">— attributed to an Apple backend change</span></li>
+                        <li><span class="text-white">Astro</span> <span class="text-slate-500">— confirmed it affects "all ASO tools on the market"</span></li>
+                        <li><span class="text-white">Radaso</span> <span class="text-slate-500">— Apple's replacement uses a different methodology</span></li>
+                    </ul>
+                </div>
+                <p>
+                    <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
+                       target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 font-medium">
+                        Full write-up: Why Apple Search Ads popularity broke
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </a>
+                </p>
+            </div>
+        </details>
         <div class="bg-[#1e293b] border border-white/10 rounded-xl">
             <div class="overflow-x-auto">
                 <table class="w-full" id="history-table">

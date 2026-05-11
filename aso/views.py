@@ -131,6 +131,15 @@ def dashboard_view(request):
     )
     latest_ids = list(latest_ids_qs)
 
+    # Most recent refresh timestamp (respects app/country filters above).
+    # Surfaces the auto-refresh the scheduler runs in the background so users
+    # see "Rankings auto-refreshed X ago" without needing to click anything.
+    last_refresh = (
+        SearchResult.objects
+        .filter(**latest_filter)
+        .aggregate(latest=Max("searched_at"))["latest"]
+    )
+
     results_qs = (
         SearchResult.objects
         .filter(id__in=latest_ids)
@@ -328,6 +337,7 @@ def dashboard_view(request):
             "total_pages": total_pages,
             "total_count": total_count,
             "total_unfiltered_count": total_unfiltered_count,
+            "last_refresh": last_refresh,
             "has_prev": page > 1,
             "has_next": page < total_pages,
             "current_sort": sort_by,
