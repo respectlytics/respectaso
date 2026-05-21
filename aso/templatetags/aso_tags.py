@@ -325,10 +325,13 @@ def download_cell(estimates, idx=0, total=0):
     show_below = total > 0 and idx < total / 2
     pos_class = "top-full mt-2" if show_below else "bottom-full mb-2"
     return mark_safe(
-        '<div class="group relative inline-block">'
+        # Named group ("group/dl") scopes the hover to THIS cell only. A plain
+        # "group" would also respond to the parent <tr class="... group">, making
+        # the tooltip appear on row-hover instead of cell-hover.
+        '<div class="group/dl relative inline-block">'
         '<span class="text-xs font-mono text-slate-300 cursor-help border-b border-dotted border-slate-600">'
         f'{p1_lo}–{p1_hi}<span class="text-slate-500">/day</span></span>'
-        f'<div class="hidden group-hover:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
+        f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
         '<p class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
         '<div class="space-y-1.5">'
         f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 font-mono">{p1_lo}–{p1_hi}</span></div>'
@@ -355,6 +358,55 @@ def download_sort_value(estimates):
         return float(positions[0].get("downloads_high", -1))
     except (TypeError, ValueError):
         return -1
+
+
+@register.filter
+def dl_interval(value):
+    """Render a [low, high] dict/tuple as '~120–180' (no '/day' suffix).
+
+    Accepts dicts with 'low'/'high' keys, tuples, or lists. Returns '—' for
+    empty intervals. Used by the App Summary panel.
+    """
+    from aso.dashboard_summary import format_interval
+
+    if isinstance(value, dict):
+        return format_interval(value.get("low", 0), value.get("high", 0))
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        return format_interval(value[0], value[1])
+    return "—"
+
+
+@register.filter
+def dl_interval_from(low, high):
+    """Render a two-arg interval. Usage: ``{{ low|dl_interval_from:high }}``.
+
+    Lets templates render a [low, high] without us packing every interval
+    into a dict in the view. Returns '—' when both ends are zero.
+    """
+    from aso.dashboard_summary import format_interval
+
+    return format_interval(low, high)
+
+
+@register.filter
+def pct_of(part, whole):
+    """Return part/whole as an integer percentage (clamped 0–100). Safe for div-by-zero."""
+    try:
+        whole = float(whole)
+        if whole <= 0:
+            return 0
+        pct = round(float(part) / whole * 100)
+        return max(0, min(100, pct))
+    except (TypeError, ValueError):
+        return 0
+
+
+@register.filter
+def get_item(d, key):
+    """Look up a dict key from a template. Usage: {{ mydict|get_item:'foo' }}."""
+    if isinstance(d, dict):
+        return d.get(key)
+    return None
 
 
 @register.filter

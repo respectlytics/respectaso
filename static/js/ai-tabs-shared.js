@@ -167,10 +167,12 @@
         var p1 = dl.positions[0], p5 = dl.positions[4], p10 = dl.positions[9];
         var showBelow = idx < total / 2;
         var posClass = showBelow ? 'top-full mt-2' : 'bottom-full mb-2';
-        return '<div class="group relative inline-block">' +
+        // Named group ("group/dl") so the tooltip only shows on cell hover, not
+        // when hovering anywhere on a parent row that also carries a "group" class.
+        return '<div class="group/dl relative inline-block">' +
             '<span class="text-xs font-mono text-slate-300 cursor-help border-b border-dotted border-slate-600">' +
             fmt(p1.downloads_low) + '–' + fmt(p1.downloads_high) + '<span class="text-slate-500">/day</span></span>' +
-            '<div class="hidden group-hover:block absolute z-20 ' + posClass + ' left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">' +
+            '<div class="hidden group-hover/dl:block absolute z-20 ' + posClass + ' left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">' +
             '<p class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>' +
             '<div class="space-y-1.5">' +
             '<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 font-mono">' + fmt(p1.downloads_low) + '–' + fmt(p1.downloads_high) + '</span></div>' +
@@ -189,9 +191,10 @@
         }
         var showBelow = idx < total / 2;
         var posClass = showBelow ? 'top-full mt-1' : 'bottom-full mb-1';
-        return '<div class="group relative inline-block">' +
+        // Named group ("group/src") to avoid triggering on a parent row's "group".
+        return '<div class="group/src relative inline-block">' +
             '<span class="text-xs px-1.5 py-0.5 rounded cursor-help ' + color + '">' + escapeHtml(labelText) + '</span>' +
-            '<div class="hidden group-hover:block absolute z-20 ' + posClass + ' left-0 w-52 bg-slate-800 border border-white/10 rounded-lg p-2 shadow-xl text-left">' +
+            '<div class="hidden group-hover/src:block absolute z-20 ' + posClass + ' left-0 w-52 bg-slate-800 border border-white/10 rounded-lg p-2 shadow-xl text-left">' +
             '<p class="text-[11px] text-slate-300 leading-snug">' + tooltip + '</p>' +
             '</div></div>';
     }

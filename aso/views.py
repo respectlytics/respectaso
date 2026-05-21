@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
 from .models import App, Keyword, SearchResult
+from .dashboard_summary import compute_app_summary
 from .scoring import calc_opportunity, classify_keyword, CLASSIFICATION_LABELS
 from .services import (
     DifficultyCalculator,
@@ -319,12 +320,24 @@ def dashboard_view(request):
     # Determine if any filters are active
     has_filters = bool(valid_insights or pop_min is not None or diff_max is not None or search_q)
 
+    # App Summary panel — aggregates the user's tracked-keyword data into a
+    # 30-second read of the app's ASO posture. Returns None when no app is
+    # selected or the app has zero rankings anywhere; the template hides the
+    # panel in that case.
+    app_summary = compute_app_summary(
+        selected_app=int(app_id) if app_id else None,
+        selected_app_name=selected_app_name,
+        last_refresh=last_refresh,
+    )
+
     return render(
         request,
         "aso/dashboard.html",
         {
             "apps": apps,
             "search_form": search_form,
+            # App Summary panel (None when hidden)
+            "app_summary": app_summary,
             # History table context
             "history_results": history_results,
             "keyword_count": keyword_count,
@@ -917,13 +930,30 @@ def keyword_delete_view(request, keyword_id):
 
 @require_POST
 def result_delete_view(request, result_id):
-    """Delete a single search result. If the parent keyword has no remaining results, delete the keyword too."""
+    """Remove a Search History row entry — i.e., all snapshots of a (keyword, country) pair.
+
+    The row passed to this endpoint identifies which (keyword, country) pair the
+    user is removing; we then drop EVERY SearchResult for that pair, not just the
+    latest snapshot. This matches the user's mental model — each row in the
+    History table represents a keyword tracked in a country, and the delete
+    button is expected to remove that tracking entry entirely. Deleting only
+    the latest snapshot would silently resurrect the previous one on reload,
+    making the click feel like a no-op.
+
+    If the parent keyword has no remaining results across any country, the
+    keyword row itself is cleaned up to avoid orphans.
+    """
     result = get_object_or_404(SearchResult, id=result_id)
     keyword = result.keyword
-    result.delete()
-    # Clean up orphaned keyword (no remaining search results)
+    country = result.country
+
+    # Remove every snapshot for this keyword in this country (not just `result`).
+    SearchResult.objects.filter(keyword_id=keyword.id, country=country).delete()
+
+    # If the keyword no longer has any results in any country, clean it up.
     if not keyword.results.exists():
         keyword.delete()
+
     return JsonResponse({"success": True})
 
 
