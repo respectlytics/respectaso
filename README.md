@@ -40,9 +40,9 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 
 | Feature | Description |
 |---------|-------------|
-| **Keyword Popularity** | Estimated popularity scores (1–100) derived from a 6-signal model analyzing iTunes Search competitor data |
-| **Difficulty Score** | 7 weighted sub-scores (rating volume, dominant players, rating quality, market age, publisher diversity, app count, content relevance) with ranking tier analysis |
-| **Ranking Tiers** | Separate difficulty analysis for Top 5, Top 10, and Top 20 positions |
+| **Keyword Popularity** | Estimated popularity scores (1–100) based on analysis of iTunes Search API competitor data |
+| **Difficulty Score** | Competition difficulty analysis across multiple factors with ranking tier breakdowns for Top 5, Top 10, and Top 20 |
+| **Ranking Tiers** | Separate difficulty analysis for Top 5, Top 10, and Top 20 positions — because breaking into the top 5 is different from reaching the top 20 |
 | **Download Estimates** | Estimated daily downloads per ranking position based on search volume, tap-through rates, and conversion rates |
 | **Competitor Analysis** | See the top 10 apps ranking for each keyword with ratings, reviews, genre, release date, and direct App Store links |
 | **Country Opportunity Finder** | Scan up to 30 App Store regions at once to find which countries offer the best ranking opportunities |
@@ -51,16 +51,24 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 | **App Rank Tracking** | Add your apps and see where you rank for each keyword alongside competitor data |
 | **Search History** | Browse past keyword research with sorting, filtering, and expandable detail views |
 | **CSV Export** | Export your keyword research data for use in spreadsheets |
-| **ASO Targeting Advice** | Automatic keyword classification (Sweet Spot, Hidden Gem, Low Volume, Avoid, etc.) |
+| **ASO Targeting Advice** | Automatic keyword classification (Sweet Spot, Good Target, Hidden Gem, High Competition, Moderate, Low Volume, Avoid) based on opportunity scoring |
 
 ## Download
 
-**→ [Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+)
+**→ [Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+, Apple Silicon)
 
 Open the `.dmg` and drag **RespectASO** into your **Applications** folder. Your data is stored at `~/Library/Application Support/RespectASO/` and survives app updates.
 
 <details>
-<summary><strong>Docker (legacy)</strong></summary>
+<summary><strong>🐳 Docker (free features only)</strong></summary>
+
+Docker provides the **free edition** of RespectASO (keyword research, difficulty scoring, ranking tracking). AI-powered Pro features require the native macOS app above.
+
+#### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed and running
+
+#### Install via Docker
 
 ```bash
 git clone https://github.com/respectlytics/respectaso.git
@@ -77,20 +85,13 @@ RespectASO uses the **iTunes Search API** as its only data source — no Apple S
 
 ### Popularity Score (1–100)
 
-A 6-signal composite model that estimates how often a keyword is searched:
-
-| Signal | Weight | What It Measures |
-|--------|--------|------------------|
-| Result count | 0–25 pts | How many apps appear for this keyword |
-| Leader strength | 0–30 pts | Rating volume of the top-ranking apps |
-| Title match density | 0–20 pts | How many apps use this exact keyword in their title |
-| Market depth | 0–10 pts | Whether strong apps appear deep in results |
-| Specificity penalty | -5 to -30 | Adjusts for generic terms that inflate result counts |
-| Exact phrase bonus | 0–15 pts | Rewards multi-word keywords with precise matches |
+Estimates how frequently a keyword is searched by analyzing multiple signals from iTunes Search results, including the number and quality of competing apps, keyword relevance patterns, and market depth. Higher scores mean more people are searching for that keyword.
 
 ### Difficulty Score (1–100)
 
-A 7-factor weighted system that estimates how hard it is to rank:
+Estimates how hard it would be to rank for a keyword by evaluating competition strength across factors like existing app ratings, market dominance, publisher diversity, and content relevance.
+
+**Tiers:** Very Easy (&lt;16) · Easy (16–35) · Moderate (36–55) · Hard (56–75) · Very Hard (76–90) · Extreme (91+)
 
 | Factor | Weight | What It Measures |
 |--------|--------|------------------|
@@ -106,6 +107,19 @@ For the complete algorithm reference with every formula, calibration band, and i
 
 ## Project Structure
 
+Estimates daily downloads per ranking position based on search volume, expected tap-through rates by position, and install conversion rates. Results are shown as conservative–optimistic ranges with tier breakdowns for Top 5, Top 6–10, and Top 11–20.
+
+For full methodology details, visit the **Methodology** page inside the app or explore the [source code](https://github.com/respectlytics/respectaso).
+
+## Configuration
+
+<details>
+<summary><strong>Custom Local Domain (Docker only)</strong></summary>
+
+If running via Docker, you can use a cleaner URL. Add this to your `/etc/hosts` file:
+
+```bash
+sudo sh -c 'echo "127.0.0.1  respectaso.private" >> /etc/hosts'
 ```
 aso/
   services.py       # Core engine: all scoring algorithms (2,068 lines)
@@ -157,7 +171,7 @@ RespectASO is designed with privacy as a core principle:
 
 ## Contact
 
-[respectlytics@loheden.com](mailto:respectlytics@loheden.com)
+[respectaso@loheden.com](mailto:respectaso@loheden.com)
 
 ---
 

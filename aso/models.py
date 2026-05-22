@@ -6,6 +6,8 @@ from django.db import models
 from django.db.models import Manager, Min
 from django.utils import timezone
 
+from aso.scoring import calc_opportunity, classify_keyword, get_targeting_advice
+
 
 class App(models.Model):
     """
@@ -130,6 +132,11 @@ class SearchResult(models.Model):
         default="us",
         help_text="Country code used for this search",
     )
+    classification = models.CharField(
+        max_length=20,
+        default="Moderate",
+        help_text="Keyword classification label from classify_keyword()",
+    )
     searched_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -155,6 +162,13 @@ class SearchResult(models.Model):
             searched_at__lt=today_end,
         ).delete()
         return cls.objects.create(keyword=keyword, country=country, **fields)
+
+    def save(self, *args, **kwargs):
+        """Auto-compute classification from popularity + difficulty on save."""
+        self.classification = classify_keyword(
+            self.popularity_score or 0, self.difficulty_score
+        )
+        super().save(*args, **kwargs)
 
     @property
     def difficulty_label(self):
@@ -189,49 +203,14 @@ class SearchResult(models.Model):
         return "text-red-600"
 
     @property
+    def opportunity_score(self):
+        """Computed opportunity score from popularity and difficulty."""
+        return calc_opportunity(self.popularity_score or 0, self.difficulty_score)
+
+    @property
     def targeting_advice(self):
         """Return (icon, label, css_classes, description) for ASO targeting."""
-        diff = self.difficulty_score
-        pop = self.popularity_score
-
-        if pop is not None:
-            if pop >= 40 and diff <= 40:
-                return ("🎯", "Sweet Spot", "bg-green-900/20 text-green-300 border-green-500/20",
-                        "High popularity + low difficulty — ideal keyword to target with good ASO.")
-            elif pop >= 40 and diff <= 60:
-                return ("✅", "Good Target", "bg-green-900/20 text-green-300 border-green-500/20",
-                        "Solid popularity with manageable difficulty.")
-            elif pop >= 40 and diff > 60:
-                return ("⚔️", "Worth Competing", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
-                        "High demand but tough competition. Consider long-tail variants.")
-            elif 30 <= pop < 40 and diff <= 40:
-                return ("💎", "Hidden Gem", "bg-blue-900/20 text-blue-300 border-blue-500/20",
-                        "Moderate volume with little competition. Good for niche apps.")
-            elif 30 <= pop < 40 and diff <= 60:
-                return ("👍", "Decent Option", "bg-slate-800 text-slate-300 border-white/10",
-                        "Moderate demand and competition. Can work as a supporting keyword.")
-            elif pop < 30 and diff <= 30:
-                return ("🔍", "Low Volume", "bg-slate-800 text-slate-300 border-white/10",
-                        "Easy to rank but few people search for this. Best as a supporting keyword.")
-            elif pop < 30 and diff > 30:
-                return ("🚫", "Avoid", "bg-red-900/20 text-red-300 border-red-500/20",
-                        "Low search volume with notable competition.")
-            else:
-                return ("⚔️", "Challenging", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
-                        "Strong competition. Focus on long-tail variants.")
-        else:
-            if diff <= 25:
-                return ("🟢", "Easy to Rank", "bg-green-900/20 text-green-300 border-green-500/20",
-                        "Low competition — a well-optimized app can rank quickly.")
-            elif diff <= 50:
-                return ("🟡", "Moderate", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
-                        "Achievable with strong ASO.")
-            elif diff <= 75:
-                return ("🟠", "Competitive", "bg-orange-900/20 text-orange-300 border-orange-500/20",
-                        "Consider long-tail variants.")
-            else:
-                return ("🔴", "Very Competitive", "bg-red-900/20 text-red-300 border-red-500/20",
-                        "Dominated by established apps. Target easier keywords first.")
+        return get_targeting_advice(self.popularity_score, self.difficulty_score)
 
 
 class TrendSignal(models.Model):

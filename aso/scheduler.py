@@ -87,6 +87,7 @@ def _refresh_pair(keyword_obj, country):
         DownloadEstimator,
         ITunesSearchService,
         PopularityEstimator,
+        SearchAPIUnavailableError,
     )
 
     itunes_service = ITunesSearchService()
@@ -94,18 +95,28 @@ def _refresh_pair(keyword_obj, country):
     popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
-    competitors = itunes_service.search_apps(
-        keyword_obj.keyword, country=country, limit=25
-    )
+    try:
+        competitors = itunes_service.search_apps(
+            keyword_obj.keyword, country=country, limit=25
+        )
+    except SearchAPIUnavailableError as e:
+        logger.warning(
+            f"Skipping refresh for {keyword_obj.keyword} ({country}): {e}"
+        )
+        return None
+
     difficulty_score, breakdown = difficulty_calc.calculate(
         competitors, keyword=keyword_obj.keyword
     )
 
     app_rank = None
     if keyword_obj.app and keyword_obj.app.track_id:
-        app_rank = itunes_service.find_app_rank(
-            keyword_obj.keyword, keyword_obj.app.track_id, country=country
-        )
+        try:
+            app_rank = itunes_service.find_app_rank(
+                keyword_obj.keyword, keyword_obj.app.track_id, country=country
+            )
+        except SearchAPIUnavailableError:
+            pass  # Rank is optional
 
     popularity = popularity_est.estimate(competitors, keyword_obj.keyword)
 
@@ -202,6 +213,72 @@ def _scheduler_loop():
 
         # Sleep 1 hour before checking again
         time.sleep(3600)
+
+
+def run_manual_refresh(pairs):
+    """
+    Run a manual bulk refresh in a background thread.
+
+    *pairs* is a list of (keyword_id, country) tuples — only these will be
+    refreshed.  Uses the same in-memory progress state as the automatic
+    scheduler so the dashboard progress bar works identically.
+
+    Returns immediately.  If a refresh (manual or automatic) is already
+    running, does nothing.
+    """
+    from .models import Keyword
+
+    with _status_lock:
+        if _refresh_status["running"]:
+            return  # Already busy
+
+    if not pairs:
+        return
+
+    def _work():
+        total = len(pairs)
+        _update_status(
+            running=True,
+            total=total,
+            completed=0,
+            current_keyword="",
+            started_at=timezone.now().isoformat(),
+            error=None,
+        )
+
+        logger.info(f"Manual bulk refresh starting: {total} keyword+country pairs.")
+
+        for i, (keyword_id, country) in enumerate(pairs):
+            try:
+                keyword_obj = Keyword.objects.select_related("app").get(id=keyword_id)
+            except Keyword.DoesNotExist:
+                _update_status(completed=i + 1)
+                continue
+
+            _update_status(
+                current_keyword=f"{keyword_obj.keyword} ({country.upper()})",
+                completed=i,
+            )
+
+            try:
+                if i > 0:
+                    time.sleep(2)  # Rate limit
+                _refresh_pair(keyword_obj, country)
+            except Exception as e:
+                logger.warning(
+                    f"Manual refresh failed for {keyword_obj.keyword} ({country}): {e}"
+                )
+
+        _update_status(
+            running=False,
+            completed=total,
+            current_keyword="",
+            last_completed_at=timezone.now().isoformat(),
+        )
+        logger.info(f"Manual bulk refresh complete: {total} pairs refreshed.")
+
+    thread = threading.Thread(target=_work, daemon=True, name="aso-manual-refresh")
+    thread.start()
 
 
 _scheduler_started = False

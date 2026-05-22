@@ -1,11 +1,17 @@
 """
-Service classes for iTunes Search API, keyword difficulty calculation,
+Service classes for App Store search, keyword difficulty calculation,
 and popularity estimation.
+
+Primary data source: iTunes Search API (itunes.apple.com/search).
+Fallback: App Store SSR scraping (apps.apple.com search pages) when
+the iTunes API is unavailable.  Both produce identical output via
+the same _parse_app() dict format.
 
 All API calls are made from the user's local machine — no central
 server is involved.
 """
 
+import json as _json
 import logging
 import math
 import re
@@ -15,6 +21,34 @@ from datetime import datetime, timezone
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+# --------------------------------------------------------------------------- #
+# Exceptions
+# --------------------------------------------------------------------------- #
+
+
+class ITunesAPIError(Exception):
+    """Base class for App Store data retrieval errors."""
+    pass
+
+
+class SearchAPIUnavailableError(ITunesAPIError):
+    """Both primary (iTunes API) and fallback (SSR) search are down."""
+    pass
+
+
+class ITunesRateLimited(ITunesAPIError):
+    """The iTunes API returned a rate-limit signal (429 or 503 with Retry-After).
+
+    `retry_after` is the server-suggested wait in seconds, or None if the
+    server didn't include the header. Runners feed this into the adaptive
+    rate limiter so the next call waits at least this long before retrying.
+    """
+
+    def __init__(self, message: str = "iTunes API rate-limited", retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 _FINANCE_INTENT_TOKENS = {
@@ -61,8 +95,12 @@ _TOKEN_NORMALIZATION = {
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize into lowercase alphanumeric words for robust title matching."""
-    raw_tokens = re.findall(r"[a-z0-9]+", (text or "").lower())
+    """Tokenize into lowercase words for robust title matching.
+
+    Uses ``[^\W_]+`` (Unicode-aware \\w minus underscore) so accented
+    characters like é, ü, ñ are preserved as part of the token.
+    """
+    raw_tokens = re.findall(r"[^\W_]+", (text or "").lower())
     return [_TOKEN_NORMALIZATION.get(tok, tok) for tok in raw_tokens]
 
 
@@ -436,13 +474,35 @@ class PopularityEstimator:
 
 class ITunesSearchService:
     """
-    Searches the public iTunes Search API for competitor apps.
+    Searches for iOS apps by keyword.
+
+    Primary: iTunes Search API (fast, lightweight JSON).
+    Fallback: App Store SSR scraping — extracts ranked app IDs from the
+    web search page, then batch-fetches full data via the Lookup API.
+
+    Both paths produce identical output (same _parse_app() dict format,
+    same number of results) so scoring is deterministic regardless of
+    which data source was used.
 
     No authentication required. Calls are made from the user's local network.
     """
 
     SEARCH_URL = "https://itunes.apple.com/search"
     LOOKUP_URL = "https://itunes.apple.com/lookup"
+    SSR_SEARCH_URL = "https://apps.apple.com/{country}/iphone/search"
+
+    _SSR_HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.0 Safari/605.1.15"
+        ),
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    # Timestamp of last SSR request — rate-limit to 1 req/sec minimum.
+    _last_ssr_request: float = 0.0
 
     def lookup_by_id(self, track_id: int, country: str = "us") -> dict | None:
         """
@@ -466,11 +526,318 @@ class ITunesSearchService:
             logger.error(f"iTunes lookup failed for id {track_id}: {e}")
             return None
 
+    def lookup_full_description(self, track_id: int, country: str = "us") -> dict:
+        """Look up an app and return its description, genre, and context metadata.
+
+        Returns a dict with keys: description, genre, rating, rating_count,
+        release_date, update_date, price, version, seller.
+        """
+        defaults = {
+            "description": "",
+            "genre": "",
+            "rating": 0,
+            "rating_count": 0,
+            "release_date": "",
+            "update_date": "",
+            "price": "Free",
+            "version": "",
+            "seller": "",
+        }
+        try:
+            response = requests.get(
+                self.LOOKUP_URL,
+                params={"id": track_id, "country": country},
+                timeout=30,
+            )
+            response.raise_for_status()
+            results = response.json().get("results", [])
+            if results:
+                r = results[0]
+                return {
+                    "description": r.get("description", ""),
+                    "genre": r.get("primaryGenreName", ""),
+                    "rating": r.get("averageUserRating", 0),
+                    "rating_count": r.get("userRatingCount", 0),
+                    "release_date": r.get("releaseDate", ""),
+                    "update_date": r.get("currentVersionReleaseDate", ""),
+                    "price": r.get("formattedPrice", "Free"),
+                    "version": r.get("version", ""),
+                    "seller": r.get("sellerName", ""),
+                }
+            return defaults
+        except Exception:
+            return defaults
+
+    # ── Primary: iTunes Search API ──────────────────────────────────────
+
+    def _search_itunes(
+        self, keyword: str, country: str = "us", limit: int = 10
+    ) -> list[dict]:
+        """Search via iTunes API. Tighter timeout + 429/503 detection +
+        single in-line retry on transient errors before giving up.
+
+        Raises:
+            ITunesRateLimited: when the response is 429 or 503. Carries the
+                server's `Retry-After` value if present.
+            HTTPError / RequestException: on other failures (caller falls
+                back to SSR scraping).
+        """
+        params = {
+            "term": keyword,
+            "country": country,
+            "entity": "software",
+            "limit": limit,
+        }
+        # Two attempts: the second one only fires on transient (5xx) errors,
+        # waiting Retry-After (or 5s default) before retrying. Permanent
+        # errors (4xx) raise immediately so SSR fallback can take over.
+        for attempt in range(2):
+            try:
+                response = requests.get(self.SEARCH_URL, params=params, timeout=15)
+            except requests.Timeout:
+                # Tighter timeout failed — let caller try SSR fallback.
+                # No second attempt: timeouts here usually mean Apple's API
+                # is overloaded and SSR may be more responsive.
+                raise
+
+            status = response.status_code
+            if status in (429, 503):
+                retry_after = self._parse_retry_after(response.headers.get("Retry-After"))
+                # First attempt: wait Retry-After (capped at 5s) and try once more.
+                if attempt == 0:
+                    wait = min(5.0, retry_after) if retry_after is not None else 2.0
+                    logger.info(
+                        "iTunes API returned %d; waiting %.1fs before retry "
+                        "(Retry-After=%s, keyword=%r)",
+                        status, wait, retry_after, keyword,
+                    )
+                    time.sleep(wait)
+                    continue
+                # Second attempt also rate-limited — surface it so the runner
+                # can record the failure on the limiter and consider SSR.
+                raise ITunesRateLimited(
+                    f"iTunes API rate-limited ({status})", retry_after=retry_after,
+                )
+
+            # Any other 5xx: retry once with a brief pause; otherwise raise.
+            if 500 <= status < 600:
+                if attempt == 0:
+                    time.sleep(1.5)
+                    continue
+                response.raise_for_status()  # raises HTTPError
+
+            response.raise_for_status()
+            data = response.json()
+            return [self._parse_app(r) for r in data.get("results", [])]
+
+        # Should be unreachable — both attempts return or raise above.
+        raise SearchAPIUnavailableError("iTunes API exhausted retries")
+
+    @staticmethod
+    def _parse_retry_after(value: str | None) -> float | None:
+        """Parse the HTTP `Retry-After` header.
+
+        The header may be either a delta in seconds (e.g. "30") or an
+        HTTP-date. We support the delta form (the common case for iTunes);
+        if it's an HTTP-date we conservatively return None (caller falls
+        back to its own backoff).
+        """
+        if not value:
+            return None
+        try:
+            return float(value.strip())
+        except (TypeError, ValueError):
+            return None
+
+    # ── Fallback: App Store SSR ─────────────────────────────────────────
+
+    def _fetch_ssr_page(self, keyword: str, country: str = "us") -> dict:
+        """Fetch the App Store search page and extract the embedded JSON.
+
+        Returns the parsed top-level dict from the serialized-server-data
+        script tag.  Retries up to 3 times with exponential backoff on
+        transient failures (5xx, timeouts, connection errors).
+        """
+        max_retries = 3
+        last_exc: Exception | None = None
+
+        for attempt in range(max_retries):
+            # Rate limit: at least 1 second between SSR requests
+            elapsed = time.time() - self.__class__._last_ssr_request
+            if elapsed < 1.0:
+                time.sleep(1.0 - elapsed)
+
+            url = self.SSR_SEARCH_URL.format(country=country.lower())
+            try:
+                response = requests.get(
+                    url,
+                    params={"term": keyword},
+                    headers=self._SSR_HEADERS,
+                    timeout=30,
+                )
+                self.__class__._last_ssr_request = time.time()
+
+                # Don't retry client errors (4xx) — they won't succeed
+                if 400 <= response.status_code < 500:
+                    response.raise_for_status()
+
+                response.raise_for_status()
+
+                # Extract JSON from <script id="serialized-server-data">
+                match = re.search(
+                    r'<script[^>]*id="serialized-server-data"[^>]*>(.*?)</script>',
+                    response.text,
+                    re.DOTALL,
+                )
+                if not match:
+                    raise ITunesAPIError(
+                        "App Store SSR: serialized-server-data script tag not found"
+                    )
+                return _json.loads(match.group(1))
+
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout) as e:
+                last_exc = e
+                if attempt < max_retries - 1:
+                    delay = 2 ** attempt  # 1s, 2s
+                    logger.warning(
+                        f"SSR fetch attempt {attempt + 1} failed "
+                        f"(connection/timeout), retrying in {delay}s: {e}"
+                    )
+                    time.sleep(delay)
+            except requests.exceptions.HTTPError as e:
+                if response.status_code >= 500 and attempt < max_retries - 1:
+                    delay = 2 ** attempt
+                    logger.warning(
+                        f"SSR fetch attempt {attempt + 1} got {response.status_code}, "
+                        f"retrying in {delay}s"
+                    )
+                    time.sleep(delay)
+                    last_exc = e
+                else:
+                    raise
+
+        raise last_exc  # type: ignore[misc]
+
+    @staticmethod
+    def _extract_ssr_app_ids(ssr_data: dict) -> list[int]:
+        """Extract an ordered list of app IDs from SSR JSON.
+
+        Combines lockup items (top shelf) with nextPage results,
+        preserving Apple's search ranking order.  Deduplicates by ID.
+        """
+        app_ids: list[int] = []
+        seen: set[int] = set()
+
+        try:
+            inner = ssr_data["data"][0]["data"]
+        except (KeyError, IndexError, TypeError):
+            return app_ids
+
+        # 1. Lockup items from shelves (top ~12 results)
+        for shelf in inner.get("shelves", []):
+            for item in shelf.get("items", []):
+                lockup = item.get("lockup", {})
+                adam_id = lockup.get("adamId")
+                if adam_id and int(adam_id) not in seen:
+                    app_ids.append(int(adam_id))
+                    seen.add(int(adam_id))
+
+        # 2. nextPage results — type "apps" only (skip editorial, bundles)
+        next_page = inner.get("nextPage", {})
+        for r in next_page.get("results", []):
+            if r.get("type") != "apps":
+                continue
+            rid = r.get("id")
+            if rid and int(rid) not in seen:
+                app_ids.append(int(rid))
+                seen.add(int(rid))
+
+        return app_ids
+
+    def _batch_lookup(
+        self, track_ids: list[int], country: str = "us"
+    ) -> dict[int, dict]:
+        """Batch-fetch apps via Lookup API.  Returns {trackId: app_dict}.
+
+        The Lookup API accepts comma-separated IDs (tested up to 200).
+        We chunk in groups of 50 for reliability.
+        """
+        result: dict[int, dict] = {}
+        chunk_size = 50
+
+        for start in range(0, len(track_ids), chunk_size):
+            chunk = track_ids[start : start + chunk_size]
+            ids_str = ",".join(str(tid) for tid in chunk)
+            try:
+                resp = requests.get(
+                    self.LOOKUP_URL,
+                    params={"id": ids_str, "country": country},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                for r in resp.json().get("results", []):
+                    tid = r.get("trackId")
+                    if tid:
+                        result[tid] = self._parse_app(r)
+            except Exception as e:
+                logger.warning(f"Batch lookup failed for chunk: {e}")
+                # Continue with next chunk — partial data is better than none
+
+        return result
+
+    def _search_ssr(
+        self, keyword: str, country: str = "us", limit: int = 10
+    ) -> list[dict]:
+        """Fallback search via App Store SSR + Lookup API.
+
+        1. Fetch SSR page → extract ordered app IDs (ranking order)
+        2. Take first `limit` IDs
+        3. Batch-fetch full data via Lookup API
+        4. Return in ranking order with all scoring fields populated
+
+        Raises SearchAPIUnavailableError if SSR fetch or Lookup both fail.
+        """
+        ssr_data = self._fetch_ssr_page(keyword, country=country)
+        all_ids = self._extract_ssr_app_ids(ssr_data)
+
+        if not all_ids:
+            # SSR returned no results — this is valid (niche keyword)
+            return []
+
+        # Take first `limit` IDs and batch-fetch via Lookup API
+        target_ids = all_ids[:limit]
+        lookup_map = self._batch_lookup(target_ids, country=country)
+
+        if not lookup_map:
+            raise SearchAPIUnavailableError(
+                "App Store search data is temporarily unavailable. "
+                "Both the iTunes Search API and the Lookup API failed. "
+                "Please try again in a few minutes."
+            )
+
+        # Return in ranking order, only apps that Lookup returned
+        apps = []
+        for tid in target_ids:
+            if tid in lookup_map:
+                app_dict = lookup_map[tid]
+                app_dict["_data_source"] = "appstore_ssr"
+                apps.append(app_dict)
+
+        return apps
+
+    # ── Public API ──────────────────────────────────────────────────────
+
     def search_apps(
         self, keyword: str, country: str = "us", limit: int = 10
     ) -> list[dict]:
         """
         Search for iOS apps matching a keyword.
+
+        Tries the iTunes Search API first.  If it fails (HTTP error,
+        timeout, etc.), falls back to App Store SSR scraping + Lookup
+        API batch fetch.  If both sources fail, raises
+        SearchAPIUnavailableError.
 
         Args:
             keyword: The search term.
@@ -478,30 +845,47 @@ class ITunesSearchService:
             limit: Max results to return (default: 10).
 
         Returns:
-            List of dicts with app data.
+            List of dicts with app data (same format regardless of source).
+
+        Raises:
+            SearchAPIUnavailableError: When both data sources are down.
         """
+        # Try primary source: iTunes Search API
         try:
-            response = requests.get(
-                self.SEARCH_URL,
-                params={
-                    "term": keyword,
-                    "country": country,
-                    "entity": "software",
-                    "limit": limit,
-                },
-                timeout=30,
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            apps = []
-            for result in data.get("results", []):
-                apps.append(self._parse_app(result))
+            apps = self._search_itunes(keyword, country=country, limit=limit)
+            for app in apps:
+                app["_data_source"] = "itunes"
             return apps
-
+        except ITunesRateLimited:
+            # Rate-limit signal must propagate so the runner's adaptive
+            # limiter records it and waits the right amount of time before
+            # the next call. SSR isn't a sensible fallback here — Apple
+            # would rate-limit the SSR endpoint too.
+            raise
         except Exception as e:
-            logger.error(f"iTunes search failed for '{keyword}': {e}")
-            return []
+            logger.warning(
+                f"iTunes Search API failed for '{keyword}' ({country}), "
+                f"falling back to SSR: {e}"
+            )
+
+        # Fallback: App Store SSR + Lookup API
+        try:
+            apps = self._search_ssr(keyword, country=country, limit=limit)
+            logger.info(
+                f"SSR fallback returned {len(apps)} apps for '{keyword}' ({country})"
+            )
+            return apps
+        except SearchAPIUnavailableError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"SSR fallback also failed for '{keyword}' ({country}): {e}"
+            )
+            raise SearchAPIUnavailableError(
+                "App Store search data is temporarily unavailable. "
+                "Both the iTunes Search API and the App Store website "
+                "returned errors. Please try again in a few minutes."
+            ) from e
 
     def find_app_rank(
         self, keyword: str, track_id: int, country: str = "us"
@@ -512,6 +896,9 @@ class ITunesSearchService:
         Searches up to 200 results (iTunes API max) and returns the
         1-based position of the app, or None if not found.
 
+        If the iTunes API fails, falls back to checking the position
+        in the SSR ordered ID list (200+ apps, no full hydration needed).
+
         Args:
             keyword: The search term.
             track_id: The iTunes trackId to look for.
@@ -519,12 +906,52 @@ class ITunesSearchService:
 
         Returns:
             1-based rank position, or None if not in top 200.
+
+        Raises:
+            SearchAPIUnavailableError: When both data sources are down.
         """
-        results = self.search_apps(keyword, country=country, limit=200)
-        for i, app in enumerate(results):
-            if app.get("trackId") == track_id:
-                return i + 1
-        return None
+        # Try primary: iTunes Search API
+        try:
+            results = self._search_itunes(
+                keyword, country=country, limit=200
+            )
+            for i, app in enumerate(results):
+                if app.get("trackId") == track_id:
+                    return i + 1
+            return None
+        except Exception as e:
+            logger.warning(
+                f"iTunes API failed for rank lookup '{keyword}' ({country}), "
+                f"falling back to SSR: {e}"
+            )
+
+        # Fallback: SSR ID list (no full hydration — lightweight)
+        try:
+            return self._find_rank_in_ssr(keyword, track_id, country=country)
+        except SearchAPIUnavailableError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"SSR rank fallback also failed for '{keyword}' ({country}): {e}"
+            )
+            raise SearchAPIUnavailableError(
+                "App Store search data is temporarily unavailable. "
+                "Cannot determine app ranking."
+            ) from e
+
+    def _find_rank_in_ssr(
+        self, keyword: str, track_id: int, country: str = "us"
+    ) -> int | None:
+        """Check app rank using the ordered SSR ID list.
+
+        No full app hydration — just position in the list.
+        """
+        ssr_data = self._fetch_ssr_page(keyword, country=country)
+        all_ids = self._extract_ssr_app_ids(ssr_data)
+        try:
+            return all_ids.index(track_id) + 1
+        except ValueError:
+            return None
 
     @staticmethod
     def _parse_app(result: dict) -> dict:
@@ -565,7 +992,7 @@ class DownloadEstimator:
          tap on the result at each position.  Follows a well-documented
          power-law decay curve.
       3. Conversion rate — percentage of taps that become installs.
-         Varies by category/price but ~45–55 % for free apps is typical.
+         Varies by category/listing quality; 5–20 % range used.
 
     All numbers are rough estimates shown as ranges (low–high).
     """

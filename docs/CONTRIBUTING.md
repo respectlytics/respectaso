@@ -89,4 +89,4 @@ docker compose up --build
 
 ## Questions?
 
-Email: [respectlytics@loheden.com](mailto:respectlytics@loheden.com)
+Email: [respectaso@loheden.com](mailto:respectaso@loheden.com)

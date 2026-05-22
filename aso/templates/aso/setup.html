@@ -26,8 +26,7 @@
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>You're running the native Mac app — the recommended way to use RespectASO.</p>
             <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
-                <li>Download the latest <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">.dmg</code> from
-                    <a href="https://github.com/respectlytics/respectaso/releases/latest" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300">GitHub Releases</a></li>
+                <li><a href="{% url 'aso:download_dmg' %}" class="text-purple-400 hover:text-purple-300">Download the latest <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">.dmg</code></a></li>
                 <li>Open the <code class="bg-slate-800 px-1.5 py-0.5 rounded">.dmg</code> and drag <strong class="text-white">RespectASO</strong> into <strong class="text-white">Applications</strong></li>
                 <li>Launch from Applications (or Spotlight: <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">⌘ Space</kbd> → "RespectASO")</li>
             </ol>
@@ -69,7 +68,7 @@
                 When an update is available, a banner appears on the Dashboard with a <strong class="text-white">Download Update</strong> button and release notes.
             </p>
             <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
-                <li>Click <strong class="text-white">Download Update</strong> (or visit <a href="https://github.com/respectlytics/respectaso/releases/latest" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300">GitHub Releases</a>)</li>
+                <li>Click <strong class="text-white">Download Update</strong> (or <a href="{% url 'aso:download_dmg' %}" class="text-purple-400 hover:text-purple-300">download the latest .dmg</a>)</li>
                 <li>Open the new <code class="bg-slate-800 px-1.5 py-0.5 rounded">.dmg</code> and drag to Applications (replace the old version)</li>
                 <li>Relaunch RespectASO</li>
             </ol>
@@ -93,7 +92,7 @@
                 It's faster, simpler, and updates with a single drag-and-drop.
             </p>
             <div class="flex items-center gap-3">
-                <a href="https://github.com/respectlytics/respectaso/releases/latest" target="_blank" rel="noopener"
+                <a href="{% url 'aso:download_dmg' %}"
                    class="text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg px-4 py-2 transition-colors">
                     Download .dmg
                 </a>

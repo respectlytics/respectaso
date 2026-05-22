@@ -61,6 +61,9 @@
             <button type="button" id="opp-cancel-btn" onclick="cancelOpportunityScan()" class="hidden mt-2 text-xs text-red-400 hover:text-red-300 border border-red-500/20 rounded-lg px-3 py-1.5 transition-colors">
                 Cancel Scan
             </button>
+            <div class="flex justify-center mt-4">
+                <img src="{% static 'gif/respectaso_processing.gif' %}" alt="Processing..." class="w-48 h-48 rounded-full object-cover shadow-lg shadow-purple-500/10 opacity-90">
+            </div>
         </div>
     </div>
 
@@ -106,7 +109,7 @@
         <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
             <div class="px-4 py-3 border-b border-white/10">
                 <h2 class="text-sm font-semibold text-white">All Countries — Ranked by Opportunity Score</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Opportunity = Popularity × (100 − Difficulty) / 100. Higher = better chance to rank and get downloads. Click a row to see detailed insights.</p>
+                <p class="text-xs text-slate-500 mt-0.5">Opportunity combines search volume and competition into a single score — higher means more realistic ranking potential. Click a row to see detailed insights.</p>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm" id="opp-table">
@@ -403,36 +406,24 @@ function renderRankingTiers(tiers) {
         </div>`;
 }
 
-function getTargetingAdvice(pop, diff) {
-    let icon, color, title, advice;
-    if (pop !== null && pop !== undefined) {
-        if (pop >= 40 && diff <= 40) { icon = '🎯'; color = 'green'; title = 'Sweet Spot'; advice = 'High popularity + low difficulty — ideal keyword to target with good ASO.'; }
-        else if (pop >= 40 && diff <= 60) { icon = '✅'; color = 'green'; title = 'Good Target'; advice = 'Solid popularity with manageable difficulty.'; }
-        else if (pop >= 40 && diff > 60) { icon = '⚔️'; color = 'yellow'; title = 'Worth Competing'; advice = 'High demand but tough competition. Consider long-tail variants.'; }
-        else if (pop >= 30 && pop < 40 && diff <= 40) { icon = '💎'; color = 'blue'; title = 'Hidden Gem'; advice = 'Moderate volume with little competition. Good for niche apps.'; }
-        else if (pop >= 30 && pop < 40 && diff <= 60) { icon = '👍'; color = 'slate'; title = 'Decent Option'; advice = 'Moderate demand and competition. Can work as a supporting keyword.'; }
-        else if (pop < 30 && diff <= 30) { icon = '🔍'; color = 'slate'; title = 'Low Volume'; advice = 'Easy to rank but few people search for this. Best as a supporting keyword.'; }
-        else if (pop < 30 && diff > 30) { icon = '🚫'; color = 'red'; title = 'Avoid'; advice = 'Low search volume with notable competition.'; }
-        else { icon = '⚔️'; color = 'yellow'; title = 'Challenging'; advice = 'Strong competition. Focus on long-tail variants.'; }
-    } else {
-        if (diff <= 25) { icon = '🟢'; color = 'green'; title = 'Easy to Rank'; advice = 'Low competition — a well-optimized app can rank quickly.'; }
-        else if (diff <= 50) { icon = '🟡'; color = 'yellow'; title = 'Moderate Competition'; advice = 'Achievable with strong ASO.'; }
-        else if (diff <= 75) { icon = '🟠'; color = 'orange'; title = 'Competitive'; advice = 'Consider long-tail variants.'; }
-        else { icon = '🔴'; color = 'red'; title = 'Very Competitive'; advice = 'Dominated by established apps. Target easier keywords first.'; }
-    }
-    const colorMap = {
-        green: 'bg-green-900/20 border-green-500/20 text-green-300',
-        yellow: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300',
-        blue: 'bg-blue-900/20 border-blue-500/20 text-blue-300',
-        orange: 'bg-orange-900/20 border-orange-500/20 text-orange-300',
-        red: 'bg-red-900/20 border-red-500/20 text-red-300',
-        slate: 'bg-slate-800 border-white/10 text-slate-300',
+function classificationBadge(label) {
+    // Render a classification badge from a server-provided label.
+    // classify_keyword() in aso/scoring.py is the single source of truth.
+    const map = {
+        'Sweet Spot':       {icon: '🎯', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'High search volume + low competition — the ideal ASO target.'},
+        'Good Target':      {icon: '✅', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'Solid search volume with manageable competition.'},
+        'Hidden Gem':       {icon: '💎', css: 'bg-blue-900/20 border-blue-500/20 text-blue-300',     advice: 'Moderate search volume with minimal competition — a genuine opportunity others have overlooked.'},
+        'High Competition': {icon: '⚔️', css: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300', advice: 'Dominated by established apps with thousands of ratings. Focus on long-tail variants instead.'},
+        'Moderate':         {icon: '👍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Reasonable opportunity. Can work as a supporting keyword.'},
+        'Low Volume':       {icon: '🔍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Very few searches. Only worth targeting if highly relevant to your app.'},
+        'Avoid':            {icon: '🚫', css: 'bg-red-900/20 border-red-500/20 text-red-300',        advice: 'Low opportunity. Effort better spent elsewhere.'},
     };
+    const info = map[label] || map['Moderate'];
     return `
-        <div class="${colorMap[color]} border rounded-lg p-2.5">
+        <div class="${info.css} border rounded-lg p-2.5">
             <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
-            <p class="text-xs font-medium">${icon} ${title}</p>
-            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${advice}</p>
+            <p class="text-xs font-medium">${info.icon} ${label}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${info.advice}</p>
         </div>`;
 }
 
@@ -539,7 +530,7 @@ function toggleOppDetail(rowEl, index) {
     td.className = 'px-4 py-4 bg-slate-800/50';
 
     // Targeting advice
-    const adviceHtml = getTargetingAdvice(r.popularity, r.difficulty);
+    const adviceHtml = classificationBadge(r.classification);
 
     // Ranking tiers
     const tiersHtml = renderRankingTiers(r.difficulty_breakdown?.ranking_tiers);

@@ -25,4 +25,9 @@ urlpatterns = [
     path("auto-refresh/status/", views.auto_refresh_status_view, name="auto_refresh_status"),
     path("keywords/<int:keyword_id>/trend/", views.keyword_trend_view, name="keyword_trend"),
     path("version-check/", views.version_check_view, name="version_check"),
+    path("download/dmg/", views.download_dmg_view, name="download_dmg"),
+    # Pro promotional pages (shown in free version nav)
+    path("pro/ai-researcher/", views.pro_promo_researcher_view, name="pro_promo_researcher"),
+    path("pro/ai-competitor/", views.pro_promo_competitor_view, name="pro_promo_competitor"),
+    path("pro/simulator/", views.pro_promo_simulator_view, name="pro_promo_simulator"),
 ]

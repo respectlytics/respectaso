@@ -46,7 +46,19 @@ def ensure_secret_key(data_dir):
 
 
 def find_free_port():
-    """Find an available TCP port on localhost."""
+    """Find an available TCP port on localhost in the 8000–8099 range.
+
+    CSRF_TRUSTED_ORIGINS in core/settings.py is pre-configured for this
+    range. Falls back to any available port if all 100 ports are taken.
+    """
+    for port in range(8000, 8100):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("127.0.0.1", port))
+                return port
+        except OSError:
+            continue
+    # Fallback: let the OS pick any available port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -107,6 +119,10 @@ def main():
     secret_key = ensure_secret_key(data_dir)
     os.environ["SECRET_KEY"] = secret_key
 
+    # Ensure SSL certificate verification works inside PyInstaller bundle
+    import certifi
+    os.environ["SSL_CERT_FILE"] = certifi.where()
+
     # Setup Django
     import django
 
@@ -158,6 +174,43 @@ def main():
                 return save_path
             return None
 
+        def open_external(self, url):
+            """Open a URL (http(s)://, mailto:, etc.) in the default system handler.
+
+            Pywebview's WebKit view blocks mailto: and may swallow target=_blank
+            links. This delegates to Python's webbrowser module, which on macOS
+            uses LaunchServices to route the URL to the right app (browser,
+            Mail.app, etc.).
+            """
+            import webbrowser
+
+            if not isinstance(url, str) or not url:
+                return False
+            try:
+                webbrowser.open(url)
+                return True
+            except Exception:
+                return False
+
+        def copy_to_clipboard(self, text):
+            """Copy text to the system clipboard.
+
+            Pywebview's WebKit view blocks both the modern Clipboard API and the
+            legacy document.execCommand('copy') on http://localhost (non-secure
+            context), so JS-side copy fails silently. This native bridge uses
+            macOS NSPasteboard via AppKit, which always works.
+            """
+            if not isinstance(text, str):
+                return False
+            try:
+                from AppKit import NSPasteboard, NSPasteboardTypeString  # type: ignore[import-not-found]
+                pb = NSPasteboard.generalPasteboard()
+                pb.clearContents()
+                pb.setString_forType_(text, NSPasteboardTypeString)
+                return True
+            except Exception:
+                return False
+
     api = Api()
     window = webview.create_window(
         "RespectASO",
@@ -165,6 +218,7 @@ def main():
         width=1280,
         height=860,
         min_size=(900, 600),
+        maximized=True,
         js_api=api,
     )
     webview.start()

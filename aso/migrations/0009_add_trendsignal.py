@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('aso', '0006_alter_searchresult_popularity_score'),
+        ('aso', '0008_backfill_classification'),
     ]
 
     operations = [

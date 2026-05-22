@@ -1,0 +1,134 @@
+{% extends "aso/base.html" %}
+
+{% block title %}AI Competitor Analyzer — RespectASO Pro{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8">
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-4 py-1.5 mb-4">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span class="text-xs font-medium text-emerald-300">Pro Feature</span>
+        </div>
+        <h1 class="text-3xl font-bold text-slate-50 mb-3">AI Competitor Analyzer</h1>
+        <p class="text-lg text-slate-400 max-w-xl mx-auto">
+            Search for any competitor — reverse-engineer their keyword strategy, map the competitive landscape, and get metadata to outrank them.
+        </p>
+    </div>
+
+    <!-- What it does -->
+    <div class="bg-slate-800/50 border border-white/10 rounded-xl p-8 mb-6">
+        <h2 class="text-lg font-semibold text-slate-50 mb-4">What You Get</h2>
+        <div class="space-y-4">
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">1</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Competitor Profile & Metadata Teardown</p>
+                    <p class="text-sm text-slate-400">See the competitor's icon, rating, genre, and a character-level analysis of their title, subtitle, and keyword field — what they prioritize and what they miss.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">2</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Keyword Table with Rankings</p>
+                    <p class="text-sm text-slate-400">Every keyword they target — with source, popularity, difficulty, opportunity score, and their actual rank for each term.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">3</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Niche Map & Competitive Landscape</p>
+                    <p class="text-sm text-slate-400">See the full competitive landscape — not just one app, but how the entire niche is structured, where overlap exists, and where gaps are.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">4</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Differentiation Metadata & Strategy</p>
+                    <p class="text-sm text-slate-400">AI-generated metadata to beat this competitor — validated against Apple's limits — plus a coverage analysis and strategic action plan.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced capabilities -->
+    <div class="bg-slate-800/50 border border-white/10 rounded-xl p-8 mb-6">
+        <h2 class="text-lg font-semibold text-slate-50 mb-4">Built for Iterative Work</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="flex items-start gap-2.5">
+                <span class="text-emerald-400 mt-0.5">🔍</span>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Search by Name</p>
+                    <p class="text-xs text-slate-400">Find competitors with autocomplete search — no need to copy App Store URLs.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="text-emerald-400 mt-0.5">🔄</span>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Refine with Feedback</p>
+                    <p class="text-xs text-slate-400">Not satisfied? Give the AI feedback and it regenerates with your guidance.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="text-emerald-400 mt-0.5">📋</span>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Session History</p>
+                    <p class="text-xs text-slate-400">Your recent analyses are saved. Reload, compare, and continue where you left off.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-2.5">
+                <span class="text-emerald-400 mt-0.5">📤</span>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Export & Copy</p>
+                    <p class="text-xs text-slate-400">Export results as Markdown or copy to clipboard with one click.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="bg-slate-800/50 border border-white/10 rounded-xl p-8 mb-8">
+        <h2 class="text-lg font-semibold text-slate-50 mb-3">How It Works</h2>
+        <p class="text-sm text-slate-400 leading-relaxed">
+            Search for a competitor by name or paste their App Store URL. The analyzer fetches their real metadata, cross-references it with keyword data, and uses LLM analysis to map the competitive landscape and build a differentiation strategy. Uses <strong class="text-slate-200">your own API key</strong> (OpenAI, Anthropic, or Google Gemini) — your data stays on your machine. Token usage is shown so you always know the cost.
+        </p>
+    </div>
+
+    <!-- Demo Video -->
+    <a href="https://youtu.be/8G7kVR2b2rY" target="_blank" rel="noopener" class="flex items-center gap-4 bg-[#1a1215] border border-red-500/20 hover:border-red-500/40 rounded-xl p-5 mb-8 transition-colors group">
+        <div class="w-12 h-12 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-600/20 group-hover:shadow-red-600/30 transition-shadow">
+            <svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">Watch Demo on YouTube</p>
+            <p class="text-xs text-slate-500">See AI Competitor Analyzer in action — from app URL to differentiation strategy.</p>
+        </div>
+        <svg class="w-4 h-4 text-slate-600 group-hover:text-red-400 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+    </a>
+
+    <!-- CTA -->
+    <div class="bg-gradient-to-b from-purple-900/30 to-slate-800/50 border border-purple-500/20 rounded-xl p-8 text-center">
+        <h2 class="text-lg font-semibold text-slate-50 mb-2">Ready to try AI Competitor Analyzer?</h2>
+        <p class="text-sm text-slate-400 mb-5">Download the native macOS app to unlock all AI-powered features.</p>
+        <a href="{% url 'aso:download_dmg' %}" class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-8 py-3 rounded-xl transition-colors shadow-lg shadow-purple-600/20 hover:shadow-purple-600/30">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download RespectASO Pro (.dmg)
+        </a>
+        <p class="text-xs text-slate-500 mt-4">See <a href="https://respectaso.com/pricing/" target="_blank" rel="noopener" class="text-purple-400 hover:text-purple-300">respectaso.com/pricing</a> for license details.</p>
+        {% if not IS_NATIVE_APP %}
+        <div class="mt-4 inline-flex items-center gap-2 bg-amber-900/40 border border-amber-500/30 rounded-lg px-4 py-2">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-sm text-amber-300">Pro features require the native macOS app. They are not available in Docker.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

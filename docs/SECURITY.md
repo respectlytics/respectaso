@@ -8,7 +8,7 @@ If you discover a security vulnerability in RespectASO, please report it respons
 
 ### Contact
 
-Email: [respectlytics@loheden.com](mailto:respectlytics@loheden.com)
+Email: [respectaso@loheden.com](mailto:respectaso@loheden.com)
 
 Subject line: `[SECURITY] [RespectASO] Brief description`
 
@@ -41,7 +41,7 @@ Out of scope:
 
 ## Security Design
 
-RespectASO is designed as a **local-only tool** running in Docker on the user's machine:
+RespectASO is designed as a **local-only tool** running on the user's machine (native macOS app or Docker):
 
 - **No remote access** — binds to localhost only
 - **No authentication** — single-user tool, no auth needed

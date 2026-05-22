@@ -6,58 +6,13 @@
 
 {% block content %}
 <div class="space-y-5">
-    <!-- Update Banner (populated by JS) -->
-    <div id="update-banner" class="hidden animate-fade-in">
-        <div class="bg-purple-900/30 border border-purple-500/30 rounded-xl px-4 py-3">
-            <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3 min-w-0">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                        </svg>
-                    </div>
-                    <p class="text-sm text-slate-300">
-                        <span class="text-purple-300 font-medium">RespectASO <span id="update-version"></span></span> is available
-                        <span class="text-slate-500">(you're on <span id="current-version"></span>)</span>
-                    </p>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <button id="update-toggle-notes" onclick="document.getElementById('update-notes').classList.toggle('hidden'); this.querySelector('svg').classList.toggle('rotate-180');"
-                            class="text-xs text-slate-400 hover:text-slate-300 transition-colors inline-flex items-center gap-1 hidden">
-                        What's new
-                        <svg class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <a id="update-download-btn" href="#" target="_blank" rel="noopener"
-                       class="hidden text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
-                        Download Update
-                    </a>
-                    <a id="update-instructions-btn" href="{% url 'aso:setup' %}#updating"
-                       class="hidden text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
-                        Update instructions →
-                    </a>
-                    <button onclick="this.closest('#update-banner').classList.add('hidden'); try{localStorage.setItem('aso_dismiss_update', document.getElementById('update-version').textContent)}catch(e){}"
-                            class="text-slate-500 hover:text-slate-300 transition-colors p-1" title="Dismiss">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
-            </div>
-            <!-- Release notes (hidden until toggled) -->
-            <div id="update-notes" class="hidden mt-3 pt-3 border-t border-purple-500/20">
-                <div id="update-notes-content" class="text-xs text-slate-400 leading-relaxed whitespace-pre-line max-h-48 overflow-y-auto"></div>
-                <a id="update-release-link" href="#" target="_blank" rel="noopener" class="inline-block mt-2 text-xs text-purple-400 hover:text-purple-300 transition-colors">
-                    View full release on GitHub →
-                </a>
-            </div>
-        </div>
-    </div>
-
     <!-- Header -->
     <div>
         <h1 class="text-xl font-bold text-white">Keyword Research</h1>
         <p class="text-slate-400 text-sm mt-0.5">Search for App Store keywords to analyze popularity, difficulty, and competitors.</p>
     </div>
 
-    <!-- Shared Filters -->
+    <!-- Search Panel -->
     <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
         <div class="flex flex-col sm:flex-row gap-3">
             <div class="flex-1">
@@ -86,11 +41,7 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Search Form -->
-    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
-        <form id="search-form" method="post" action="{% url 'aso:search' %}">
+        <form id="search-form" method="post" action="{% url 'aso:search' %}" class="mt-4 pt-4 border-t border-white/5">
             {% csrf_token %}
             <div class="flex gap-3">
                 <div class="flex-1">
@@ -122,58 +73,20 @@
         <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
             <p class="text-slate-400 text-sm mt-3" id="loading-text">Analyzing keywords...</p>
+            <div class="flex justify-center mt-4">
+                <img src="{% static 'gif/respectaso_processing.gif' %}" alt="Processing..." class="w-48 h-48 rounded-full object-cover shadow-lg shadow-purple-500/10 opacity-90">
+            </div>
         </div>
     </div>
 
-    <!-- Scoring Guide -->
-    <details class="bg-[#1e293b] border border-white/10 rounded-xl">
-        <summary class="px-4 py-3 cursor-pointer text-sm font-medium text-slate-300 hover:text-white transition-colors select-none flex items-center gap-2">
-            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Scoring Guide — What to aim for
-        </summary>
-        <div class="px-4 pb-4 pt-1">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Popularity (1–100)</h4>
-                    <div class="space-y-1.5 text-xs">
-                        <div class="flex justify-between"><span class="text-slate-400">50+ &nbsp;High demand</span><span class="text-green-400 font-medium">Excellent</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">30–49 &nbsp;Good search volume</span><span class="text-emerald-400 font-medium">Good</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">15–29 &nbsp;Moderate volume</span><span class="text-yellow-400 font-medium">Fair</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">5–14 &nbsp;Low volume</span><span class="text-orange-400 font-medium">Low</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">&lt;5 &nbsp;Very few searches</span><span class="text-red-400 font-medium">Minimal</span></div>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Difficulty (1–100)</h4>
-                    <div class="space-y-1.5 text-xs">
-                        <div class="flex justify-between"><span class="text-slate-400">0–15 &nbsp;Very Easy</span><span class="text-green-400 font-medium">Go for it</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">16–35 &nbsp;Easy</span><span class="text-green-300 font-medium">Good chance</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">36–55 &nbsp;Moderate</span><span class="text-yellow-400 font-medium">Achievable</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">56–75 &nbsp;Hard</span><span class="text-orange-400 font-medium">Tough</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">76–90 &nbsp;Very Hard</span><span class="text-red-400 font-medium">Risky</span></div>
-                        <div class="flex justify-between"><span class="text-slate-400">91–100 &nbsp;Extreme</span><span class="text-red-600 font-medium">Avoid</span></div>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-4 border-t border-white/5 pt-3">
-                <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Targeting Advice</h4>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-2.5 py-1.5 text-green-300">🎯 Sweet Spot<span class="block text-[10px] text-slate-500 mt-0.5">High pop + low diff</span></div>
-                    <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-2.5 py-1.5 text-green-300">✅ Good Target<span class="block text-[10px] text-slate-500 mt-0.5">High pop, ok diff</span></div>
-                    <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg px-2.5 py-1.5 text-blue-300">💎 Hidden Gem<span class="block text-[10px] text-slate-500 mt-0.5">Mid pop + low diff</span></div>
-                    <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-2.5 py-1.5 text-yellow-300">⚔️ Worth Competing<span class="block text-[10px] text-slate-500 mt-0.5">High pop + high diff</span></div>
-                    <div class="bg-slate-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-300">👍 Decent Option<span class="block text-[10px] text-slate-500 mt-0.5">Mid pop + mid diff</span></div>
-                    <div class="bg-slate-800 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-300">🔍 Low Volume<span class="block text-[10px] text-slate-500 mt-0.5">Few searches, easy</span></div>
-                    <div class="bg-red-900/20 border border-red-500/20 rounded-lg px-2.5 py-1.5 text-red-300">🚫 Avoid<span class="block text-[10px] text-slate-500 mt-0.5">Low pop + high diff</span></div>
-                    <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-2.5 py-1.5 text-yellow-300">⚔️ Challenging<span class="block text-[10px] text-slate-500 mt-0.5">Strong competition</span></div>
-                </div>
-            </div>
-        </div>
-    </details>
+    {% if app_summary %}
+    {% include "aso/_app_summary.html" with summary=app_summary %}
+    {% endif %}
 
     <!-- Search History -->
-    <div id="history-section">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+    <div id="history-section" class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+        <div class="p-4 {% if total_unfiltered_count or history_results %}border-b border-white/5{% endif %}">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <h2 class="text-base font-semibold text-white">
                     Search History{% if selected_app_name %} — {{ selected_app_name }}{% else %} — All Apps{% endif %}
@@ -183,15 +96,27 @@
                     {{ keyword_count }} keyword{{ keyword_count|pluralize }}{% if total_pages > 1 %} · Page {{ page }} of {{ total_pages }}{% endif %}
                 </p>
                 {% endif %}
+                {% if last_refresh and not app_summary %}
+                <p class="text-slate-500 text-[11px] mt-1 inline-flex items-center gap-1" title="{{ last_refresh|date:'Y-m-d H:i:s' }}">
+                    <svg class="w-3 h-3 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Rankings auto-refreshed {{ last_refresh|timesince }} ago — runs daily in the background while the app is open.
+                </p>
+                {% endif %}
             </div>
             <div class="flex items-center gap-2">
-                {% if available_countries|length > 1 %}
+                {% comment %}Show the dropdown whenever there are multiple countries OR when a country
+                filter is currently set in the URL — even if it matches no data. Otherwise the user has
+                no UI to clear an orphan ?country=xx filter that's producing an empty table.{% endcomment %}
+                {% if available_countries|length > 1 or selected_country %}
                 <select id="history-country-filter"
                         class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <option value="">All Countries</option>
                     {% for cc in available_countries %}
                     <option value="{{ cc }}" {% if selected_country == cc %}selected{% endif %}>{{ cc|country_flag }} {{ cc|country_name }}</option>
                     {% endfor %}
+                    {% if selected_country and selected_country not in available_countries %}
+                    <option value="{{ selected_country }}" selected>{{ selected_country|country_flag }} {{ selected_country|country_name }} (no results)</option>
+                    {% endif %}
                 </select>
                 {% endif %}
                 <button onclick="location.reload()" title="Reload history table"
@@ -202,13 +127,30 @@
                     Reload
                 </button>
                 {% if history_results %}
-                <button onclick="exportHistoryCSV()" title="Export all search history as CSV"
-                   class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    Export CSV
-                </button>
+                <div class="relative" id="export-dropdown-wrapper">
+                    <button onclick="document.getElementById('export-dropdown').classList.toggle('hidden')" title="Export search history as CSV"
+                       class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Export CSV
+                        <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="export-dropdown" class="hidden absolute right-0 mt-1 w-56 bg-slate-800 border border-white/10 rounded-lg shadow-xl z-50 py-1">
+                        <button onclick="exportHistoryCSV()" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/60 transition-colors">
+                            Summary Only
+                            <span class="block text-[10px] text-slate-500 mt-0.5">Keyword scores &amp; metrics</span>
+                        </button>
+                        <button onclick="exportHistoryCSV('top5')" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/60 transition-colors">
+                            Include Top 5 Apps
+                            <span class="block text-[10px] text-slate-500 mt-0.5">Scores + ranking competitors per keyword</span>
+                        </button>
+                        <button onclick="exportHistoryCSV('top10')" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700/60 transition-colors">
+                            Include Top 10 Apps
+                            <span class="block text-[10px] text-slate-500 mt-0.5">Scores + more competitors per keyword</span>
+                        </button>
+                    </div>
+                </div>
                 <button onclick="bulkRefresh()" id="bulk-refresh-btn"
                         class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,10 +169,107 @@
             </div>
         </div>
 
+        <!-- Compact info disclosures (Scoring guide + ASA explainer) -->
+        <!-- 2-column when both closed; collapses to 1-column when either is open so expanded content fills full width -->
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 has-[details[open]]:md:grid-cols-1">
+            <details class="group bg-slate-900/40 hover:bg-slate-900/60 open:bg-slate-900/60 border border-white/5 open:border-purple-500/20 rounded-lg transition-colors">
+                <summary class="flex items-center gap-2 px-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <svg class="w-3.5 h-3.5 text-purple-400/80 group-open:text-purple-400 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Scoring guide — what to aim for</span>
+                    <svg class="w-3 h-3 text-slate-500 group-open:text-purple-400 transition-all group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="px-4 pb-4 pt-3 border-t border-white/5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                        <div>
+                            <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Popularity (1–100)</h4>
+                            <div class="space-y-1 text-xs">
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">50+</span><span class="text-slate-300">High demand</span><span class="text-green-400 font-medium">Excellent</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">30–49</span><span class="text-slate-300">Good search volume</span><span class="text-emerald-400 font-medium">Good</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">15–29</span><span class="text-slate-300">Moderate volume</span><span class="text-yellow-400 font-medium">Fair</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">5–14</span><span class="text-slate-300">Low volume</span><span class="text-orange-400 font-medium">Low</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">&lt;5</span><span class="text-slate-300">Very few searches</span><span class="text-red-400 font-medium">Minimal</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Difficulty (1–100)</h4>
+                            <div class="space-y-1 text-xs">
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">0–15</span><span class="text-slate-300">Very Easy</span><span class="text-green-400 font-medium">Go for it</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">16–35</span><span class="text-slate-300">Easy</span><span class="text-green-300 font-medium">Good chance</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">36–55</span><span class="text-slate-300">Moderate</span><span class="text-yellow-400 font-medium">Achievable</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">56–75</span><span class="text-slate-300">Hard</span><span class="text-orange-400 font-medium">Tough</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">76–90</span><span class="text-slate-300">Very Hard</span><span class="text-red-400 font-medium">Risky</span></div>
+                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">91–100</span><span class="text-slate-300">Extreme</span><span class="text-red-600 font-medium">Avoid</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-white/5">
+                        <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Targeting Advice</h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+                            <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-3 py-2 text-green-300 leading-tight">🎯 Sweet Spot<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">High pop + low diff</span></div>
+                            <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-3 py-2 text-green-300 leading-tight">✅ Good Target<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">High pop, ok diff</span></div>
+                            <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg px-3 py-2 text-blue-300 leading-tight">💎 Hidden Gem<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Moderate pop + very low diff</span></div>
+                            <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-3 py-2 text-yellow-300 leading-tight">⚔️ High Competition<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Tough to rank via ASO</span></div>
+                            <div class="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-slate-300 leading-tight">👍 Moderate<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Reasonable opportunity</span></div>
+                            <div class="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-slate-300 leading-tight">🔍 Low Volume<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Few searches</span></div>
+                            <div class="bg-red-900/20 border border-red-500/20 rounded-lg px-3 py-2 text-red-300 leading-tight">🚫 Avoid<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Low opportunity</span></div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            <details class="group bg-slate-900/40 hover:bg-slate-900/60 open:bg-slate-900/60 border border-white/5 open:border-purple-500/20 rounded-lg transition-colors">
+                <summary class="flex items-center gap-2 px-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <svg class="w-3.5 h-3.5 text-purple-400/80 group-open:text-purple-400 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Why our <span class="text-purple-300 font-medium">Popularity</span> scores don't use Apple Search Ads data</span>
+                    <svg class="w-3 h-3 text-slate-500 group-open:text-purple-400 transition-all group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="px-4 pb-4 pt-3 border-t border-white/5 text-xs text-slate-400 leading-relaxed space-y-3">
+                    <p>
+                        Apple Search Ads "popularity" is a paid-auction metric Apple publishes for ad bidders — not a measurement of organic search volume.
+                        In late September 2025 it <span class="text-slate-200 font-medium">collapsed 77% in four days</span> across every tool that reads from Apple's API,
+                        and Apple issued no acknowledgment. The same silent shift happened in June 2024 and again in March 2026.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <div class="bg-emerald-500/[0.04] border border-emerald-500/15 rounded-lg p-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-emerald-300 mb-2">Avoid ASA passthrough — same approach as us</p>
+                            <ul class="space-y-1">
+                                <li><span class="text-white font-medium">Sensor Tower</span> <span class="text-slate-500">— proprietary 10M+ consumer panel</span></li>
+                                <li><span class="text-white font-medium">Gummicube</span> <span class="text-slate-500">— real mobile data, not Apple's API values</span></li>
+                                <li><span class="text-white font-medium">APPlyzer</span> <span class="text-slate-500">— independent dynamic model</span></li>
+                            </ul>
+                        </div>
+                        <div class="bg-amber-500/[0.04] border border-amber-500/15 rounded-lg p-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-amber-300 mb-2">Relied on ASA — confirmed the 2025 collapse</p>
+                            <ul class="space-y-1">
+                                <li><span class="text-white font-medium">MobileAction</span> <span class="text-slate-500">— froze updates during the outage</span></li>
+                                <li><span class="text-white font-medium">AppFigures</span> <span class="text-slate-500">— "identified an alternative collection method"</span></li>
+                                <li><span class="text-white font-medium">Phiture</span> <span class="text-slate-500">— attributed to an Apple backend change</span></li>
+                                <li><span class="text-white font-medium">Astro</span> <span class="text-slate-500">— "all ASO tools on the market"</span></li>
+                                <li><span class="text-white font-medium">Radaso</span> <span class="text-slate-500">— Apple's replacement uses a different methodology</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="pt-1">
+                        <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
+                           target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 font-medium">
+                            Full write-up: Why Apple Search Ads popularity broke
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </a>
+                    </p>
+                </div>
+            </details>
+        </div>
+        </div>
+        <!-- /panel header -->
+
         {% if total_unfiltered_count %}
         <!-- Filter Bar -->
-        <div id="filter-bar" class="mb-3">
+        <div id="filter-bar" class="px-4 py-3 border-b border-white/5">
             <div class="flex items-center gap-2 flex-wrap">
+                <div class="relative">
+                    <svg class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" id="keyword-search" placeholder="Search keywords…" value="{{ search_q|default:'' }}" class="text-xs bg-slate-700/50 text-white placeholder-slate-500 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
                 <button id="filter-toggle" onclick="toggleFilterPanel()" class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                     Filters
@@ -240,7 +279,7 @@
                 <button onclick="clearAllFilters()" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">Clear all</button>
                 {% endif %}
             </div>
-            <div id="filter-panel" class="{% if not has_filters %}hidden{% endif %} mt-2 bg-[#1e293b] border border-white/10 rounded-xl p-3 animate-fade-in">
+            <div id="filter-panel" class="{% if not has_filters %}hidden{% endif %} mt-3 pt-3 border-t border-white/5 animate-fade-in">
                 <div class="flex items-end gap-3">
                     <!-- Insight multi-select dropdown -->
                     <div class="relative" id="insight-dropdown-wrap">
@@ -260,19 +299,16 @@
                                 <input type="checkbox" value="Hidden Gem" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Hidden Gem' in selected_insights %}checked{% endif %}> 💎 Hidden Gem
                             </label>
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Worth Competing" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Worth Competing' in selected_insights %}checked{% endif %}> ⚔️ Worth Competing
+                                <input type="checkbox" value="High Competition" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'High Competition' in selected_insights %}checked{% endif %}> ⚔️ High Competition
                             </label>
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Decent Option" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Decent Option' in selected_insights %}checked{% endif %}> 👍 Decent Option
+                                <input type="checkbox" value="Moderate" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Moderate' in selected_insights %}checked{% endif %}> 👍 Moderate
                             </label>
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
                                 <input type="checkbox" value="Low Volume" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Low Volume' in selected_insights %}checked{% endif %}> 🔍 Low Volume
                             </label>
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
                                 <input type="checkbox" value="Avoid" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Avoid' in selected_insights %}checked{% endif %}> 🚫 Avoid
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Challenging" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Challenging' in selected_insights %}checked{% endif %}> ⚔️ Challenging
                             </label>
                         </div>
                     </div>
@@ -301,9 +337,8 @@
                 </div>
             </div>
         </div>
-        <div class="bg-[#1e293b] border border-white/10 rounded-xl">
-            <div class="overflow-x-auto">
-                <table class="w-full" id="history-table">
+        <div class="overflow-x-auto">
+            <table class="w-full" id="history-table">
                     <thead>
                         <tr class="border-b border-white/10">
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('keyword')">Keyword <span class="sort-indicator text-slate-500">{% if current_sort == 'keyword' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
@@ -315,10 +350,22 @@
                                 </span>
                                 <span class="sort-indicator text-slate-500">{% if current_sort == 'difficulty' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
                             </th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('opportunity')">
+                                <span class="inline-flex items-center gap-1">Opportunity
+                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Combined score reflecting how likely you are to rank AND get downloads. High popularity + low difficulty = high opportunity."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </span>
+                                <span class="sort-indicator text-slate-500">{% if current_sort == 'opportunity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
+                            </th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('est_downloads')">
+                                <span class="inline-flex items-center gap-1">Est. Downloads
+                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Estimated daily downloads if you rank #1 (hover each cell for the breakdown across rank #1, #5, and #10)."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </span>
+                                <span class="sort-indicator text-slate-500">{% if current_sort == 'est_downloads' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
+                            </th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2">Ranking Difficulty
                                 <svg class="w-3.5 h-3.5 text-slate-500 cursor-help inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Difficulty score computed for reaching the Top 5, Top 10, and Top 20 positions specifically, based on the competitors in each tier."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </th>
-                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2">Insight</th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('insight')">Insight <span class="sort-indicator text-slate-500">{% if current_sort == 'insight' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('country')">Country <span class="sort-indicator text-slate-500">{% if current_sort == 'country' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('competitors')">Competitors <span class="sort-indicator text-slate-500">{% if current_sort == 'competitors' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('date')">Date <span class="sort-indicator text-slate-500">{% if current_sort == 'date' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
@@ -358,6 +405,12 @@
                                 {% if result.difficulty_breakdown.is_brand_keyword %}
                                 <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword — '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's reviews.">🏷️ Brand</span>
                                 {% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.opportunity_score }}">
+                                <span class="text-cyan-400">{{ result.opportunity_score }}</span>
+                            </td>
+                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_breakdown.download_estimates|download_sort_value }}">
+                                {% download_cell result.difficulty_breakdown.download_estimates forloop.counter0 history_results|length %}
                             </td>
                             <td class="px-3 py-2">
                                 {% with tiers=result.difficulty_breakdown.ranking_tiers %}
@@ -429,7 +482,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                         </svg>
                                     </button>
-                                    <button onclick="deleteResult({{ result.id }}, this)" title="Delete this result"
+                                    <button onclick="deleteResult({{ result.id }}, '{{ result.keyword.keyword|escapejs }}', '{{ result.country }}', this)" title="Remove this keyword from this country's tracking"
                                             class="text-slate-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-white/5">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -440,7 +493,7 @@
                         </tr>
                         {% if result.competitors_data %}
                         <tr class="competitor-row hidden">
-                            <td colspan="{% if show_rank %}10{% else %}9{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 {% with advice=result.targeting_advice %}
                                 <div class="{{ advice.2 }} border rounded-lg p-2.5 mb-4">
                                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
@@ -582,7 +635,7 @@
                         {% endif %}
                         <!-- Trend detail row (loaded via AJAX) -->
                         <tr class="trend-row hidden" data-keyword-id="{{ result.keyword.id }}" data-country="{{ result.country }}">
-                            <td colspan="{% if show_rank %}10{% else %}9{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 <div class="trend-content flex items-center justify-center py-4">
                                     <svg class="w-5 h-5 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                     <span class="text-slate-500 text-sm ml-2">Loading trend data…</span>
@@ -593,11 +646,10 @@
                     </tbody>
                 </table>
             </div>
-        </div>
 
         <!-- Pagination -->
         {% if total_pages > 1 %}
-        <div class="flex items-center justify-center gap-2 mt-3">
+        <div class="flex items-center justify-center gap-2 px-4 py-3 border-t border-white/5">
             {% if has_prev %}
             <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}{% for i in selected_insights %}insight={{ i|urlencode }}&{% endfor %}{% if selected_pop_min %}pop_min={{ selected_pop_min }}&{% endif %}{% if selected_diff_max %}diff_max={{ selected_diff_max }}&{% endif %}sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"-1" }}"
                class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
@@ -616,13 +668,36 @@
 
         {% else %}
         <!-- Empty State -->
-        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
+        {% if selected_country and app_summary %}
+        {% comment %}Active country filter is producing 0 results, but the App Summary above shows data
+        exists elsewhere for this app. Make the inconsistency comprehensible and give a one-click escape.
+        {% endcomment %}
+        <div class="p-8 text-center">
+            <svg class="w-10 h-10 text-amber-400/70 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+            <h3 class="text-white text-sm font-medium mt-3">
+                No results match the active filter
+            </h3>
+            <p class="text-slate-400 text-xs mt-1.5">
+                Filtered to {{ selected_country|country_flag }} <span class="text-slate-200">{{ selected_country|country_name }}</span> —
+                but this app doesn't have any tracked keywords in that country.
+            </p>
+            <a href="?{% if selected_app %}app={{ selected_app }}{% endif %}"
+               class="inline-flex items-center gap-1.5 mt-4 text-xs bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-lg transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                Clear country filter
+            </a>
+        </div>
+        {% else %}
+        <div class="p-8 text-center">
             <svg class="w-10 h-10 text-slate-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <h3 class="text-white text-sm font-medium mt-3">No search history yet</h3>
             <p class="text-slate-400 text-xs mt-1.5">Search for keywords above to start analyzing the App Store.</p>
         </div>
+        {% endif %}
         {% endif %}
     </div>
 </div>
@@ -659,7 +734,10 @@ const currentHistorySort = '{{ current_sort }}';
 const currentHistorySortDir = '{{ current_dir }}';
 
 // --- CSV Export (uses native save dialog in pywebview, blob fallback for browser) ---
-function exportHistoryCSV() {
+function exportHistoryCSV(includeApps) {
+    // Close the dropdown
+    document.getElementById('export-dropdown').classList.add('hidden');
+
     const params = new URLSearchParams(window.location.search);
     // Keep only the filter params relevant for CSV export
     const exportParams = new URLSearchParams();
@@ -668,32 +746,50 @@ function exportHistoryCSV() {
     params.getAll('insight').forEach(v => exportParams.append('insight', v));
     if (params.get('pop_min')) exportParams.set('pop_min', params.get('pop_min'));
     if (params.get('diff_max')) exportParams.set('diff_max', params.get('diff_max'));
+    if (params.get('q')) exportParams.set('q', params.get('q'));
+    if (includeApps) exportParams.set('include_apps', includeApps);
     const qs = exportParams.toString();
     const url = '{% url "aso:export_history_csv" %}' + (qs ? '?' + qs : '');
+    const filename = includeApps ? 'respectaso-search-history-with-apps.csv' : 'respectaso-search-history.csv';
     fetch(url)
         .then(r => r.text())
         .then(content => {
             if (window.pywebview && window.pywebview.api) {
-                window.pywebview.api.save_file('respectaso-search-history.csv', content);
+                window.pywebview.api.save_file(filename, content);
             } else {
                 const blob = new Blob([content], { type: 'text/csv' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'respectaso-search-history.csv';
+                a.download = filename;
                 a.click();
                 URL.revokeObjectURL(a.href);
             }
         });
 }
 
+// --- Close export dropdown on outside click ---
+document.addEventListener('click', function(e) {
+    const wrapper = document.getElementById('export-dropdown-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        document.getElementById('export-dropdown').classList.add('hidden');
+    }
+});
+
 // --- Fixed-position tooltip system (escapes overflow containers) ---
+// The tooltip itself is hoverable — moving the mouse onto it cancels the hide
+// timer so the user can read long content without the tooltip vanishing.
 (function() {
     const tip = document.createElement('div');
-    tip.className = 'fixed z-[9999] max-w-[240px] bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-slate-300 leading-snug shadow-xl pointer-events-none opacity-0 transition-opacity duration-150';
+    tip.className = 'fixed z-[9999] max-w-[320px] bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-slate-300 leading-snug shadow-xl opacity-0 transition-opacity duration-150';
     tip.style.display = 'none';
+    tip.style.pointerEvents = 'auto';  // allow hovering the tooltip to keep it open
     document.body.appendChild(tip);
 
     let hideTimeout = null;
+
+    // Hovering the tooltip itself keeps it visible.
+    tip.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+    tip.addEventListener('mouseleave', () => hideSoon());
 
     function show(e) {
         const el = e.target.closest('[data-tip]');
@@ -702,34 +798,55 @@ function exportHistoryCSV() {
         tip.textContent = el.dataset.tip;
         tip.style.display = 'block';
 
-        // Position: prefer above the element, fallback below if clipped
+        // Position: prefer above the element, fall below if clipped, clamp to viewport if both
         const rect = el.getBoundingClientRect();
         const tipRect = tip.getBoundingClientRect();
-        let top = rect.top - tipRect.height - 8;
-        let left = rect.left + rect.width / 2 - tipRect.width / 2;
+        const margin = 8;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
 
-        // If clipped above viewport, show below
-        if (top < 4) top = rect.bottom + 8;
-        // Keep within horizontal bounds
-        if (left < 8) left = 8;
-        if (left + tipRect.width > window.innerWidth - 8) left = window.innerWidth - tipRect.width - 8;
+        // Vertical: try above, then below, then whichever side has more room
+        let top = rect.top - tipRect.height - margin;
+        if (top < margin) {
+            const below = rect.bottom + margin;
+            if (below + tipRect.height <= vh - margin) {
+                top = below;  // fits below
+            } else {
+                // Doesn't fit above OR below — pick the side with more space and clamp
+                const spaceAbove = rect.top;
+                const spaceBelow = vh - rect.bottom;
+                if (spaceBelow >= spaceAbove) {
+                    top = Math.max(margin, vh - tipRect.height - margin);
+                } else {
+                    top = margin;
+                }
+            }
+        }
+
+        // Horizontal: center on trigger, clamp to viewport
+        let left = rect.left + rect.width / 2 - tipRect.width / 2;
+        if (left < margin) left = margin;
+        if (left + tipRect.width > vw - margin) left = vw - tipRect.width - margin;
 
         tip.style.top = top + 'px';
         tip.style.left = left + 'px';
         requestAnimationFrame(() => tip.style.opacity = '1');
     }
 
-    function hide() {
+    function hideSoon() {
+        clearTimeout(hideTimeout);
+        // 250ms grace period — gives the user time to traverse from trigger to
+        // tooltip (or back) without it disappearing under the cursor.
         hideTimeout = setTimeout(() => {
             tip.style.opacity = '0';
             setTimeout(() => { tip.style.display = 'none'; }, 150);
-        }, 50);
+        }, 250);
     }
 
     document.addEventListener('mouseenter', show, true);
-    document.addEventListener('mouseleave', hide, true);
+    document.addEventListener('mouseleave', hideSoon, true);
     document.addEventListener('focusin', show, true);
-    document.addEventListener('focusout', hide, true);
+    document.addEventListener('focusout', hideSoon, true);
 })();
 
 // Country code → flag emoji + name
@@ -860,11 +977,14 @@ function updateCountryBtnText() {
 initCountryDropdown();
 
 // --- History sorting (server-side, across the full dataset) ---
+// Numeric/score columns default to DESC on first click (highest first), text columns default to ASC.
+const HISTORY_NUMERIC_COLUMNS = new Set(['popularity', 'difficulty', 'opportunity', 'rank', 'competitors', 'est_downloads']);
 function sortHistory(sortKey) {
     const params = new URLSearchParams(window.location.search);
+    const defaultDir = HISTORY_NUMERIC_COLUMNS.has(sortKey) ? 'desc' : 'asc';
     const nextDir = currentHistorySort === sortKey
         ? (currentHistorySortDir === 'asc' ? 'desc' : 'asc')
-        : 'asc';
+        : defaultDir;
 
     params.set('sort', sortKey);
     params.set('dir', nextDir);
@@ -903,6 +1023,7 @@ function applyServerFilters() {
     params.delete('insight');
     params.delete('pop_min');
     params.delete('diff_max');
+    params.delete('q');
     params.delete('page');
 
     // Insight checkboxes
@@ -920,11 +1041,17 @@ function applyServerFilters() {
     const diffVal = document.getElementById('filter-diff-max');
     if (diffVal && diffVal.value) params.set('diff_max', diffVal.value);
 
+    // Keyword text search
+    const qInput = document.getElementById('keyword-search');
+    const qVal = qInput ? qInput.value.trim() : '';
+    if (qVal) params.set('q', qVal);
+
     // Persist filter state so it survives tab switches
     const filterState = {};
     if (insights.length) filterState.insight = insights;
     if (popVal && popVal.value) filterState.pop_min = popVal.value;
     if (diffVal && diffVal.value) filterState.diff_max = diffVal.value;
+    if (qVal) filterState.q = qVal;
     if (Object.keys(filterState).length) {
         sessionStorage.setItem('dash_filters', JSON.stringify(filterState));
     } else {
@@ -941,6 +1068,7 @@ function clearAllFilters() {
     params.delete('insight');
     params.delete('pop_min');
     params.delete('diff_max');
+    params.delete('q');
     params.delete('page');
     const qs = params.toString();
     window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
@@ -987,6 +1115,14 @@ function initHistoryFilters() {
     if (popInput) popInput.addEventListener('change', applyServerFilters);
     if (diffInput) diffInput.addEventListener('change', applyServerFilters);
 
+    // Keyword text search — apply on Enter key
+    const qInput = document.getElementById('keyword-search');
+    if (qInput) {
+        qInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); applyServerFilters(); }
+        });
+    }
+
     // Country filter — must be re-attached after refreshHistorySection replaces the DOM
     const historyCountryFilter = document.getElementById('history-country-filter');
     if (historyCountryFilter) {
@@ -1027,7 +1163,7 @@ initHistoryFilters();
 // Restore saved filters when returning to Dashboard without filter params in URL
 (function restoreFiltersFromSession() {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('insight') || params.has('pop_min') || params.has('diff_max')) return;
+    if (params.has('insight') || params.has('pop_min') || params.has('diff_max') || params.has('q')) return;
     const saved = sessionStorage.getItem('dash_filters');
     if (!saved) return;
     try {
@@ -1037,6 +1173,7 @@ initHistoryFilters();
         if (state.insight) state.insight.forEach(v => params.append('insight', v));
         if (state.pop_min) params.set('pop_min', state.pop_min);
         if (state.diff_max) params.set('diff_max', state.diff_max);
+        if (state.q) params.set('q', state.q);
         params.delete('page');
         window.location.replace(`?${params.toString()}`);
     } catch (_) { sessionStorage.removeItem('dash_filters'); }
@@ -1071,6 +1208,12 @@ async function refreshHistorySection() {
         const html = await resp.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
+
+        // Swap the App Summary panel first (sits above the History table).
+        // After a new search or refresh, KPIs, per-country rows, and callouts all
+        // need to reflect the latest results — not just the History table below.
+        swapAppSummaryFromResponse(doc);
+
         const newHistory = doc.getElementById('history-section');
         if (newHistory) {
             const oldHistory = document.getElementById('history-section');
@@ -1086,6 +1229,75 @@ async function refreshHistorySection() {
     }
 }
 
+// Swap the App Summary panel from a parsed response document, preserving the
+// user's collapsed/expanded preference across the swap. Handles three cases:
+//   - panel exists in old AND new → replace
+//   - panel exists only in new → insert before #history-section
+//   - panel exists only in old (e.g., last keyword for app deleted) → remove
+function swapAppSummaryFromResponse(doc) {
+    const oldSummary = document.getElementById('app-summary-section');
+    const newSummary = doc.getElementById('app-summary-section');
+
+    if (newSummary && oldSummary) {
+        oldSummary.replaceWith(newSummary);
+    } else if (newSummary && !oldSummary) {
+        const history = document.getElementById('history-section');
+        if (history && history.parentNode) {
+            history.parentNode.insertBefore(newSummary, history);
+        }
+    } else if (!newSummary && oldSummary) {
+        oldSummary.remove();
+    }
+    // Restore collapsed state if the user had collapsed the panel before the swap
+    applyAppSummaryCollapsedState();
+}
+
+// --- App Summary collapse/expand state ---
+const APP_SUMMARY_COLLAPSED_KEY = 'aso_app_summary_collapsed';
+
+function applyAppSummaryCollapsedState() {
+    const section = document.getElementById('app-summary-section');
+    if (!section) return;
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(APP_SUMMARY_COLLAPSED_KEY) === '1'; } catch(e) {}
+    setAppSummaryCollapsed(collapsed, /*persist=*/false);
+}
+
+function setAppSummaryCollapsed(collapsed, persist) {
+    const section = document.getElementById('app-summary-section');
+    if (!section) return;
+    const body = section.querySelector('[data-summary-body]');
+    const toggle = section.querySelector('[data-summary-toggle]');
+    const chevron = toggle ? toggle.querySelector('[data-summary-chevron]') : null;
+    if (body) body.classList.toggle('hidden', collapsed);
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        const label = toggle.querySelector('[data-summary-label]');
+        if (label) label.textContent = collapsed ? 'Expand' : 'Collapse';
+    }
+    if (chevron) {
+        chevron.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+    }
+    // Hide the bottom border on the header when collapsed — looks cleaner with no body below
+    const header = section.querySelector('[data-summary-header]');
+    if (header) header.classList.toggle('border-b', !collapsed);
+    if (header) header.classList.toggle('border-white/5', !collapsed);
+    if (persist !== false) {
+        try { localStorage.setItem(APP_SUMMARY_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(e) {}
+    }
+}
+
+function toggleAppSummary() {
+    const section = document.getElementById('app-summary-section');
+    if (!section) return;
+    const body = section.querySelector('[data-summary-body]');
+    const isCollapsed = body && body.classList.contains('hidden');
+    setAppSummaryCollapsed(!isCollapsed, /*persist=*/true);
+}
+
+// Restore collapsed state on first load
+document.addEventListener('DOMContentLoaded', applyAppSummaryCollapsedState);
+
 // --- History table actions ---
 function toggleCompetitors(btn) {
     const row = btn.closest('tr');
@@ -1098,17 +1310,33 @@ function toggleCompetitors(btn) {
     }
 }
 
-async function deleteResult(resultId, btn) {
-    const ok = await showConfirm('Delete this search result?', {type: 'danger', title: 'Delete Result', confirmLabel: 'Delete', confirmStyle: 'danger'});
+async function deleteResult(resultId, keyword, country, btn) {
+    // The "delete row" button removes a (keyword, country) tracking entry —
+    // every snapshot is dropped on the server. Confirmation copy reflects that
+    // so the user doesn't expect previous snapshots to resurrect.
+    const cc = (country || '').toLowerCase();
+    const flag = (typeof countryFlag === 'function') ? countryFlag(cc) : '';
+    const cname = (typeof COUNTRY_NAMES === 'object' && COUNTRY_NAMES[cc]) ? COUNTRY_NAMES[cc] : cc.toUpperCase();
+    const ok = await showConfirm(
+        `Remove "${keyword}" from ${flag} ${cname} tracking? All historical snapshots for this keyword in this country will be deleted. This cannot be undone.`,
+        {type: 'danger', title: 'Remove from tracking', confirmLabel: 'Remove', confirmStyle: 'danger'}
+    );
     if (!ok) return;
     try {
         const resp = await fetch(`/results/${resultId}/delete/`, {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken},
         });
-        if (resp.ok) location.reload();
+        if (resp.ok) {
+            // Soft refresh — re-fetches the dashboard and swaps both
+            // #app-summary-section AND #history-section. No full page reload,
+            // so scroll position, expanded rows, and collapse state are preserved.
+            refreshHistorySection();
+        } else {
+            showAlert('Failed to remove from tracking.', {type: 'danger', title: 'Error'});
+        }
     } catch (e) {
-        showAlert('Failed to delete result.', {type: 'danger', title: 'Error'});
+        showAlert('Failed to remove from tracking.', {type: 'danger', title: 'Error'});
     }
 }
 
@@ -1133,28 +1361,40 @@ async function refreshKeyword(keywordId, btn) {
 }
 
 async function bulkRefresh() {
-    const resultCount = {{ total_count|default:"0" }};
-    const ok = await showConfirm(`Refresh all ${resultCount} keywords? This may take a while.`, {type: 'alert', title: 'Bulk Refresh'});
+    const ok = await showConfirm('Refresh all tracked keywords across all countries? This runs in the background — you can navigate away safely.', {type: 'alert', title: 'Bulk Refresh'});
     if (!ok) return;
 
     const btn = document.getElementById('bulk-refresh-btn');
     btn.disabled = true;
-    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Refreshing rankings...`;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Starting…`;
 
     try {
+        const countryEl = document.getElementById('history-country-filter');
+        const countryVal = countryEl ? countryEl.value : '';
         const resp = await fetch('{% url "aso:keywords_bulk_refresh" %}', {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
-            body: JSON.stringify({app_id: selectedApp, country: getSelectedCountries()[0] || 'us'}),
+            body: JSON.stringify({app_id: selectedApp, country: countryVal}),
         });
-        if (resp.ok) {
-            const data = await resp.json();
-            await showAlert(`Refreshed ${data.refreshed} keywords.`, {type: 'success', title: 'Done'});
-            location.reload();
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+            // Background thread started — the auto-refresh progress bar
+            // (polled every 5 s) will show live progress and reload the
+            // history section when finished.
+            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
+            btn.disabled = false;
+            if (data.total === 0) {
+                await showAlert('No keywords to refresh.', {type: 'info', title: 'Nothing to do'});
+            }
+            // Progress bar will appear automatically via the existing poller
+        } else {
+            await showAlert(data.error || 'Could not start refresh.', {type: 'danger', title: 'Error'});
+            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
+            btn.disabled = false;
         }
     } catch (e) {
         showAlert('Bulk refresh failed.', {type: 'danger', title: 'Error'});
-    } finally {
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Rankings`;
         btn.disabled = false;
     }
 }
@@ -1425,14 +1665,19 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 localStorage.removeItem('aso_app');
             }
+            // Reset the persisted History country filter when switching apps.
+            // Otherwise a country filter from the previous app (e.g. "Canada")
+            // would carry over and hide a new app's keywords that live in other
+            // storefronts — leaving the History table mysteriously empty.
+            localStorage.removeItem('aso_history_country');
         } catch(e) {}
-        const params = new URLSearchParams(window.location.search);
+        // Build a CLEAN URL — only the app param survives. Every History view
+        // filter (country, insight, pop_min, diff_max, q, page, sort, dir) is
+        // dropped so switching apps always starts from an unfiltered view.
+        const params = new URLSearchParams();
         if (appId) {
             params.set('app', appId);
-        } else {
-            params.delete('app');
         }
-        params.delete('page');
         const qs = params.toString();
         window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
     });
@@ -1613,41 +1858,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function getTargetingAdvice(result) {
-        const diff = result.difficulty_score;
-        const pop = result.popularity_score;
-        let icon, color, title, advice;
-
-        if (pop !== null) {
-            if (pop >= 40 && diff <= 40) { icon = '🎯'; color = 'green'; title = 'Sweet Spot'; advice = 'High popularity + low difficulty — ideal keyword to target with good ASO.'; }
-            else if (pop >= 40 && diff <= 60) { icon = '✅'; color = 'green'; title = 'Good Target'; advice = 'Solid popularity with manageable difficulty.'; }
-            else if (pop >= 40 && diff > 60) { icon = '⚔️'; color = 'yellow'; title = 'Worth Competing'; advice = 'High demand but tough competition. Consider long-tail variants.'; }
-            else if (pop >= 30 && pop < 40 && diff <= 40) { icon = '💎'; color = 'blue'; title = 'Hidden Gem'; advice = 'Moderate volume with little competition. Good for niche apps.'; }
-            else if (pop >= 30 && pop < 40 && diff <= 60) { icon = '👍'; color = 'slate'; title = 'Decent Option'; advice = 'Moderate demand and competition. Can work as a supporting keyword.'; }
-            else if (pop < 30 && diff <= 30) { icon = '🔍'; color = 'slate'; title = 'Low Volume'; advice = 'Easy to rank but few people search for this. Best as a supporting keyword.'; }
-            else if (pop < 30 && diff > 30) { icon = '🚫'; color = 'red'; title = 'Avoid'; advice = 'Low search volume with notable competition.'; }
-            else { icon = '⚔️'; color = 'yellow'; title = 'Challenging'; advice = 'Strong competition. Focus on long-tail variants.'; }
-        } else {
-            if (diff <= 25) { icon = '🟢'; color = 'green'; title = 'Easy to Rank'; advice = 'Low competition — a well-optimized app can rank quickly.'; }
-            else if (diff <= 50) { icon = '🟡'; color = 'yellow'; title = 'Moderate Competition'; advice = 'Achievable with strong ASO.'; }
-            else if (diff <= 75) { icon = '🟠'; color = 'orange'; title = 'Competitive'; advice = 'Consider long-tail variants.'; }
-            else { icon = '🔴'; color = 'red'; title = 'Very Competitive'; advice = 'Dominated by established apps. Target easier keywords first.'; }
-        }
-
-        const colorMap = {
-            green: 'bg-green-900/20 border-green-500/20 text-green-300',
-            yellow: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300',
-            blue: 'bg-blue-900/20 border-blue-500/20 text-blue-300',
-            orange: 'bg-orange-900/20 border-orange-500/20 text-orange-300',
-            red: 'bg-red-900/20 border-red-500/20 text-red-300',
-            slate: 'bg-slate-800 border-white/10 text-slate-300',
+    function classificationBadge(label) {
+        // Render a classification badge from a server-provided label.
+        // classify_keyword() in aso/scoring.py is the single source of truth.
+        const map = {
+            'Sweet Spot':       {icon: '🎯', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'High search volume + low competition — the ideal ASO target.'},
+            'Good Target':      {icon: '✅', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'Solid search volume with manageable competition.'},
+            'Hidden Gem':       {icon: '💎', css: 'bg-blue-900/20 border-blue-500/20 text-blue-300',     advice: 'Moderate search volume with minimal competition — a genuine opportunity others have overlooked.'},
+            'High Competition': {icon: '⚔️', css: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300', advice: 'Dominated by established apps with thousands of ratings. Focus on long-tail variants instead.'},
+            'Moderate':         {icon: '👍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Reasonable opportunity. Can work as a supporting keyword.'},
+            'Low Volume':       {icon: '🔍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Very few searches. Only worth targeting if highly relevant to your app.'},
+            'Avoid':            {icon: '🚫', css: 'bg-red-900/20 border-red-500/20 text-red-300',        advice: 'Low opportunity. Effort better spent elsewhere.'},
         };
-
+        const info = map[label] || map['Moderate'];
         return `
-            <div class="${colorMap[color]} border rounded-lg p-2.5">
+            <div class="${info.css} border rounded-lg p-2.5">
                 <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
-                <p class="text-xs font-medium">${icon} ${title}</p>
-                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${advice}</p>
+                <p class="text-xs font-medium">${info.icon} ${label}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${info.advice}</p>
             </div>`;
     }
 
@@ -1675,7 +1903,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-lg">🏆</span>
                 <div>
                     <h3 class="text-sm font-semibold text-white">Country Opportunity Comparison</h3>
-                    <p class="text-xs text-slate-500">Opportunity = Popularity × (100 − Difficulty) / 100. Higher is better.</p>
+                    <p class="text-xs text-slate-500">Opportunity combines search volume and competition — higher means more realistic ranking potential.</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -1884,8 +2112,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p class="${difficultyColorClass} text-xs mt-0.5 font-medium">${result.difficulty_label}</p>
                                 ${brandBadge}
                             </div>
+                            <div class="bg-slate-800 rounded-lg p-2.5">
+                                <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide inline-flex items-center gap-1">Opportunity
+                                    <span class="relative group/otip">
+                                        <svg class="w-3 h-3 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/otip:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal">Combined score reflecting how likely you are to rank AND get downloads. High popularity + low difficulty = high opportunity.</span>
+                                    </span>
+                                </p>
+                                <span class="text-2xl font-bold text-cyan-400">${result.opportunity_score}</span>
+                                <span class="text-slate-500 text-xs ml-1">/ 100</span>
+                            </div>
                             ${getAppRankDisplay(result)}
-                            ${getTargetingAdvice(result)}
+                            ${classificationBadge(result.classification)}
                         </div>
                     </div>
                 </div>
@@ -2251,38 +2489,6 @@ function renderTrendPanel(data, keywordId, country) {
 
     check();
     setInterval(check, 5000); // Poll every 5 seconds
-})();
-
-// --- Version update check ---
-(function() {
-    fetch('{% url "aso:version_check" %}')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.update_available) return;
-            var versionLabel = 'v' + data.latest;
-            // Check if user dismissed this specific version
-            try { if (localStorage.getItem('aso_dismiss_update') === versionLabel) return; } catch(e) {}
-            document.getElementById('update-version').textContent = versionLabel;
-            document.getElementById('current-version').textContent = 'v' + data.current;
-            // Show appropriate action button
-            if (data.is_native && data.download_url) {
-                var dlBtn = document.getElementById('update-download-btn');
-                dlBtn.href = data.download_url;
-                dlBtn.classList.remove('hidden');
-            } else {
-                document.getElementById('update-instructions-btn').classList.remove('hidden');
-            }
-            // Show release notes toggle if available
-            if (data.release_notes) {
-                document.getElementById('update-toggle-notes').classList.remove('hidden');
-                document.getElementById('update-notes-content').textContent = data.release_notes;
-            }
-            if (data.release_url) {
-                document.getElementById('update-release-link').href = data.release_url;
-            }
-            document.getElementById('update-banner').classList.remove('hidden');
-        })
-        .catch(() => {}); // Silently fail
 })();
 </script>
 {% endblock %}

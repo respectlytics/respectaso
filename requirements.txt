@@ -4,6 +4,7 @@ whitenoise==6.8.2
 requests==2.32.3
 python-dotenv==1.0.1
 pywebview>=5.0,<6.0
+certifi>=2024.0.0
 
 # Optional: Google Trends signal backends (see aso/signals/google_trends/README.md)
 # pytrends-modern>=0.2.5     # Free — uncomment to enable pytrends backend
