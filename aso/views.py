@@ -11,6 +11,7 @@ from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
@@ -861,6 +862,18 @@ def apps_view(request):
     message = None
     message_type = None
 
+    # Feedback from the per-app refresh action, which redirects back here.
+    refresh_status = request.GET.get("refresh")
+    if refresh_status == "renamed":
+        message = "App details updated from the App Store."
+        message_type = "success"
+    elif refresh_status == "current":
+        message = "App is already up to date."
+        message_type = "success"
+    elif refresh_status == "failed":
+        message = "Couldn't reach the App Store to refresh. Please try again."
+        message_type = "error"
+
     if request.method == "POST":
         # Check if this is from App Store lookup (has track_id)
         track_id = request.POST.get("track_id")
@@ -918,6 +931,35 @@ def app_delete_view(request, app_id):
     name = app.name
     app.delete()
     return redirect("aso:apps")
+
+
+@require_POST
+def app_refresh_view(request, app_id):
+    """Re-sync an app's title, icon, and seller from the App Store.
+
+    Name/icon/seller are a snapshot taken when the app was first added. If the
+    developer later renames the app (or changes its icon) on the App Store, the
+    stored values go stale. This pulls the current values from iTunes via the
+    app's track_id and writes them back to the App row — the single source of
+    truth every screen reads from — so the refresh propagates everywhere the
+    title is shown. Manual apps (no track_id) can't be refreshed.
+    """
+    app = get_object_or_404(App, id=app_id)
+    if not app.track_id:
+        return redirect("aso:apps")
+
+    fresh = ITunesSearchService().lookup_by_id(app.track_id)
+    if not fresh:
+        return redirect(f"{reverse('aso:apps')}?refresh=failed")
+
+    old_name = app.name
+    app.name = fresh.get("trackName") or app.name
+    app.icon_url = fresh.get("artworkUrl100") or app.icon_url
+    app.seller_name = fresh.get("sellerName") or app.seller_name
+    app.save(update_fields=["name", "icon_url", "seller_name"])
+
+    status = "renamed" if app.name != old_name else "current"
+    return redirect(f"{reverse('aso:apps')}?refresh={status}")
 
 
 @require_POST

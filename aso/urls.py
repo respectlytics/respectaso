@@ -17,6 +17,7 @@ urlpatterns = [
     path("apps/", views.apps_view, name="apps"),
     path("apps/lookup/", views.app_lookup_view, name="app_lookup"),
     path("apps/<int:app_id>/delete/", views.app_delete_view, name="app_delete"),
+    path("apps/<int:app_id>/refresh/", views.app_refresh_view, name="app_refresh"),
     path("keywords/<int:keyword_id>/delete/", views.keyword_delete_view, name="keyword_delete"),
     path("results/<int:result_id>/delete/", views.result_delete_view, name="result_delete"),
     path("keywords/bulk-delete/", views.keywords_bulk_delete_view, name="keywords_bulk_delete"),
