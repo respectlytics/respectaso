@@ -224,6 +224,44 @@
         if (label) {
             label.textContent = data.phase_label || 'AI is thinking...';
         }
+
+        // Live local-generation telemetry (present only for Local AI runs).
+        var lg = data.local_gen;
+        var isLocal = (data.phase_label || '').indexOf('Local AI') !== -1 || !!(lg && lg.running);
+
+        // "It's alive" signal: loading vs writing + a word count that keeps moving.
+        var subtext = document.getElementById('ai-thinking-subtext');
+        if (subtext) {
+            if (lg && lg.running) {
+                if (!lg.writing) {
+                    subtext.textContent = 'Loading the model and reading your request… (' + Math.round(lg.secs) + 's)';
+                } else {
+                    var spd = lg.tps ? ' · ~' + lg.tps + ' tokens/sec' : '';
+                    subtext.textContent = 'Writing the response… ~' + lg.words + ' words (' + Math.round(lg.secs) + 's)' + spd;
+                }
+            } else {
+                subtext.textContent = 'This may take a moment…';
+            }
+        }
+
+        // Escalating guidance when a single local step runs unusually long, so the
+        // user knows it isn't frozen — and that switching models is an option.
+        var guidance = document.getElementById('ai-thinking-guidance');
+        if (guidance) {
+            var msg = '';
+            var secs = (isLocal && lg && lg.running) ? lg.secs : 0;
+            if (secs >= 1200) {            // 20+ minutes on one step
+                msg = 'This step has been running over 20 minutes. It hasn’t frozen — local generation is just slow for this demanding workload. You can keep waiting, or cancel and use a cloud provider for a quick result.';
+            } else if (secs >= 480) {      // 8+ minutes on one step
+                msg = 'Still working — local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
+            }
+            if (msg) {
+                guidance.textContent = msg;
+                guidance.classList.remove('hidden');
+            } else {
+                guidance.classList.add('hidden');
+            }
+        }
     }
 
     /**
