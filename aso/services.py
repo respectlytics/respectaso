@@ -95,9 +95,9 @@ _TOKEN_NORMALIZATION = {
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize into lowercase words for robust title matching.
+    r"""Tokenize into lowercase words for robust title matching.
 
-    Uses ``[^\W_]+`` (Unicode-aware \\w minus underscore) so accented
+    Uses ``[^\W_]+`` (Unicode-aware \w minus underscore) so accented
     characters like é, ü, ñ are preserved as part of the token.
     """
     raw_tokens = re.findall(r"[^\W_]+", (text or "").lower())

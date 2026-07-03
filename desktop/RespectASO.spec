@@ -36,11 +36,6 @@ shared_datas = [
     (str(BASE_DIR / "core"), "core"),
     # Licensing — Ed25519 public key must be alongside validator.py
     (str(BASE_DIR / "licensing" / "public_key.pem"), "licensing"),
-    # fakeredis data file required by docket → fakeredis at runtime
-    # commands.json lives at fakeredis/ root; model/__init__.py creates the
-    # model/ directory so that model/../commands.json resolves on disk.
-    (os.path.join(os.path.dirname(__import__("fakeredis").__file__), "commands.json"), "fakeredis"),
-    (os.path.join(os.path.dirname(__import__("fakeredis").__file__), "model", "__init__.py"), "fakeredis/model"),
 ] + copy_metadata("fastmcp")
 
 shared_hiddenimports = [
@@ -117,17 +112,9 @@ shared_hiddenimports = [
         "cryptography.hazmat.primitives.asymmetric.ed25519",
         "cryptography.hazmat.primitives.serialization",
         "httpx",
-        # MCP server & its transitive deps (docket → fakeredis → lupa)
+        # MCP server
         "fastmcp",
         "mcp",
-        "docket",
-        "fakeredis",
-        "lupa",
-        "lupa.lua51",
-        "lupa.lua52",
-        "lupa.lua53",
-        "lupa.lua54",
-        "lupa.lua55",
         "aso_pro.mcp",
         "aso_pro.mcp.bootstrap",
         "aso_pro.mcp.server",
