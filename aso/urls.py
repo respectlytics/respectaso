@@ -20,6 +20,7 @@ urlpatterns = [
     path("apps/<int:app_id>/refresh/", views.app_refresh_view, name="app_refresh"),
     path("keywords/<int:keyword_id>/delete/", views.keyword_delete_view, name="keyword_delete"),
     path("results/<int:result_id>/delete/", views.result_delete_view, name="result_delete"),
+    path("results/bulk-delete/", views.results_bulk_delete_view, name="results_bulk_delete"),
     path("keywords/bulk-delete/", views.keywords_bulk_delete_view, name="keywords_bulk_delete"),
     path("keywords/<int:keyword_id>/refresh/", views.keyword_refresh_view, name="keyword_refresh"),
     path("keywords/bulk-refresh/", views.keywords_bulk_refresh_view, name="keywords_bulk_refresh"),

@@ -17,13 +17,21 @@
         <div class="flex flex-col sm:flex-row gap-3">
             <div class="flex-1">
                 <label for="global-app" class="block text-xs font-medium text-slate-300 mb-1.5">App</label>
-                <select id="global-app"
-                        class="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                    <option value="">All apps</option>
-                    {% for app in apps %}
-                    <option value="{{ app.id }}" {% if selected_app == app.id %}selected{% endif %}>{{ app.name }}</option>
-                    {% endfor %}
-                </select>
+                {% comment %}appearance-none + custom chevron: the native select ignores the
+                vertical padding, rendering shorter than the Countries button next to it.
+                This keeps both fields pixel-identical in height and look.{% endcomment %}
+                <div class="relative">
+                    <select id="global-app"
+                            class="w-full appearance-none bg-slate-700 border border-white/10 rounded-lg pl-3 pr-9 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <option value="">All apps</option>
+                        {% for app in apps %}
+                        <option value="{{ app.id }}" {% if selected_app == app.id %}selected{% endif %}>{{ app.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
             </div>
             <div class="flex-1">
                 <label class="block text-xs font-medium text-slate-300 mb-1.5">Countries <span class="text-slate-500">(max 5)</span></label>
@@ -337,10 +345,43 @@
                 </div>
             </div>
         </div>
+        <!-- Contextual selection bar — shown by JS when at least one row is selected.
+             Selection persists across pages (sessionStorage), so the count may include
+             rows selected on other pages of the table. -->
+        <div id="history-selection-bar" class="hidden flex items-center justify-between gap-3 px-4 py-2 bg-purple-600/10 border-y border-purple-500/20">
+            <span class="text-xs text-slate-300" role="status" aria-live="polite">
+                <span id="history-selected-count" class="font-semibold text-white">0</span> selected<span id="history-selected-offpage" class="text-slate-400"></span>
+            </span>
+            <div class="flex items-center gap-2">
+                <button id="history-clear-selection"
+                        class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors">
+                    Clear
+                </button>
+                <button id="history-copy-selected" title="Copy the selected keywords as a comma-separated list (ready to paste into App Store Connect)"
+                        class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    Copy keywords
+                </button>
+                <button id="history-delete-selected"
+                        class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete selected
+                </button>
+            </div>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full" id="history-table">
                     <thead>
                         <tr class="border-b border-white/10">
+                            <th class="px-3 py-2 w-8">
+                                <input type="checkbox" id="history-select-all"
+                                       class="rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer align-middle"
+                                       aria-label="Select all keywords on this page" title="Select / deselect all on this page">
+                            </th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('keyword')">Keyword <span class="sort-indicator text-slate-500">{% if current_sort == 'keyword' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('rank')">Rank <span class="sort-indicator text-slate-500">{% if current_sort == 'rank' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>{% endif %}
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')">Popularity <span class="sort-indicator text-slate-500">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
@@ -375,6 +416,12 @@
                     <tbody id="history-body">
                         {% for result in history_results %}
                         <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group" data-popularity="{{ result.popularity_score|default:'-1' }}" data-difficulty="{{ result.difficulty_score|default:'-1' }}" data-insight="{{ result.targeting_advice.1 }}">
+                            <td class="px-3 py-2 w-8">
+                                <input type="checkbox"
+                                       class="history-row-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer align-middle"
+                                       data-keyword-id="{{ result.keyword.id }}" data-country="{{ result.country }}" data-kw="{{ result.keyword.keyword }}"
+                                       aria-label="Select {{ result.keyword.keyword }} ({{ result.country|upper }})">
+                            </td>
                             <td class="px-3 py-2">
                                 <span class="text-white text-sm font-medium">{{ result.keyword.keyword }}</span><button class="kw-copy-btn ml-1.5 text-slate-600 hover:text-slate-300 transition-colors inline-flex items-center align-middle" data-kw="{{ result.keyword.keyword }}" title="Copy keyword" aria-label="Copy keyword"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
                                 {% if result.keyword.app %}
@@ -493,7 +540,7 @@
                         </tr>
                         {% if result.competitors_data %}
                         <tr class="competitor-row hidden">
-                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}12{% else %}11{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 {% with advice=result.targeting_advice %}
                                 <div class="{{ advice.2 }} border rounded-lg p-2.5 mb-4">
                                     <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
@@ -635,7 +682,7 @@
                         {% endif %}
                         <!-- Trend detail row (loaded via AJAX) -->
                         <tr class="trend-row hidden" data-keyword-id="{{ result.keyword.id }}" data-country="{{ result.country }}">
-                            <td colspan="{% if show_rank %}11{% else %}10{% endif %}" class="px-4 py-3 bg-slate-800/50">
+                            <td colspan="{% if show_rank %}12{% else %}11{% endif %}" class="px-4 py-3 bg-slate-800/50">
                                 <div class="trend-content flex items-center justify-center py-4">
                                     <svg class="w-5 h-5 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                                     <span class="text-slate-500 text-sm ml-2">Loading trend data…</span>
@@ -1224,7 +1271,233 @@ document.addEventListener('click', function(e) {
     });
 });
 
+// --- Multi-select for the Search History table ---
+// Selection persists across pages via sessionStorage, so the user can select
+// keywords on one page, paginate (a full page load), select more, and delete
+// everything in one action. Rows are identified by their stable
+// "keywordId:country" pair — snapshot ids churn on refresh (upsert_today),
+// so they cannot be used as a selection key.
+// Handlers are delegated at document level so they survive
+// refreshHistorySection() swapping the table's DOM.
+const HISTORY_SELECTION_KEY = 'aso_history_selected_entries';
+
+// Each entry is {pair: "keywordId:country", kw: "keyword text"} — the keyword
+// text is captured at selection time so off-page selections can still be
+// copied as a keyword list without another server round-trip.
+function historySelectedEntries() {
+    try {
+        const entries = JSON.parse(sessionStorage.getItem(HISTORY_SELECTION_KEY) || '[]');
+        return Array.isArray(entries)
+            ? entries.filter(e => e && typeof e.pair === 'string' && e.pair.includes(':')
+                && typeof e.kw === 'string')
+            : [];
+    } catch (_) { return []; }
+}
+
+function saveHistorySelection(entries) {
+    try {
+        if (entries.length) sessionStorage.setItem(HISTORY_SELECTION_KEY, JSON.stringify(entries));
+        else sessionStorage.removeItem(HISTORY_SELECTION_KEY);
+    } catch (_) {}
+}
+
+function historyRowCbs() {
+    return Array.from(document.querySelectorAll('.history-row-cb'));
+}
+
+function historyCbPair(cb) {
+    return `${cb.dataset.keywordId}:${cb.dataset.country}`;
+}
+
+function setHistoryPairSelected(pair, kw, on) {
+    const entries = historySelectedEntries();
+    const idx = entries.findIndex(e => e.pair === pair);
+    if (on && idx === -1) entries.push({pair: pair, kw: kw || ''});
+    if (!on && idx !== -1) entries.splice(idx, 1);
+    saveHistorySelection(entries);
+}
+
+// Re-apply the persisted selection to the checkboxes on the current page and
+// refresh the selection bar + select-all state. Called on initial load and
+// after every #history-section swap.
+function syncHistorySelectionUI() {
+    const selected = new Set(historySelectedEntries().map(e => e.pair));
+    const cbs = historyRowCbs();
+    let onPage = 0;
+    cbs.forEach(cb => {
+        cb.checked = selected.has(historyCbPair(cb));
+        if (cb.checked) onPage++;
+    });
+
+    const bar = document.getElementById('history-selection-bar');
+    if (bar) {
+        bar.classList.toggle('hidden', selected.size === 0);
+        const countEl = document.getElementById('history-selected-count');
+        if (countEl) countEl.textContent = selected.size;
+        const offPageEl = document.getElementById('history-selected-offpage');
+        if (offPageEl) {
+            const offPage = selected.size - onPage;
+            offPageEl.textContent = offPage > 0
+                ? ` (${offPage} on other page${offPage === 1 ? '' : 's'})`
+                : '';
+        }
+    }
+
+    const selectAll = document.getElementById('history-select-all');
+    if (selectAll) {
+        selectAll.checked = cbs.length > 0 && onPage === cbs.length;
+        selectAll.indeterminate = onPage > 0 && onPage < cbs.length;
+    }
+}
+
+function clearHistorySelection() {
+    saveHistorySelection([]);
+    syncHistorySelectionUI();
+}
+
+let historyLastClickedCb = null;
+
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'history-select-all') {
+        const on = e.target.checked;
+        historyRowCbs().forEach(cb => {
+            cb.checked = on;
+            setHistoryPairSelected(historyCbPair(cb), cb.dataset.kw, on);
+        });
+        syncHistorySelectionUI();
+        return;
+    }
+    if (e.target.classList && e.target.classList.contains('history-row-cb')) {
+        setHistoryPairSelected(historyCbPair(e.target), e.target.dataset.kw, e.target.checked);
+        syncHistorySelectionUI();
+    }
+});
+
+document.addEventListener('click', function(e) {
+    // Shift-click selects the whole range between the previously clicked row
+    // checkbox and this one (standard list multi-select affordance).
+    const cb = e.target.closest('.history-row-cb');
+    if (cb) {
+        if (e.shiftKey && historyLastClickedCb && historyLastClickedCb !== cb
+                && document.contains(historyLastClickedCb)) {
+            const cbs = historyRowCbs();
+            const a = cbs.indexOf(cb);
+            const b = cbs.indexOf(historyLastClickedCb);
+            if (a !== -1 && b !== -1) {
+                for (let i = Math.min(a, b); i <= Math.max(a, b); i++) {
+                    cbs[i].checked = cb.checked;
+                    setHistoryPairSelected(historyCbPair(cbs[i]), cbs[i].dataset.kw, cb.checked);
+                }
+                syncHistorySelectionUI();
+            }
+        }
+        historyLastClickedCb = cb;
+        return;
+    }
+    if (e.target.closest('#history-clear-selection')) {
+        clearHistorySelection();
+        return;
+    }
+    if (e.target.closest('#history-copy-selected')) {
+        copySelectedKeywords();
+        return;
+    }
+    if (e.target.closest('#history-delete-selected')) {
+        deleteSelectedResults();
+    }
+});
+
+// Copy the selected keywords as a comma-separated list, ready to paste into
+// the App Store Connect keywords field (no spaces — they'd waste characters
+// of ASC's 100-char budget). The same keyword selected in several countries
+// is listed only once.
+function copySelectedKeywords() {
+    const entries = historySelectedEntries();
+    if (!entries.length) return;
+
+    const seen = new Set();
+    const keywords = [];
+    entries.forEach(e => {
+        if (e.kw && !seen.has(e.kw)) { seen.add(e.kw); keywords.push(e.kw); }
+    });
+    const text = keywords.join(',');
+
+    const btn = document.getElementById('history-copy-selected');
+    const write = (navigator.clipboard && navigator.clipboard.writeText)
+        ? navigator.clipboard.writeText(text)
+        : Promise.reject(new Error('Clipboard API unavailable'));
+    write.catch(function() {
+        // Native bridge fallback for pywebview builds where the Clipboard API is unavailable
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.copy_to_clipboard) {
+            return window.pywebview.api.copy_to_clipboard(text).then(function(ok) {
+                if (!ok) throw new Error('Native copy returned false');
+            });
+        }
+        throw new Error('Copy failed');
+    }).then(function() {
+        if (!btn) return;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied ${keywords.length} keyword${keywords.length === 1 ? '' : 's'}`;
+        btn.classList.add('text-emerald-400');
+        btn.classList.remove('text-slate-300');
+        setTimeout(function() {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('text-emerald-400');
+            btn.classList.add('text-slate-300');
+        }, 1500);
+    }).catch(function() {
+        showAlert('Could not copy the selected keywords to the clipboard.', {type: 'danger', title: 'Error'});
+    });
+}
+
+async function deleteSelectedResults() {
+    const pairs = historySelectedEntries().map(e => e.pair);
+    if (!pairs.length) return;
+    const noun = pairs.length === 1 ? 'tracked keyword' : 'tracked keywords';
+    const ok = await showConfirm(
+        `Remove ${pairs.length} ${noun}? All historical snapshots for each selected keyword and country will be deleted. This cannot be undone.`,
+        {type: 'danger', title: 'Remove selected', confirmLabel: `Delete ${pairs.length}`, confirmStyle: 'danger'}
+    );
+    if (!ok) return;
+
+    const btn = document.getElementById('history-delete-selected');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Deleting…`;
+    }
+
+    const entries = pairs.map(pair => {
+        const sep = pair.indexOf(':');
+        return {
+            keyword_id: parseInt(pair.slice(0, sep), 10),
+            country: pair.slice(sep + 1),
+        };
+    });
+
+    try {
+        const resp = await fetch('{% url "aso:results_bulk_delete" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+            body: JSON.stringify({entries: entries}),
+        });
+        if (resp.ok) {
+            saveHistorySelection([]);
+            // Soft refresh swaps in a fresh (hidden) selection bar; the sync in
+            // refreshHistorySection() keeps everything consistent afterwards.
+            await refreshHistorySection();
+        } else {
+            showAlert('Failed to delete the selected keywords.', {type: 'danger', title: 'Error'});
+            if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+        }
+    } catch (e) {
+        showAlert('Failed to delete the selected keywords.', {type: 'danger', title: 'Error'});
+        if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+    }
+}
+
 initHistoryFilters();
+syncHistorySelectionUI();
 
 // Restore saved filters when returning to Dashboard without filter params in URL
 (function restoreFiltersFromSession() {
@@ -1288,6 +1561,8 @@ async function refreshHistorySection() {
             convertDatesToLocal();
             // Re-attach filter event listeners and render download charts
             initHistoryFilters();
+            // Re-apply the persisted multi-select state to the fresh DOM
+            syncHistorySelectionUI();
         }
     } catch (e) {
         // Silently fail — user can still manually reload
@@ -1394,6 +1669,10 @@ async function deleteResult(resultId, keyword, country, btn) {
             headers: {'X-CSRFToken': csrfToken},
         });
         if (resp.ok) {
+            // Drop the row from the persisted multi-select so its pair doesn't
+            // linger as a phantom selection.
+            const rowCb = btn.closest('tr').querySelector('.history-row-cb');
+            if (rowCb) setHistoryPairSelected(historyCbPair(rowCb), rowCb.dataset.kw, false);
             // Soft refresh — re-fetches the dashboard and swaps both
             // #app-summary-section AND #history-section. No full page reload,
             // so scroll position, expanded rows, and collapse state are preserved.
@@ -1476,7 +1755,12 @@ async function bulkDelete() {
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
             body: JSON.stringify({app_id: selectedApp}),
         });
-        if (resp.ok) location.reload();
+        if (resp.ok) {
+            // The wiped rows may include remembered selections (possibly from
+            // other pages) — clear the store so no phantom selection survives.
+            saveHistorySelection([]);
+            location.reload();
+        }
     } catch (e) {
         showAlert('Bulk delete failed.', {type: 'danger', title: 'Error'});
     }

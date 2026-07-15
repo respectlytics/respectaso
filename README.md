@@ -161,7 +161,7 @@ The `.private` TLD is reserved by [RFC 6762](https://www.rfc-editor.org/rfc/rfc6
 - **SQLite** — local single-user database
 - **wsgiref** — built-in Python WSGI server
 - **WhiteNoise** — efficient static file serving
-- **Tailwind CSS** (CDN) — dark theme UI
+- **Tailwind CSS** (compiled locally, no CDN - styling works offline) - dark theme UI
 - **PyInstaller** — macOS `.app` bundle
 
 ## Privacy

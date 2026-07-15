@@ -995,33 +995,95 @@ def keyword_delete_view(request, keyword_id):
     return JsonResponse({"success": True})
 
 
+def _delete_tracking_entries(pairs):
+    """Delete the Search History rows identified by (keyword_id, country) pairs.
+
+    Each dashboard row represents a keyword tracked in a country, so for every
+    pair we drop EVERY SearchResult snapshot, not just the latest one. Deleting
+    only the latest snapshot would silently resurrect the previous one on
+    reload, making the click feel like a no-op.
+
+    The pair is the stable row identity — snapshot ids churn because
+    SearchResult.upsert_today replaces today's snapshot on refresh, so callers
+    must not identify rows by result id when the reference can outlive a
+    refresh (e.g. the dashboard's cross-page selection).
+
+    Keywords left with no results in any country are cleaned up to avoid
+    orphans. Pairs that no longer exist are skipped. Returns the number of
+    tracking entries (dashboard rows) deleted.
+    """
+    from django.db.models import Q
+
+    requested = set(pairs)
+    if not requested:
+        return 0
+
+    pair_filter = Q()
+    for keyword_id, country in requested:
+        pair_filter |= Q(keyword_id=keyword_id, country=country)
+
+    existing = set(SearchResult.objects.filter(pair_filter).values_list("keyword_id", "country"))
+    if not existing:
+        return 0
+
+    SearchResult.objects.filter(pair_filter).delete()
+
+    Keyword.objects.filter(
+        id__in={keyword_id for keyword_id, _ in existing}, results__isnull=True
+    ).delete()
+
+    return len(existing)
+
+
 @require_POST
 def result_delete_view(request, result_id):
-    """Remove a Search History row entry — i.e., all snapshots of a (keyword, country) pair.
+    """Remove a single Search History row — all snapshots of its (keyword, country) pair.
 
-    The row passed to this endpoint identifies which (keyword, country) pair the
-    user is removing; we then drop EVERY SearchResult for that pair, not just the
-    latest snapshot. This matches the user's mental model — each row in the
-    History table represents a keyword tracked in a country, and the delete
-    button is expected to remove that tracking entry entirely. Deleting only
-    the latest snapshot would silently resurrect the previous one on reload,
-    making the click feel like a no-op.
-
-    If the parent keyword has no remaining results across any country, the
-    keyword row itself is cleaned up to avoid orphans.
+    See _delete_tracking_entries for the deletion semantics.
     """
     result = get_object_or_404(SearchResult, id=result_id)
-    keyword = result.keyword
-    country = result.country
-
-    # Remove every snapshot for this keyword in this country (not just `result`).
-    SearchResult.objects.filter(keyword_id=keyword.id, country=country).delete()
-
-    # If the keyword no longer has any results in any country, clean it up.
-    if not keyword.results.exists():
-        keyword.delete()
-
+    _delete_tracking_entries([(result.keyword_id, result.country)])
     return JsonResponse({"success": True})
+
+
+@require_POST
+def results_bulk_delete_view(request):
+    """
+    Delete the selected Search History rows.
+
+    POST body: {"entries": [{"keyword_id": int, "country": str}, ...]}
+
+    Entries whose (keyword, country) pair no longer exists (e.g. removed by a
+    concurrent action) are skipped, so the endpoint is idempotent; "deleted"
+    reflects the tracking entries actually removed.
+    """
+    try:
+        body = json.loads(request.body)
+        entries = body.get("entries")
+        if not isinstance(entries, list) or not entries:
+            raise ValueError
+        pairs = []
+        for entry in entries:
+            keyword_id = entry.get("keyword_id") if isinstance(entry, dict) else None
+            country = entry.get("country") if isinstance(entry, dict) else None
+            if not isinstance(keyword_id, int) or not isinstance(country, str) or not country:
+                raise ValueError
+            pairs.append((keyword_id, country))
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "entries must be a non-empty list of {keyword_id, country} objects.",
+            },
+            status=400,
+        )
+
+    from django.db import transaction
+
+    with transaction.atomic():
+        deleted = _delete_tracking_entries(pairs)
+
+    return JsonResponse({"success": True, "deleted": deleted})
 
 
 @require_POST

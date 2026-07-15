@@ -49,6 +49,8 @@ The CLA preserves our ability to offer dual licensing (AGPL-3.0 for open source,
 - Use Tailwind CSS utility classes for styling
 - Follow the dark theme design system (`bg-slate-900`, `bg-[#1e293b]`, etc.)
 - Follow existing template patterns in the repository
+- After adding or removing Tailwind class names, run `./scripts/build_css.sh` and commit the updated `static/css/tailwind.css`
+- Always write complete class names - never build them from concatenated fragments (the Tailwind content scanner only sees whole literals)
 
 ### JavaScript
 

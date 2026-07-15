@@ -19,6 +19,7 @@ media/
 
 # Build artifacts
 *.dmg
+.tailwind-cli/
 
 # IDE
 .vscode/

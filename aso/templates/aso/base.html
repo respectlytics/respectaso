@@ -5,33 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}RespectASO — Free ASO Keyword Research Tool{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        slate: {
-                            850: '#1a2234',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    {# Compiled locally via scripts/build_css.sh - never load Tailwind from a CDN (see tailwind.instructions.md) #}
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32x32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-16x16.png' %}">
     <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
     <link rel="manifest" href="{% static 'images/site.webmanifest' %}">
-    <style>
-        /* Minimal custom CSS — only for things Tailwind CDN can't do */
-        @keyframes fade-in {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.3s ease-out; }
-    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col">
