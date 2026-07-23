@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import settings_views, views
 
 app_name = "aso"
 
@@ -8,6 +8,16 @@ urlpatterns = [
     path("", views.dashboard_view, name="dashboard"),
     path("methodology/", views.methodology_view, name="methodology"),
     path("setup/", views.setup_view, name="setup"),
+    path("setup/apple-ads/", views.apple_ads_setup_view, name="apple_ads_setup"),
+    # Popularity source (free feature): selection + Apple Ads integration
+    path("settings/popularity/", settings_views.settings_popularity_view, name="settings_popularity"),
+    path("settings/popularity/banner/", settings_views.popularity_banner_view, name="popularity_banner"),
+    path("settings/popularity/signin/", settings_views.apple_signin_view, name="apple_signin"),
+    path("settings/popularity/signin-status/", settings_views.apple_signin_status_view, name="apple_signin_status"),
+    path("settings/popularity/signout/", settings_views.apple_signout_view, name="apple_signout"),
+    path("settings/popularity/test/", settings_views.apple_test_view, name="apple_test"),
+    path("settings/popularity/sync-now/", settings_views.apple_sync_now_view, name="apple_sync_now"),
+    path("settings/popularity/sync-status/", settings_views.apple_sync_status_view, name="apple_sync_status"),
     path("search/", views.search_view, name="search"),
     path("opportunity/", views.opportunity_view, name="opportunity"),
     path("opportunity/search/", views.opportunity_search_view, name="opportunity_search"),

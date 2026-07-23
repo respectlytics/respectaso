@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "2.20.0"
+VERSION = "2.21.1"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -69,6 +69,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.version",
+                "aso.context_processors.popularity_source",
             ],
         },
     },
@@ -126,7 +127,7 @@ if IS_NATIVE_APP:
         },
         "handlers": {
             "file": {
-                "level": "WARNING",
+                "level": "INFO",
                 "class": "logging.handlers.RotatingFileHandler",
                 "filename": str(_log_file),
                 "maxBytes": 1_048_576,  # 1 MB
@@ -138,6 +139,13 @@ if IS_NATIVE_APP:
             "aso": {
                 "handlers": ["file"],
                 "level": "WARNING",
+            },
+            # Sign-in/verification trail at INFO - essential for diagnosing
+            # Apple connection issues from a user's log.
+            "aso.apple_ads": {
+                "handlers": ["file"],
+                "level": "INFO",
+                "propagate": False,
             },
         },
     }

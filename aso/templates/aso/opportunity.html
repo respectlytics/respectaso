@@ -138,6 +138,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{% static 'js/popularity-display.js' %}"></script>
 <script>
 const csrfToken = '{{ csrf_token }}';
 
@@ -654,7 +655,8 @@ function toggleOppDetail(rowEl, index) {
                 <div class="bg-slate-800 rounded-lg p-2.5">
                     <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Popularity</p>
                     <span class="text-2xl font-bold text-purple-400">${r.popularity ?? 'N/A'}</span>
-                    ${r.popularity ? '<span class="text-slate-500 text-xs ml-1">/ 100</span>' : ''}
+                    ${r.popularity ? '<span class="text-slate-500 text-xs ml-1">/ 100</span> ' + popBadgeHtml(r) : ''}
+                    ${popSecondaryHtml(r)}
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2.5">
                     <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Overall Difficulty</p>
@@ -905,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h3 class="text-xl font-bold text-white">${COUNTRY_NAMES[best.country] || best.country.toUpperCase()}</h3>
                         <p class="text-sm text-slate-400 mt-0.5">
                             Opportunity <span class="text-green-400 font-bold">${best.opportunity}</span>
-                            · Popularity <span class="text-purple-400 font-semibold">${best.popularity}</span>
+                            · Popularity <span class="text-purple-400 font-semibold">${best.popularity}</span> ${popBadgeHtml(best)}
                             · Difficulty <span class="${diffColor(best.difficulty)} font-semibold">${best.difficulty}</span>
                             <span class="text-slate-600">(${best.difficulty_label})</span>
                         </p>
@@ -923,7 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td class="px-3 py-2 text-center text-slate-500 text-sm">${i + 1}</td>
                 <td class="px-3 py-2 text-white text-sm font-medium whitespace-nowrap">${countryFlag(r.country)} ${COUNTRY_NAMES[r.country] || r.country.toUpperCase()}</td>
                 <td class="px-3 py-2 text-center"><span class="${oppColor(r.opportunity)} font-bold text-sm">${r.opportunity}</span></td>
-                <td class="px-3 py-2 text-center text-purple-400 text-sm font-semibold">${r.popularity}</td>
+                <td class="px-3 py-2 text-center text-sm font-semibold">${formatPopularityCell(r)}</td>
                 <td class="px-3 py-2 text-center"><span class="${diffColor(r.difficulty)} text-sm font-semibold">${r.difficulty}</span><span class="text-slate-600 text-xs ml-1">${r.difficulty_label}</span></td>
                 <td class="px-3 py-2 text-center text-slate-400 text-sm">${r.competitor_count}</td>
                 <td class="px-3 py-2 text-slate-300 text-sm">${r.top_competitor}${r.top_ratings ? ` <span class="text-slate-600 text-xs">(${r.top_ratings.toLocaleString()} ratings)</span>` : ''}</td>
@@ -998,15 +1000,58 @@ async function addAllToHistory() {
     saveToHistory(lastResultsData);
 }
 
+function popBadgeHtml(r) {
+    // Compact badge for big-number layouts; table cells use formatPopularityCell.
+    const source = r.popularity_source || 'internal';
+    if (r.popularity_fallback) {
+        return '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-amber-900/40 text-amber-300 border border-amber-500/30 align-middle" title="Apple Ads has no value for this keyword in this storefront, so the RespectASO estimate is used instead.">EST*</span>';
+    }
+    if (source === 'apple') {
+        return '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-sky-900/40 text-sky-300 border border-sky-500/30 align-middle" title="Apple Ads search popularity - the active source powering your scores.">ASA</span>';
+    }
+    return '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-slate-700/40 text-slate-300 border border-white/10 align-middle" title="RespectASO estimate - the active source powering your scores.">EST</span>';
+}
+
+function popSecondaryHtml(r) {
+    // Secondary source value. When the Apple integration is connected but
+    // has no value for this keyword, state it on screen (muted) instead of
+    // hiding it behind a tooltip.
+    const source = r.popularity_source || 'internal';
+    let text = '';
+    let muted = false;
+    if (r.popularity_fallback) {
+        text = 'no Apple data';
+        muted = true;
+    } else if (source === 'apple' && r.popularity_internal !== null && r.popularity_internal !== undefined) {
+        text = 'EST: ' + r.popularity_internal;
+    } else if (source !== 'apple') {
+        if (r.popularity_apple !== null && r.popularity_apple !== undefined) {
+            text = 'ASA: ' + r.popularity_apple;
+        } else if (window.APPLE_POP_CONFIGURED) {
+            text = 'no Apple data';
+            muted = true;
+        }
+    }
+    return text
+        ? `<span class="block text-[10px] mt-0.5 ${muted ? 'text-slate-600 italic' : 'text-slate-500'}">${text}</span>`
+        : '';
+}
+
 function exportOpportunityCSV() {
     if (!lastResultsData || !lastResultsData.length) return;
-    const headers = ['Rank', 'Country Code', 'Country', 'Opportunity', 'Popularity', 'Difficulty', 'Difficulty Label', 'Competitors', 'Top Competitor', 'Top Ratings', 'Your Rank'];
+    const headers = ['Rank', 'Country Code', 'Country', 'Opportunity', 'Popularity',
+        'Popularity (RespectASO)', 'Popularity (Apple Ads)', 'Popularity Source', 'Popularity Fallback',
+        'Difficulty', 'Difficulty Label', 'Competitors', 'Top Competitor', 'Top Ratings', 'Your Rank'];
     const rows = lastResultsData.map((r, i) => [
         i + 1,
         r.country.toUpperCase(),
         COUNTRY_NAMES[r.country] || r.country.toUpperCase(),
         r.opportunity,
         r.popularity,
+        r.popularity_internal ?? '',
+        r.popularity_apple ?? '',
+        r.popularity_source || 'internal',
+        r.popularity_fallback ? 'yes' : 'no',
         r.difficulty,
         r.difficulty_label,
         r.competitor_count,

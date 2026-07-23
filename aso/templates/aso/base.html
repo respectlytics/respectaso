@@ -41,6 +41,20 @@
     </div>
     {% endif %}
 
+    <!-- Popularity-source banners (choose-source / Apple session expired) -->
+    <div id="popularity-banner-region" data-banner-url="{% url 'aso:popularity_banner' %}">
+        {% include "aso/partials/popularity_banner.html" %}
+    </div>
+    <script src="{% static 'js/popularity-banner.js' %}"></script>
+    <script>
+        // Whether the Apple Ads popularity integration passed its connection
+        // test - popularity-display.js uses this to decide if "no Apple data"
+        // is worth stating on screen.
+        window.APPLE_POP_CONFIGURED = {% if apple_popularity_configured %}true{% else %}false{% endif %};
+        // The user's current popularity-source selection ("internal"/"apple").
+        window.POPULARITY_SOURCE = "{% if popularity_source == 'apple' %}apple{% else %}internal{% endif %}";
+    </script>
+
     <!-- Navigation -->
     <nav class="bg-slate-800/80 border-b border-white/10 backdrop-blur-sm sticky top-0 z-40">
         <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -83,6 +97,10 @@
                     <a href="{% url 'aso:setup' %}"
                        class="text-sm {% if request.resolver_match.url_name == 'setup' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
                         Setup
+                    </a>
+                    <a href="{% url 'aso:settings_popularity' %}"
+                       class="text-sm {% if request.resolver_match.url_name == 'settings_popularity' %}text-purple-400 font-medium{% else %}text-slate-300 hover:text-white{% endif %} transition-colors">
+                        Settings
                     </a>
                     <span class="border-l border-white/10 h-4"></span>
                     <a href="https://www.youtube.com/@TheCreatorBehind"
@@ -128,10 +146,6 @@
                            class="hidden text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
                             Update instructions →
                         </a>
-                        <button onclick="this.closest('#update-banner').classList.add('hidden'); try{localStorage.setItem('aso_dismiss_update', document.getElementById('update-version').textContent)}catch(e){}"
-                                class="text-slate-500 hover:text-slate-300 transition-colors p-1" title="Dismiss">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
                     </div>
                 </div>
                 <!-- Release notes (hidden until toggled) -->
@@ -446,7 +460,6 @@
                 if (data.error) { showError(); return; }
                 if (!data.update_available) return;
                 var versionLabel = 'v' + data.latest;
-                try { if (localStorage.getItem('aso_dismiss_update') === versionLabel) return; } catch(e) {}
                 document.getElementById('update-version').textContent = versionLabel;
                 document.getElementById('current-version').textContent = 'v' + data.current;
                 if (data.is_native && data.download_url) {

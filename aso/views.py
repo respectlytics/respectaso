@@ -17,12 +17,16 @@ from django.views.decorators.http import require_POST
 from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
 from .models import App, Keyword, SearchResult
 from .dashboard_summary import compute_app_summary
+from .popularity import (
+    annotate_effective_popularity,
+    prefetch_apple_values,
+    resolve_popularity,
+)
 from .scoring import calc_opportunity, classify_keyword, CLASSIFICATION_LABELS
 from .services import (
     DifficultyCalculator,
     DownloadEstimator,
     ITunesSearchService,
-    PopularityEstimator,
     SearchAPIUnavailableError,
 )
 
@@ -45,6 +49,11 @@ def methodology_view(request):
 def setup_view(request):
     """Setup guide — custom domain, Docker config, and getting started."""
     return render(request, "aso/setup.html")
+
+
+def apple_ads_setup_view(request):
+    """Step-by-step guide for connecting an Apple Ads account."""
+    return render(request, "aso/apple_ads_setup.html")
 
 
 def dashboard_view(request):
@@ -159,11 +168,13 @@ def dashboard_view(request):
     if search_q:
         results_qs = results_qs.filter(keyword__keyword__icontains=search_q)
 
-    # Apply popularity / difficulty filters
+    # Apply popularity / difficulty filters (on the EFFECTIVE popularity —
+    # the value the user sees, per their source selection)
+    results_qs = annotate_effective_popularity(results_qs)
     if pop_min is not None:
         results_qs = results_qs.filter(
-            popularity_score__isnull=False,
-            popularity_score__gte=pop_min,
+            effective_pop__isnull=False,
+            effective_pop__gte=pop_min,
         )
     if diff_max is not None:
         results_qs = results_qs.filter(
@@ -201,11 +212,11 @@ def dashboard_view(request):
             results_qs = results_qs.order_by("-searched_at")
     elif sort_by == "popularity":
         popularity_is_null = Case(
-            When(popularity_score__isnull=True, then=Value(1)),
+            When(effective_pop__isnull=True, then=Value(1)),
             default=Value(0),
             output_field=IntegerField(),
         )
-        popularity_order = "popularity_score" if sort_dir == "asc" else "-popularity_score"
+        popularity_order = "effective_pop" if sort_dir == "asc" else "-effective_pop"
         results_qs = results_qs.order_by(popularity_is_null, popularity_order, "-searched_at")
     elif sort_by == "difficulty":
         difficulty_order = "difficulty_score" if sort_dir == "asc" else "-difficulty_score"
@@ -229,7 +240,7 @@ def dashboard_view(request):
         # Per scoring-consistency.instructions.md: sort by positions[0].downloads_high
         # (rank #1 high estimate), NEVER tier averages.
         def _dl_high(result):
-            est = (result.difficulty_breakdown or {}).get("download_estimates") or {}
+            est = result.effective_download_estimates or {}
             positions = est.get("positions") or []
             if not positions:
                 return -1.0
@@ -306,11 +317,21 @@ def dashboard_view(request):
             .order_by("-searched_at")
             .values(
                 "keyword_id", "country", "searched_at",
-                "popularity_score", "difficulty_score", "app_rank",
+                "popularity_score", "apple_popularity_score",
+                "difficulty_score", "app_rank",
             )
         )
         for row in snapshot_rows:
             history_by_pair[(row["keyword_id"], row["country"])].append(row)
+
+    from .popularity import effective_from_pair, get_popularity_source
+
+    source_setting = get_popularity_source()
+
+    def _row_effective(row):
+        return effective_from_pair(
+            row["popularity_score"], row["apple_popularity_score"], source_setting
+        )[0]
 
     for result in history_results:
         pair_rows = history_by_pair[(result.keyword_id, result.country)]
@@ -320,12 +341,13 @@ def dashboard_view(request):
         )
         result.has_history = len(pair_rows) > 1
         if prev:
-            result.prev_popularity = prev["popularity_score"]
+            prev_effective = _row_effective(prev)
+            result.prev_popularity = prev_effective
             result.prev_difficulty = prev["difficulty_score"]
             result.prev_rank = prev["app_rank"]
-            # Calculate deltas
-            if result.popularity_score is not None and prev["popularity_score"] is not None:
-                result.popularity_delta = result.popularity_score - prev["popularity_score"]
+            # Deltas compare the EFFECTIVE popularity across snapshots
+            if result.effective_popularity is not None and prev_effective is not None:
+                result.popularity_delta = result.effective_popularity - prev_effective
             else:
                 result.popularity_delta = None
             result.difficulty_delta = result.difficulty_score - prev["difficulty_score"]
@@ -429,7 +451,6 @@ def search_view(request):
     # Set up services
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
     # Results grouped by country
@@ -439,6 +460,9 @@ def search_view(request):
 
     for country in countries:
         country_results = []
+        # One batched Apple fetch for the whole list, so each keyword's
+        # first score already carries its real Apple value.
+        prefetch_apple_values(keywords, country)
         for kw_text in keywords:
             # Get or create keyword
             keyword_obj, created = Keyword.objects.get_or_create(
@@ -483,8 +507,9 @@ def search_view(request):
                 except SearchAPIUnavailableError:
                     pass  # Rank is optional — continue without it
 
-            # Popularity (estimated from competitor data)
-            popularity = popularity_est.estimate(competitors, kw_text)
+            # Popularity from both sources; `pop.effective` feeds all math.
+            pop = resolve_popularity(competitors, kw_text, country)
+            popularity = pop.effective
 
             # Download estimates
             download_estimates = download_est.estimate(
@@ -496,7 +521,8 @@ def search_view(request):
             # Save result (one entry per keyword+country per day)
             search_result = SearchResult.upsert_today(
                 keyword=keyword_obj,
-                popularity_score=popularity,
+                popularity_score=pop.internal,
+                apple_popularity_score=pop.apple,
                 difficulty_score=difficulty_score,
                 difficulty_breakdown=breakdown,
                 competitors_data=competitors,
@@ -511,6 +537,10 @@ def search_view(request):
                     "keyword": kw_text,
                     "country": country,
                     "popularity_score": popularity,
+                    "popularity_internal": pop.internal,
+                    "popularity_apple": pop.apple,
+                    "popularity_source": pop.source,
+                    "popularity_fallback": pop.is_fallback,
                     "difficulty_score": difficulty_score,
                     "opportunity_score": opportunity,
                     "difficulty_label": search_result.difficulty_label,
@@ -599,7 +629,6 @@ def opportunity_search_country_view(request):
 
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
     try:
@@ -610,7 +639,8 @@ def opportunity_search_country_view(request):
     difficulty_score, breakdown = difficulty_calc.calculate(
         competitors, keyword=keyword
     )
-    popularity = popularity_est.estimate(competitors, keyword)
+    pop = resolve_popularity(competitors, keyword, country_code)
+    popularity = pop.effective
 
     download_estimates = download_est.estimate(popularity or 0, country=country_code)
     breakdown["download_estimates"] = download_estimates
@@ -644,6 +674,10 @@ def opportunity_search_country_view(request):
     return JsonResponse({
         "country": country_code,
         "popularity": popularity,
+        "popularity_internal": pop.internal,
+        "popularity_apple": pop.apple,
+        "popularity_source": pop.source,
+        "popularity_fallback": pop.is_fallback,
         "difficulty": difficulty_score,
         "difficulty_label": diff_label,
         "difficulty_breakdown": breakdown,
@@ -682,7 +716,6 @@ def opportunity_search_view(request):
 
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
     results = []
@@ -700,7 +733,8 @@ def opportunity_search_view(request):
         difficulty_score, breakdown = difficulty_calc.calculate(
             competitors, keyword=kw_text
         )
-        popularity = popularity_est.estimate(competitors, kw_text)
+        pop = resolve_popularity(competitors, kw_text, country_code)
+        popularity = pop.effective
 
         download_estimates = download_est.estimate(
             popularity or 0,
@@ -738,6 +772,10 @@ def opportunity_search_view(request):
         results.append({
             "country": country_code,
             "popularity": popularity,
+            "popularity_internal": pop.internal,
+            "popularity_apple": pop.apple,
+            "popularity_source": pop.source,
+            "popularity_fallback": pop.is_fallback,
             "difficulty": difficulty_score,
             "difficulty_label": diff_label,
             "difficulty_breakdown": breakdown,
@@ -796,10 +834,13 @@ def opportunity_save_view(request):
 
     for item in selected:
         country = item.get("country", "us")
-        # One entry per keyword+country per day (preserves historical trend data)
+        # One entry per keyword+country per day (preserves historical trend data).
+        # popularity_score stores the internal estimate; older clients that only
+        # send "popularity" fall back to it (their value was internal-only).
         SearchResult.upsert_today(
             keyword=keyword_obj,
-            popularity_score=item.get("popularity", 0),
+            popularity_score=item.get("popularity_internal", item.get("popularity", 0)),
+            apple_popularity_score=item.get("popularity_apple"),
             difficulty_score=item.get("difficulty", 0),
             difficulty_breakdown=item.get("difficulty_breakdown", {}),
             competitors_data=item.get("competitors_data", []),
@@ -1118,7 +1159,6 @@ def keyword_refresh_view(request, keyword_id):
 
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
     # Search for competitors
@@ -1145,8 +1185,9 @@ def keyword_refresh_view(request, keyword_id):
         except SearchAPIUnavailableError:
             pass  # Rank is optional
 
-    # Popularity (estimated from competitor data)
-    popularity = popularity_est.estimate(competitors, keyword_obj.keyword)
+    # Popularity from both sources; `pop.effective` feeds all math.
+    pop = resolve_popularity(competitors, keyword_obj.keyword, country)
+    popularity = pop.effective
 
     # Download estimates
     download_estimates = download_est.estimate(
@@ -1158,7 +1199,8 @@ def keyword_refresh_view(request, keyword_id):
     # Save new result (one entry per keyword+country per day)
     search_result = SearchResult.upsert_today(
         keyword=keyword_obj,
-        popularity_score=popularity,
+        popularity_score=pop.internal,
+        apple_popularity_score=pop.apple,
         difficulty_score=difficulty_score,
         difficulty_breakdown=breakdown,
         competitors_data=competitors,
@@ -1173,6 +1215,10 @@ def keyword_refresh_view(request, keyword_id):
             "keyword_id": keyword_obj.pk,
             "result_id": search_result.pk,
             "popularity_score": popularity,
+            "popularity_internal": pop.internal,
+            "popularity_apple": pop.apple,
+            "popularity_source": pop.source,
+            "popularity_fallback": pop.is_fallback,
             "difficulty_score": difficulty_score,
             "difficulty_label": search_result.difficulty_label,
             "difficulty_color": search_result.difficulty_color,
@@ -1229,11 +1275,13 @@ def export_history_csv_view(request):
     if search_q:
         results_qs = results_qs.filter(keyword__keyword__icontains=search_q)
 
-    # Apply popularity / difficulty filters
+    # Apply popularity / difficulty filters (on the EFFECTIVE popularity —
+    # the value the user sees, per their source selection)
+    results_qs = annotate_effective_popularity(results_qs)
     if pop_min is not None:
         results_qs = results_qs.filter(
-            popularity_score__isnull=False,
-            popularity_score__gte=pop_min,
+            effective_pop__isnull=False,
+            effective_pop__gte=pop_min,
         )
     if diff_max is not None:
         results_qs = results_qs.filter(
@@ -1263,8 +1311,10 @@ def export_history_csv_view(request):
     writer = csv.writer(response)
 
     base_columns = [
-        "Keyword", "App", "Country", "Popularity", "Difficulty",
-        "Difficulty Label", "Opportunity", "Insight", "Rank",
+        "Keyword", "App", "Country", "Popularity",
+        "Popularity (RespectASO)", "Popularity (Apple Ads)",
+        "Popularity Source", "Popularity Fallback",
+        "Difficulty", "Difficulty Label", "Opportunity", "Insight", "Rank",
         "Competitors", "Date",
     ]
     app_columns = [
@@ -1276,10 +1326,13 @@ def export_history_csv_view(request):
     writer.writerow(base_columns + app_columns if apps_limit else base_columns)
 
     for r in results_qs:
-        pop = r.popularity_score if r.popularity_score is not None else ""
+        # "Popularity" is the effective value (per the user's source
+        # selection); the per-source columns carry both raw values.
+        effective = r.effective_popularity
+        pop = effective if effective is not None else ""
         opportunity = (
-            calc_opportunity(r.popularity_score, r.difficulty_score)
-            if r.popularity_score is not None
+            calc_opportunity(effective, r.difficulty_score)
+            if effective is not None
             else ""
         )
         base_row = [
@@ -1287,6 +1340,10 @@ def export_history_csv_view(request):
             r.keyword.app.name if r.keyword.app else "",
             r.country.upper() if r.country else "",
             pop,
+            r.popularity_score if r.popularity_score is not None else "",
+            r.apple_popularity_score if r.apple_popularity_score is not None else "",
+            r.popularity_source_used,
+            "yes" if r.popularity_is_fallback else "no",
             r.difficulty_score,
             r.difficulty_label,
             opportunity,
@@ -1457,12 +1514,18 @@ def keyword_trend_view(request, keyword_id):
     if country:
         qs = qs.filter(country=country)
 
+    from .popularity import get_popularity_source
+
     data_points = []
     for r in qs:
         data_points.append({
             "date": r.searched_at.strftime("%Y-%m-%d"),
             "date_display": r.searched_at.strftime("%b %d"),
-            "popularity": r.popularity_score,
+            # "popularity" stays the effective value (primary chart line);
+            # both raw series ride along for the secondary dashed line.
+            "popularity": r.effective_popularity,
+            "popularity_internal": r.popularity_score,
+            "popularity_apple": r.apple_popularity_score,
             "difficulty": r.difficulty_score,
             "rank": r.app_rank,
             "country": r.country,
@@ -1472,6 +1535,7 @@ def keyword_trend_view(request, keyword_id):
         "keyword": keyword_obj.keyword,
         "keyword_id": keyword_obj.pk,
         "app_name": keyword_obj.app.name if keyword_obj.app else None,
+        "popularity_source": get_popularity_source() or "internal",
         "data_points": data_points,
     })
 

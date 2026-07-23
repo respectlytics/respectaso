@@ -203,9 +203,16 @@
             classEl.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap border ' + style.badge;
         }
 
-        // Metric pills
+        // Metric pills — popularity shows a compact source suffix
+        // ("48 ASA" / "62 EST*") when the payload carries source info.
         var popEl = document.getElementById('ticker-pop');
-        if (popEl) popEl.textContent = Math.round(data.popularity);
+        if (popEl) {
+            var popText = String(Math.round(data.popularity));
+            if (data.popularity_source && typeof window.formatPopularityCompact === 'function') {
+                popText = window.formatPopularityCompact(data);
+            }
+            popEl.textContent = popText;
+        }
 
         var diffEl = document.getElementById('ticker-diff');
         if (diffEl) diffEl.textContent = Math.round(data.difficulty);

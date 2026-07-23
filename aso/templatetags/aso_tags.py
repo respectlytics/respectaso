@@ -341,6 +341,84 @@ def download_cell(estimates, idx=0, total=0):
     )
 
 
+@register.simple_tag
+def popularity_cell(result, extra_html=""):
+    """Render the dual-source popularity cell for a SearchResult row.
+
+    Server-side counterpart of formatPopularityCell() in
+    static/js/popularity-display.js - the two MUST stay visually identical
+    (guarded by test_scoring_consistency).
+
+    Line 1 (centered): the effective value (feeds all calculations) + a
+        source badge - EST (RespectASO estimate), ASA (Apple Ads), or amber
+        EST* when Apple is selected but this keyword has no Apple value.
+    Line 2 (centered): the other source's value when it exists. When the
+        Apple integration is connected but has no value for this keyword,
+        an explicit muted "no Apple data" line is shown instead - visible
+        on screen, not tooltip-only. When Apple was never connected, no
+        second line renders (there is no second source to report on).
+
+    `extra_html` lets callers append inline content (e.g. the trend arrow)
+    to line 1 without breaking the layout.
+    """
+    from ..apple_ads.storage import load_apple_settings
+
+    effective = result.effective_popularity
+    internal = result.popularity_score
+    apple = result.apple_popularity_score
+    source = result.popularity_source_used
+    is_fallback = result.popularity_is_fallback
+    apple_configured = bool(load_apple_settings()["apple_ads"]["tested_ok"])
+
+    effective_txt = str(effective) if effective is not None else "—"
+    secondary = ""
+    secondary_muted = False
+    if is_fallback:
+        badge = (
+            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
+            'px-0.5 py-px bg-amber-900/40 text-amber-300 border border-amber-500/30 '
+            'cursor-help" title="Apple Ads has no value for this keyword in this '
+            'storefront, so the RespectASO estimate is used instead.">EST*</span>'
+        )
+        secondary, secondary_muted = "no Apple data", True
+    elif source == "apple":
+        badge = (
+            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
+            'px-0.5 py-px bg-sky-900/40 text-sky-300 border border-sky-500/30 '
+            'cursor-help" title="Apple Ads search popularity - the active source '
+            'powering your scores.">ASA</span>'
+        )
+        if internal is not None:
+            secondary = f"EST: {internal}"
+    else:
+        badge = (
+            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
+            'px-0.5 py-px bg-slate-700/40 text-slate-300 border border-white/10 '
+            'cursor-help" title="RespectASO estimate - the active source powering '
+            'your scores.">EST</span>'
+        )
+        if apple is not None:
+            secondary = f"ASA: {apple}"
+        elif apple_configured:
+            secondary, secondary_muted = "no Apple data", True
+
+    tone = "text-slate-600 italic" if secondary_muted else "text-slate-500"
+    secondary_html = (
+        f'<span class="block text-[10px] mt-0.5 {tone}">{secondary}</span>'
+        if secondary
+        else ""
+    )
+    return mark_safe(
+        '<div class="leading-tight inline-block text-center">'
+        '<span class="inline-flex items-center justify-center gap-1.5">'
+        f'<span class="text-sm font-semibold text-purple-400">{effective_txt}</span>'
+        f'{badge}{extra_html}'
+        "</span>"
+        f"{secondary_html}"
+        "</div>"
+    )
+
+
 @register.filter
 def download_sort_value(estimates):
     """Return positions[0].downloads_high as the sort key (rank #1 high estimate).

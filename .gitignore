@@ -34,3 +34,4 @@ data/
 .DS_Store
 Thumbs.db
 venv/
+.claude/settings.local.json

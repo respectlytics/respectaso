@@ -82,17 +82,16 @@ def _get_pairs_to_refresh():
 def _refresh_pair(keyword_obj, country):
     """Refresh a single keyword+country pair. Returns the new SearchResult."""
     from .models import SearchResult
+    from .popularity import resolve_popularity
     from .services import (
         DifficultyCalculator,
         DownloadEstimator,
         ITunesSearchService,
-        PopularityEstimator,
         SearchAPIUnavailableError,
     )
 
     itunes_service = ITunesSearchService()
     difficulty_calc = DifficultyCalculator()
-    popularity_est = PopularityEstimator()
     download_est = DownloadEstimator()
 
     try:
@@ -118,14 +117,15 @@ def _refresh_pair(keyword_obj, country):
         except SearchAPIUnavailableError:
             pass  # Rank is optional
 
-    popularity = popularity_est.estimate(competitors, keyword_obj.keyword)
+    pop = resolve_popularity(competitors, keyword_obj.keyword, country)
 
-    download_estimates = download_est.estimate(popularity or 0, country=country)
+    download_estimates = download_est.estimate(pop.effective or 0, country=country)
     breakdown["download_estimates"] = download_estimates
 
     return SearchResult.upsert_today(
         keyword=keyword_obj,
-        popularity_score=popularity,
+        popularity_score=pop.internal,
+        apple_popularity_score=pop.apple,
         difficulty_score=difficulty_score,
         difficulty_breakdown=breakdown,
         competitors_data=competitors,
@@ -204,6 +204,16 @@ def _scheduler_loop():
     time.sleep(30)
 
     while True:
+        try:
+            # Apple popularity sync first, so today's refresh snapshots can
+            # pick up fresh Apple values (the sync also patches rows created
+            # before it finished). Internally a no-op unless configured.
+            from .apple_ads.sync import maybe_run_sync
+
+            maybe_run_sync()
+        except Exception as e:
+            logger.error(f"Apple popularity sync scheduling error: {e}")
+
         try:
             if _needs_refresh_today():
                 _run_daily_refresh()

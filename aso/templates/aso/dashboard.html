@@ -227,14 +227,22 @@
             <details class="group bg-slate-900/40 hover:bg-slate-900/60 open:bg-slate-900/60 border border-white/5 open:border-purple-500/20 rounded-lg transition-colors">
                 <summary class="flex items-center gap-2 px-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                     <svg class="w-3.5 h-3.5 text-purple-400/80 group-open:text-purple-400 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Why our <span class="text-purple-300 font-medium">Popularity</span> scores don't use Apple Search Ads data</span>
+                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Two <span class="text-purple-300 font-medium">Popularity</span> sources - RespectASO estimate and Apple Ads - and why you choose</span>
                     <svg class="w-3 h-3 text-slate-500 group-open:text-purple-400 transition-all group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </summary>
                 <div class="px-4 pb-4 pt-3 border-t border-white/5 text-xs text-slate-400 leading-relaxed space-y-3">
                     <p>
-                        Apple Search Ads "popularity" is a paid-auction metric Apple publishes for ad bidders — not a measurement of organic search volume.
-                        In late September 2025 it <span class="text-slate-200 font-medium">collapsed 77% in four days</span> across every tool that reads from Apple's API,
-                        and Apple issued no acknowledgment. The same silent shift happened in June 2024 and again in March 2026.
+                        RespectASO shows two popularity values side by side: its own estimate (<span class="font-mono text-[10px]">EST</span>)
+                        and, when you connect your Apple Ads account, Apple's own search popularity (<span class="font-mono text-[10px]">ASA</span>),
+                        fetched directly from Apple Ads. You pick which source powers your scores in
+                        <a href="{% url 'aso:settings_popularity' %}" class="text-purple-400 hover:text-purple-300">Settings → Popularity Source</a>.
+                    </p>
+                    <p>
+                        Why not just pass Apple's number through like most tools? It's a metric built for ad bidders with no published
+                        methodology, and it has shifted without notice - in late September 2025 it
+                        <span class="text-slate-200 font-medium">collapsed 77% in four days</span> across every tool that reads it,
+                        with silent shifts in June 2024 and March 2026 too. That's why our estimate stays first-class and automatically
+                        covers any keyword Apple has no value for (marked <span class="font-mono text-[10px] text-amber-300">EST*</span>).
                     </p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                         <div class="bg-emerald-500/[0.04] border border-emerald-500/15 rounded-lg p-3">
@@ -384,7 +392,7 @@
                             </th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('keyword')">Keyword <span class="sort-indicator text-slate-500">{% if current_sort == 'keyword' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('rank')">Rank <span class="sort-indicator text-slate-500">{% if current_sort == 'rank' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>{% endif %}
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')">Popularity <span class="sort-indicator text-slate-500">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')">Popularity <span class="sort-indicator text-slate-500">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span><span class="block text-[9px] font-normal normal-case text-slate-500 whitespace-nowrap">via {% if popularity_source == 'apple' %}Apple Ads{% else %}RespectASO{% endif %}</span></th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('difficulty')">
                                 <span class="inline-flex items-center gap-1">Overall Difficulty
                                     <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Weighted score (0–100) based on 7 competition signals across all search results: rating volume, growth speed, brand strength, title relevance, rating quality, market maturity, and publisher diversity."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -415,7 +423,7 @@
                     </thead>
                     <tbody id="history-body">
                         {% for result in history_results %}
-                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group" data-popularity="{{ result.popularity_score|default:'-1' }}" data-difficulty="{{ result.difficulty_score|default:'-1' }}" data-insight="{{ result.targeting_advice.1 }}">
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors group" data-popularity="{{ result.effective_popularity|default:'-1' }}" data-difficulty="{{ result.difficulty_score|default:'-1' }}" data-insight="{{ result.targeting_advice.1 }}">
                             <td class="px-3 py-2 w-8">
                                 <input type="checkbox"
                                        class="history-row-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer align-middle"
@@ -437,9 +445,9 @@
                                 {% endif %}
                             </td>
                             {% endif %}
-                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.popularity_score|default:'-1' }}">
-                                {% if result.popularity_score is not None %}
-                                <span class="text-purple-400 cursor-help" data-tip="Estimated from competitor data (5–100). Reflects relative search volume for this keyword. Higher = more people searching.">{{ result.popularity_score }}</span>{{ result.popularity_delta|trend_arrow }}
+                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.effective_popularity|default:'-1' }}">
+                                {% if result.effective_popularity is not None %}
+                                {% popularity_cell result result.popularity_delta|trend_arrow %}
                                 {% else %}
                                 <span class="text-slate-500 text-xs font-normal">N/A</span>
                                 {% endif %}
@@ -456,8 +464,8 @@
                             <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.opportunity_score }}">
                                 <span class="text-cyan-400">{{ result.opportunity_score }}</span>
                             </td>
-                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_breakdown.download_estimates|download_sort_value }}">
-                                {% download_cell result.difficulty_breakdown.download_estimates forloop.counter0 history_results|length %}
+                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.effective_download_estimates|download_sort_value }}">
+                                {% download_cell result.effective_download_estimates forloop.counter0 history_results|length %}
                             </td>
                             <td class="px-3 py-2">
                                 {% with tiers=result.difficulty_breakdown.ranking_tiers %}
@@ -623,7 +631,7 @@
                                 </div>
                                 {% endif %}
                                 {% endwith %}
-                                {% with dl=result.difficulty_breakdown.download_estimates %}
+                                {% with dl=result.effective_download_estimates %}
                                 {% if dl %}
                                 <div id="dl-chart-{{ result.id }}" class="mb-4 dl-chart-pending" data-estimates='{{ dl|to_json }}' data-app-rank="{{ result.app_rank|default_if_none:"" }}"></div>
                                 {% endif %}
@@ -2378,8 +2386,36 @@ document.addEventListener('DOMContentLoaded', function() {
         const card = document.createElement('div');
         card.className = 'bg-[#1e293b] border border-white/10 rounded-xl p-4 animate-fade-in';
 
+        // Big-number variant of the dual-source popularity cell: effective
+        // value + source badge; the other source's value appears below only
+        // when it exists (same rules as the shared renderers).
+        const popSource = result.popularity_source || 'internal';
+        const popFallback = !!result.popularity_fallback;
+        const popBadge = popFallback
+            ? `<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-amber-900/40 text-amber-300 border border-amber-500/30 align-middle cursor-help" title="Apple Ads has no value for this keyword in this storefront, so the RespectASO estimate is used instead.">EST*</span>`
+            : (popSource === 'apple'
+                ? `<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-sky-900/40 text-sky-300 border border-sky-500/30 align-middle cursor-help" title="Apple Ads search popularity - the active source powering your scores.">ASA</span>`
+                : `<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px bg-slate-700/40 text-slate-300 border border-white/10 align-middle cursor-help" title="RespectASO estimate - the active source powering your scores.">EST</span>`);
+        let popSecondary = '';
+        let popSecondaryMuted = false;
+        if (popFallback) {
+            popSecondary = 'no Apple data';
+            popSecondaryMuted = true;
+        } else if (popSource === 'apple' && result.popularity_internal !== null && result.popularity_internal !== undefined) {
+            popSecondary = `EST: ${result.popularity_internal}`;
+        } else if (popSource !== 'apple') {
+            if (result.popularity_apple !== null && result.popularity_apple !== undefined) {
+                popSecondary = `ASA: ${result.popularity_apple}`;
+            } else if (window.APPLE_POP_CONFIGURED) {
+                popSecondary = 'no Apple data';
+                popSecondaryMuted = true;
+            }
+        }
+        const popSecondaryHtml = popSecondary
+            ? `<span class="block text-[10px] mt-0.5 ${popSecondaryMuted ? 'text-slate-600 italic' : 'text-slate-500'}">${popSecondary}</span>`
+            : '';
         const popularityDisplay = result.popularity_score !== null
-            ? `<span class="text-2xl font-bold text-purple-400">${result.popularity_score}</span><span class="text-slate-500 text-xs ml-1">/ 100</span>`
+            ? `<span class="text-2xl font-bold text-purple-400">${result.popularity_score}</span><span class="text-slate-500 text-xs ml-1">/ 100</span> ${popBadge}${popSecondaryHtml}`
             : `<span class="text-slate-500 text-xs">Not available</span>`;
 
         const difficultyColorClass = result.difficulty_color;
@@ -2632,17 +2668,24 @@ function renderTrendPanel(data, keywordId, country) {
     // Extract series first to decide if we need right axis
     const dates = points.map(p => p.date);
     const popularity = points.map(p => p.popularity);
+    // Secondary popularity series: the non-active source, drawn dashed.
+    const popSource = data.popularity_source || 'internal';
+    const popularityAlt = points.map(p => popSource === 'apple'
+        ? (p.popularity_internal !== undefined ? p.popularity_internal : null)
+        : (p.popularity_apple !== undefined ? p.popularity_apple : null));
     const difficulty = points.map(p => p.difficulty);
     const ranks = points.map(p => p.rank);
     const hasRank = ranks.some(r => r !== null);
     const hasPop = popularity.some(p => p !== null);
+    const hasPopAlt = popularityAlt.some(p => p !== null && p !== undefined);
 
     const PAD_R = hasRank ? 55 : 20;
     const chartW = W - PAD_L - PAD_R;
     const chartH = H - PAD_T - PAD_B;
 
     // Combine popularity + difficulty for shared left Y range
-    const allVals = [...difficulty.filter(v => v !== null), ...popularity.filter(v => v !== null)];
+    const allVals = [...difficulty.filter(v => v !== null), ...popularity.filter(v => v !== null),
+        ...popularityAlt.filter(v => v !== null && v !== undefined)];
     const rawMin = Math.min(...allVals);
     const rawMax = Math.max(...allVals);
 
@@ -2656,23 +2699,27 @@ function renderTrendPanel(data, keywordId, country) {
     const yTicks = [];
     for (let v = yMin; v <= yMax; v += yStep) yTicks.push(v);
 
-    function makeLine(values, color) {
-        const validPoints = values.map((v, i) => v !== null ? { x: i, y: v } : null).filter(Boolean);
+    function makeLine(values, color, dashed) {
+        const validPoints = values.map((v, i) => v !== null && v !== undefined ? { x: i, y: v } : null).filter(Boolean);
         if (validPoints.length < 2) return '';
         const pathParts = validPoints.map((p, i) => {
             const x = PAD_L + (p.x / (values.length - 1)) * chartW;
             const y = PAD_T + chartH - ((p.y - yMin) / yRange) * chartH;
             return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
         });
+        const dotR = dashed ? 3 : 4;
         const dots = validPoints.map(p => {
             const x = PAD_L + (p.x / (values.length - 1)) * chartW;
             const y = PAD_T + chartH - ((p.y - yMin) / yRange) * chartH;
-            return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${color}" stroke="rgba(15,23,42,0.6)" stroke-width="1.5"/>`;
+            return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${dotR}" fill="${color}" stroke="rgba(15,23,42,0.6)" stroke-width="1.5"${dashed ? ' opacity="0.65"' : ''}/>`;
         }).join('');
-        return `<path d="${pathParts.join('')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+        const dashAttr = dashed ? ' stroke-dasharray="6,4" opacity="0.65"' : '';
+        return `<path d="${pathParts.join('')}" fill="none" stroke="${color}" stroke-width="${dashed ? 2 : 2.5}" stroke-linejoin="round" stroke-linecap="round"${dashAttr}/>${dots}`;
     }
 
     const popLine = hasPop ? makeLine(popularity, 'rgb(192,132,252)') : '';
+    // Non-active popularity source: dashed sky-blue reference line.
+    const popAltLine = hasPopAlt ? makeLine(popularityAlt, 'rgb(56,189,248)', true) : '';
     const diffLine = makeLine(difficulty, 'rgb(251,191,36)');
 
     // Rank line — inverted Y-axis (rank 1 at top, higher ranks at bottom)
@@ -2759,7 +2806,8 @@ function renderTrendPanel(data, keywordId, country) {
     // Legend
     const legend = `
         <div class="flex items-center justify-center gap-6 mt-3 text-xs text-slate-400">
-            ${hasPop ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(192,132,252)"></span> Popularity</span>' : ''}
+            ${hasPop ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(192,132,252)"></span> Popularity (' + (popSource === 'apple' ? 'Apple Ads' : 'estimate') + ')</span>' : ''}
+            ${hasPopAlt ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(56,189,248);opacity:0.7"></span> Popularity (' + (popSource === 'apple' ? 'estimate' : 'Apple Ads') + ')</span>' : ''}
             <span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(251,191,36)"></span> Difficulty</span>
             ${hasRank ? '<span class="flex items-center gap-2"><span class="inline-block w-4 h-0.5 rounded" style="background:rgb(52,211,153);border-top:1px dashed rgb(52,211,153)"></span> Rank</span>' : ''}
         </div>`;
@@ -2772,7 +2820,7 @@ function renderTrendPanel(data, keywordId, country) {
         historyRows += `
             <tr class="border-b border-white/5 hover:bg-white/[0.02]">
                 <td class="px-3 py-1.5 text-slate-400 text-xs">${dateStr}</td>
-                <td class="px-3 py-1.5 text-center text-sm font-medium ${p.popularity !== null ? 'text-purple-400' : 'text-slate-600'}">${p.popularity !== null ? p.popularity : '—'}</td>
+                <td class="px-3 py-1.5 text-center text-sm font-medium ${p.popularity !== null ? 'text-purple-400' : 'text-slate-600'}">${p.popularity !== null ? p.popularity : '—'}${(function(){ const alt = popSource === 'apple' ? p.popularity_internal : p.popularity_apple; return (alt !== null && alt !== undefined) ? '<span class=\'text-[10px] text-slate-500 ml-1\'>(' + alt + ')</span>' : ''; })()}</td>
                 <td class="px-3 py-1.5 text-center text-sm font-medium text-amber-400">${p.difficulty}</td>
                 <td class="px-3 py-1.5 text-center text-sm font-medium ${p.rank !== null ? 'text-emerald-400' : 'text-slate-600'}">${p.rank !== null ? '#' + p.rank : '—'}</td>
             </tr>`;
@@ -2799,6 +2847,7 @@ function renderTrendPanel(data, keywordId, country) {
                             ${rankAxisHTML}
                             ${xLabels}
                             ${popLine}
+                            ${popAltLine}
                             ${diffLine}
                             ${rankLine}
                         </svg>

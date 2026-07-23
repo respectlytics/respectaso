@@ -20,9 +20,12 @@ from .models import SearchResult
 
 
 def _safe_estimates(result):
-    """Pull the download-estimates dict off a SearchResult, or return None."""
-    bd = result.difficulty_breakdown or {}
-    est = bd.get("download_estimates")
+    """Download estimates for a SearchResult (effective-popularity based).
+
+    Recomputed from the effective popularity so summary numbers always agree
+    with the popularity column, including right after a source switch.
+    """
+    est = result.effective_download_estimates
     if not est or not est.get("positions"):
         return None
     return est
@@ -126,14 +129,14 @@ def _aggregate_country(results):
                     "rank": r.app_rank,
                     "downloads_low": cur_low,
                     "downloads_high": cur_high,
-                    "popularity": r.popularity_score,
+                    "popularity": r.effective_popularity,
                 }
 
         # Biggest gap: keyword with the largest potential headroom (downloads at #1
         # minus downloads at current rank). Pure number — no bucket judgment.
         gap = pot_high - cur_high
         # Need either popularity or just a meaningful gap to qualify
-        pop = r.popularity_score
+        pop = r.effective_popularity
         if gap > biggest_gap_score and pop is not None and pop >= 5:
             biggest_gap_score = gap
             biggest_gap = {

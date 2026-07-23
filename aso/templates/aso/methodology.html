@@ -46,9 +46,18 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                The popularity score (5–100) estimates how frequently a keyword is searched in the App Store.
-                Since Apple doesn't publish exact search volumes, we estimate popularity from the competitive
-                landscape of each keyword using six signals:
+                RespectASO gives you <span class="text-white font-medium">two popularity sources</span> and lets you choose
+                which one powers your scores in
+                <a href="{% url 'aso:settings_popularity' %}" class="text-purple-400 hover:text-purple-300">Settings → Popularity Source</a>:
+                the <span class="text-white font-medium">RespectASO estimate</span> (built-in, works everywhere) and
+                <span class="text-white font-medium">Apple Ads popularity</span> (Apple's own measurement, connected through your
+                Apple Ads account). Both are shown side by side wherever popularity appears; exactly one - your selected
+                source - feeds opportunity, classification, and download estimates.
+            </p>
+            <h3 class="text-white font-medium text-sm">The RespectASO estimate</h3>
+            <p>
+                The estimate (5–100) is derived from the competitive landscape of each keyword.
+                Since Apple doesn't publish exact search volumes, we read six observable signals:
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <div class="flex items-start gap-3">
@@ -80,29 +89,38 @@
                 Keep in mind that popularity is an estimate, not an exact measurement. A score of 60 doesn't mean "60 searches per day" — it
                 means the competitive signals suggest significantly above-average search volume.
             </p>
+            <h3 class="text-white font-medium text-sm">Apple Ads popularity</h3>
+            <p>
+                When you connect your Apple Ads account, RespectASO can fetch Apple's own search popularity -
+                the same granular 5–100 values Apple's own keyword planner reports.
+                It works for any keyword you track (no ads or spend required), refreshed automatically once a day.
+                Note that 5 is the lowest value on Apple's scale and many keywords come back at exactly 5 -
+                Apple's data does not differentiate between them, while the RespectASO estimate keeps
+                differentiating in that range.
+                Very-low-volume keywords have no Apple value; those automatically use the RespectASO estimate
+                instead, marked with a visible <span class="text-amber-300 font-mono text-xs">EST*</span> indicator so
+                you always know which source produced a number.
+            </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Why we don't use Apple Search Ads data</h3>
+                <h3 class="text-white font-medium text-sm">Why we offer both - and never just pass Apple's number through</h3>
                 <p class="text-slate-400">
-                    Most ASO tools surface the "popularity" score Apple publishes inside Apple Search Ads (ASA).
-                    It looks authoritative — it comes from Apple — but it's a paid-auction metric designed for ad bidders,
-                    not a measurement of organic search volume. Apple has never published per-keyword search counts to anyone.
+                    Apple's popularity looks authoritative - it comes from Apple - but it's a metric designed for ad
+                    bidders, not a measurement of organic search volume, and Apple publishes no methodology for it.
+                    It has also shifted without notice: in late September 2025 it collapsed 77% in four days across every
+                    tool that reads it - MobileAction, AppFigures, Phiture, Astro, Radaso, and APPlyzer all publicly
+                    confirmed the break. Similar silent shifts happened in June 2024 and March 2026.
                 </p>
                 <p class="text-slate-400">
-                    It's also been visibly unreliable. In late September 2025 the ASA popularity score collapsed 77% in four
-                    days across every tool that reads from Apple's API — MobileAction, AppFigures, Phiture, Astro, Radaso,
-                    and APPlyzer all publicly confirmed the metric broke. Apple issued no acknowledgment or changelog. The same
-                    silent shift happened in June 2024 and again in March 2026. ASA also only covers 91 of 175 storefronts and
-                    requires an Apple Ads account with Admin role and a payment method on file.
-                </p>
-                <p class="text-slate-400">
-                    We chose public iTunes Search API signals instead. The methodology above is fully inspectable, works in
-                    every storefront, and doesn't break when Apple's ad backend silently shifts.
+                    That history is why the RespectASO estimate stays first-class: it's fully inspectable, works in every
+                    storefront for every keyword, and doesn't move when Apple's backend does. And it's why, when you choose
+                    Apple as your source, the estimate remains your automatic safety net for keywords Apple has no value for.
+                    Whichever source you pick, both numbers stay visible so nothing is hidden from you.
                 </p>
                 <p>
                     <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
                        target="_blank" rel="noopener noreferrer"
                        class="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors text-xs">
-                        Full write-up: How Apple Search Ads popularity broke
+                        Full write-up: How Apple's popularity metric broke - and what we do about it
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                         </svg>

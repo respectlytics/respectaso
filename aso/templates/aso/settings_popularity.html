@@ -1,0 +1,472 @@
+{% extends "aso/base.html" %}
+
+{% block title %}Popularity Source - RespectASO{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-white mb-1">Settings - Popularity Source</h1>
+        <p class="text-sm text-slate-400">Choose where your keyword popularity numbers come from.</p>
+    </div>
+
+    {% if pro_edition %}
+    <!-- Settings Tabs (Pro edition) - same order as every other settings page:
+         AI Configuration · License · Setup Guide · Popularity Source · MCP Server -->
+    <div class="flex gap-2 mb-5 flex-wrap">
+        <a href="{% url 'aso_pro:settings_ai' %}"
+           class="text-sm font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+            AI Configuration
+        </a>
+        <a href="{% url 'aso_pro:settings_license' %}"
+           class="text-sm font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+            License
+        </a>
+        <a href="{% url 'aso_pro:settings_setup' %}"
+           class="text-sm font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+            Setup Guide
+        </a>
+        <a href="{% url 'aso:settings_popularity' %}"
+           class="text-sm font-medium px-3 py-1.5 rounded-lg bg-purple-600/20 text-purple-300 border border-purple-500/30">
+            Popularity Source
+        </a>
+        <a href="{% url 'aso_pro:settings_mcp' %}"
+           class="text-sm font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-300 hover:bg-slate-800 transition-colors">
+            MCP Server
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Success/Error Message -->
+    {% if message %}
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in
+        {% if message_type == 'success' %}bg-emerald-900/30 border border-emerald-500/30 text-emerald-300
+        {% elif message_type == 'error' %}bg-red-900/30 border border-red-500/30 text-red-300
+        {% else %}bg-blue-900/30 border border-blue-500/30 text-blue-300{% endif %}">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    {% comment %}Source selector - mirrors the provider-radio idiom from the AI
+    Configuration page (visible radio circle, has-[:checked] highlight) so the
+    interaction is instantly recognizable. Deliberately no "Recommended" badge
+    and no pre-selected default (see the plan's no-recommendation decision).
+    Card text stays minimal; the full pros/cons live in the "Which should I
+    choose?" section below.{% endcomment %}
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
+        <h2 class="text-base font-semibold text-white mb-1 flex items-center gap-2">
+            <span class="text-purple-400">📊</span> Your Popularity Source
+        </h2>
+        <p class="text-xs text-slate-500 mb-4">
+            This one choice decides which popularity value powers <span class="text-slate-300">all</span> your scores -
+            opportunity, keyword insights, and download estimates, on every tab.
+            Click a card to select it. Switching is instant and fully reversible.
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="select_source">
+            <div class="grid md:grid-cols-2 gap-3">
+
+                <!-- RespectASO estimate card -->
+                <label class="group relative flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all bg-slate-800/50
+                              hover:bg-white/5 has-[:checked]:bg-purple-600/10
+                              {% if popularity_source == 'internal' %}border-purple-500 ring-1 ring-purple-500/40{% else %}border-white/10 hover:border-purple-400/50{% endif %}">
+                    <input type="radio" name="popularity_source" value="internal" class="sr-only"
+                           {% if popularity_source == 'internal' %}checked{% endif %}
+                           onchange="this.form.submit()">
+                    <span class="shrink-0 mt-0.5 w-4 h-4 rounded-full border-2 border-slate-500 transition-all
+                                 group-has-[:checked]:border-[5px] group-has-[:checked]:border-purple-500" aria-hidden="true"></span>
+                    <span class="flex-1 min-w-0">
+                        <span class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-white">RespectASO Estimate</span>
+                            <span class="text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
+                        </span>
+                        <span class="block text-xs text-slate-400 mt-1">
+                            Built-in, works for every keyword in all 30 storefronts. Open methodology.
+                        </span>
+                        {% if popularity_source == 'internal' %}
+                        <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                            Active - powering all your scores
+                        </span>
+                        {% else %}
+                        <span class="mt-2 inline-block text-[11px] text-slate-500 group-hover:text-purple-300 transition-colors">
+                            Click to make this your source
+                        </span>
+                        {% endif %}
+                    </span>
+                </label>
+
+                <!-- Apple Ads card -->
+                <label class="group relative flex items-start gap-3 rounded-xl border p-4 transition-all bg-slate-800/50
+                              {% if apple_ready %}cursor-pointer hover:bg-white/5 has-[:checked]:bg-sky-600/10
+                              {% if popularity_source == 'apple' %}border-sky-500 ring-1 ring-sky-500/40{% else %}border-white/10 hover:border-sky-400/50{% endif %}
+                              {% else %}border-white/10 opacity-70 cursor-not-allowed{% endif %}">
+                    <input type="radio" name="popularity_source" value="apple" class="sr-only"
+                           {% if popularity_source == 'apple' %}checked{% endif %}
+                           {% if not apple_ready %}disabled{% endif %}
+                           onchange="this.form.submit()">
+                    <span class="shrink-0 mt-0.5 w-4 h-4 rounded-full border-2 border-slate-500 transition-all
+                                 group-has-[:checked]:border-[5px] group-has-[:checked]:border-sky-500" aria-hidden="true"></span>
+                    <span class="flex-1 min-w-0">
+                        <span class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-white">Apple Ads Popularity</span>
+                            <span class="text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
+                        </span>
+                        <span class="block text-xs text-slate-400 mt-1">
+                            Apple's own search popularity, fetched from your Apple Ads account.
+                        </span>
+                        {% if apple_source_broken == "needs_test" %}
+                        <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                            Active - run the connection test below to resume syncing
+                        </span>
+                        {% elif popularity_source == 'apple' and not apple_ready %}
+                        <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
+                            Active, but disconnected - sign in below or switch source
+                        </span>
+                        {% elif popularity_source == 'apple' %}
+                        <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-sky-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                            Active - powering all your scores
+                        </span>
+                        {% elif apple_ready %}
+                        <span class="mt-2 inline-block text-[11px] text-slate-500 group-hover:text-sky-300 transition-colors">
+                            Click to make this your source
+                        </span>
+                        {% else %}
+                        <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            Locked - connect your Apple Ads account below first
+                        </span>
+                        {% endif %}
+                    </span>
+                </label>
+            </div>
+
+            <p class="text-[11px] text-slate-500 mt-3">
+                Whichever you choose, <span class="text-slate-400">both values stay visible side by side</span> everywhere popularity appears -
+                only the math changes. Selecting recalculates every score immediately.
+            </p>
+
+            <details class="mt-3 group">
+                <summary class="text-[11px] text-slate-400 hover:text-slate-300 cursor-pointer list-none inline-flex items-center gap-1">
+                    <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    What exactly changes when I switch?
+                </summary>
+                <ul class="mt-2 text-[11px] text-slate-500 space-y-1 pl-4">
+                    <li><span class="text-slate-400">Changes instantly, including your full history and trends:</span> popularity, opportunity, insight labels, and download estimates - everywhere in the app.</li>
+                    <li><span class="text-slate-400">Never changes:</span> difficulty. It measures your competition, not search volume.</li>
+                    <li><span class="text-slate-400">Saved AI analyses keep their numbers:</span> each report states which source it used, so it always matches the AI's written strategy. New and refined runs use your current selection.</li>
+                    <li><span class="text-slate-400">AI aggregate scores follow the source:</span> scores computed from popularity (for example the Simulator's ASO Readiness) can differ noticeably between sources - the result page tells you when the other source would paint a different picture.</li>
+                    <li><span class="text-slate-400">Nothing is lost:</span> both values keep being recorded daily, so switching back restores exactly what you had.</li>
+                </ul>
+            </details>
+        </form>
+        {% if pro_edition %}
+        <p class="text-[11px] text-slate-500 mt-3">
+            You can also check or switch the source from your AI assistant via the
+            <a href="{% url 'aso_pro:settings_mcp' %}" class="text-purple-400 hover:text-purple-300">MCP server</a>.
+        </p>
+        {% endif %}
+    </section>
+
+    <!-- Which should I choose? - the detailed comparison lives here, below the choice -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
+        <h2 class="text-base font-semibold text-white mb-2">Which should I choose?</h2>
+        <p class="text-xs text-slate-400 leading-relaxed mb-4">
+            Neither source is universally better - they are different instruments.
+            Pick <span class="text-slate-200 font-medium">Apple Ads</span> if you want popularity as Apple itself measures it;
+            pick the <span class="text-slate-200 font-medium">RespectASO estimate</span> for full coverage, stability, and an open methodology.
+        </p>
+        <div class="grid md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                    <span class="text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
+                    RespectASO Estimate
+                </p>
+                <ul class="text-xs text-slate-400 space-y-1.5">
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Works instantly for every keyword, in all 30 storefronts</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Open methodology - see exactly how the score is built</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Stable: unaffected when Apple changes its systems</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>An estimate from observable App Store signals, not Apple's own measurement</span></li>
+                </ul>
+                <a href="{% url 'aso:methodology' %}" class="inline-block mt-2 text-xs text-purple-400 hover:text-purple-300">How the estimate works →</a>
+            </div>
+            <div>
+                <p class="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                    <span class="text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
+                    Apple Ads Popularity
+                </p>
+                <ul class="text-xs text-slate-400 space-y-1.5">
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Popularity as Apple itself measures it, fetched from your Apple Ads account</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Granular values (5–100) - no ads or spend required</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>Needs an Apple Ads account sign-in (free to create)</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>Unofficial interface that Apple has changed without notice in the past</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>Many keywords come back at the scale's minimum (5), where Apple's data does not differentiate between them. This can lower opportunity and AI simulation scores compared with the estimate, which may rate the same keywords higher.</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>Very small keywords have no Apple value. Those use the estimate automatically and carry the amber <span class="text-amber-300 font-medium">EST*</span> badge.</span></li>
+                </ul>
+                <a href="{% url 'aso:apple_ads_setup' %}" class="inline-block mt-2 text-xs text-sky-400 hover:text-sky-300">Step-by-step setup guide →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Apple Ads account -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
+        <h2 class="text-base font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-sky-400"></span> Apple Ads Account
+        </h2>
+
+        {% if apple_session_expired %}
+        <div class="mb-3 px-3 py-2 rounded-lg text-xs bg-red-900/30 border border-red-500/30 text-red-300">
+            Your Apple sign-in has expired. Sign in again to resume Apple popularity syncs -
+            scores are using the internal estimate meanwhile.
+        </div>
+        {% elif apple_source_broken == "signed_out" %}
+        <div class="mb-3 px-3 py-2 rounded-lg text-xs bg-amber-900/30 border border-amber-500/30 text-amber-300">
+            You signed out, but Apple Ads is still your popularity source. Scores keep using your
+            last-synced Apple data and new keywords use the estimate - sign in again below, or
+            switch to the RespectASO estimate above.
+        </div>
+        {% elif apple_source_broken == "needs_test" %}
+        <div class="mb-3 px-3 py-2 rounded-lg text-xs bg-amber-900/30 border border-amber-500/30 text-amber-300">
+            You're signed in - run the connection test below to resume Apple popularity syncing.
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-3 mb-4">
+            {% if apple_signed_in and not apple_session_expired %}
+            {% if apple_tested_ok %}
+            <span class="text-xs text-emerald-300 bg-emerald-900/30 border border-emerald-500/30 rounded-lg px-3 py-1.5">Signed in</span>
+            {% else %}
+            <span class="text-xs text-amber-300 bg-amber-900/30 border border-amber-500/30 rounded-lg px-3 py-1.5">Signed in - connection test required</span>
+            {% endif %}
+            <form method="post" action="{% url 'aso:apple_signout' %}"
+                  onsubmit="return confirm('{% if popularity_source == 'apple' %}Apple Ads is your active popularity source. After signing out, scores keep using your last-synced Apple data and new keywords use the estimate, until you sign in again or switch source. Sign out?{% else %}After signing out, the Apple values shown beside your scores will stop refreshing until you sign in again. Sign out?{% endif %}')">
+                {% csrf_token %}
+                <button type="submit" class="text-xs text-slate-400 hover:text-slate-200 underline">Sign out</button>
+            </form>
+            {% else %}
+            <button id="apple-signin-btn" onclick="startAppleSignin()"
+                    class="text-sm font-medium px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition-colors {% if not is_native %}opacity-50 cursor-not-allowed{% endif %}"
+                    {% if not is_native %}disabled{% endif %}>
+                Sign in with your Apple Ads account
+            </button>
+            <span id="apple-signin-status" class="text-xs text-slate-400"></span>
+            {% endif %}
+        </div>
+        {% if not is_native %}
+        <p class="text-xs text-amber-300/90 mb-4">
+            Apple sign-in opens a secure window inside the RespectASO desktop app.
+            You're currently using the browser edition - open the desktop app to sign in;
+            the session is stored in your data folder and works here too.
+        </p>
+        {% endif %}
+
+        <!-- Primary App ID -->
+        <form method="post" class="mb-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_app_id">
+            <label class="block text-xs font-medium text-slate-300 mb-1">Primary App ID</label>
+            <p class="text-xs text-slate-500 mb-2">
+                Any App Store app ID your Apple Ads account can access - usually your own app.
+                Used only as request context; it does not limit which keywords you can look up.
+            </p>
+            <div class="flex gap-2">
+                <input type="text" name="primary_app_id" value="{{ apple_primary_app_id }}"
+                       placeholder="1234567890" inputmode="numeric"
+                       class="flex-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50">
+                <button type="submit" class="text-sm font-medium px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors">Save</button>
+            </div>
+            {% if tracked_apps %}
+            <div class="mt-2 flex items-center gap-2">
+                <label class="text-xs text-slate-500">Or pick a tracked app:</label>
+                <select class="bg-slate-800 border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-sky-500/50"
+                        onchange="if (this.value) { this.closest('form').primary_app_id.value = this.value; }">
+                    <option value="">Select...</option>
+                    {% for app in tracked_apps %}
+                    <option value="{{ app.track_id }}">{{ app.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </form>
+
+        <!-- Test connection -->
+        <div class="flex items-center gap-3">
+            <button id="apple-test-btn" onclick="runAppleTest()"
+                    class="text-sm font-medium px-4 py-2 rounded-lg {% if apple_signed_in and not apple_tested_ok %}bg-sky-600 hover:bg-sky-500{% else %}bg-slate-700 hover:bg-slate-600{% endif %} text-white transition-colors">
+                Test connection
+            </button>
+            <span id="apple-test-result" class="text-xs {% if apple_tested_ok %}text-emerald-300{% else %}text-slate-400{% endif %}">
+                {% if apple_tested_ok %}Connection test passed - Apple Ads is ready.{% else %}Not tested yet - required before Apple Ads can be selected.{% endif %}
+            </span>
+        </div>
+    </section>
+
+    <!-- Sync status -->
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4" id="sync-section">
+        <h2 class="text-base font-semibold text-white mb-3">Apple Data Sync</h2>
+        <div class="text-xs text-slate-400 space-y-1.5 mb-3" id="sync-status-box">
+            <div>Last sync: <span id="sync-last" class="text-slate-300">{{ sync_status.last_sync_at|default:"never" }}</span></div>
+            <div>Status: <span id="sync-state" class="text-slate-300">{{ sync_status.last_sync_status|default:"—" }}</span></div>
+            <div id="sync-error-row" {% if not sync_status.last_sync_error %}class="hidden"{% endif %}>
+                Note: <span id="sync-error" class="text-amber-300">{{ sync_status.last_sync_error }}</span>
+            </div>
+            <div>Coverage: <span id="sync-coverage" class="text-slate-300">Apple data for {{ sync_status.coverage.tracked_matched }} of {{ sync_status.coverage.tracked_total }} tracked keyword+country pairs</span></div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="sync-now-btn" onclick="runSyncNow()"
+                    class="text-sm font-medium px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors">
+                Sync now
+            </button>
+            <span id="sync-now-result" class="text-xs text-slate-400"></span>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">
+            Newly added keywords get their Apple value the moment they are scored; all values refresh automatically once a day.
+            Syncing is paced politely and backs off automatically if Apple rate-limits requests.
+        </p>
+    </section>
+
+</div>
+
+<script>
+function getCsrf() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+var signinPollTimer = null;
+
+function setSigninBusy(busy) {
+    var btn = document.getElementById('apple-signin-btn');
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.classList.toggle('opacity-60', busy);
+    btn.classList.toggle('cursor-wait', busy);
+}
+
+function startAppleSignin() {
+    var status = document.getElementById('apple-signin-status');
+    // A re-click always starts a FRESH attempt: the server discards any
+    // stuck previous window, and we discard any previous poll timer.
+    if (signinPollTimer) { clearInterval(signinPollTimer); signinPollTimer = null; }
+    setSigninBusy(true);
+    status.textContent = 'Opening the Apple sign-in window...';
+    fetch("{% url 'aso:apple_signin' %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCsrf()},
+    }).then(function (r) { return r.json(); }).then(function (state) {
+        if (state.status === 'unavailable' || state.status === 'error') {
+            status.textContent = state.error;
+            setSigninBusy(false);
+            return;
+        }
+        pollSignin(status);
+    }).catch(function () {
+        status.textContent = 'Could not start sign-in.';
+        setSigninBusy(false);
+    });
+}
+
+function pollSignin(status) {
+    signinPollTimer = setInterval(function () {
+        fetch("{% url 'aso:apple_signin_status' %}").then(function (r) { return r.json(); }).then(function (s) {
+            if (s.status === 'active') {
+                status.textContent = 'Waiting for you to finish signing in (including 2FA)...';
+                return;
+            }
+            if (s.status === 'finalizing') {
+                // Session already saved; the server is verifying it against
+                // Apple (this also IS the connection test). The sign-in
+                // window closes by itself.
+                status.textContent = 'Signed in! Verifying with Apple - the window closes by itself, this can take up to a minute...';
+                return;
+            }
+            clearInterval(signinPollTimer);
+            signinPollTimer = null;
+            if (s.status === 'success') {
+                status.textContent = 'Done! Reloading...';
+                window.location.reload();
+            } else {
+                status.textContent = s.error || 'Sign-in did not complete.';
+                setSigninBusy(false);
+                if (window.refreshPopularityBanner) window.refreshPopularityBanner();
+            }
+        }).catch(function () { /* transient - next tick retries */ });
+    }, 1500);
+}
+
+function runAppleTest() {
+    var result = document.getElementById('apple-test-result');
+    result.className = 'text-xs text-slate-400';
+    result.textContent = 'Testing...';
+    fetch("{% url 'aso:apple_test' %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCsrf()},
+    }).then(function (r) { return r.json(); }).then(function (data) {
+        if (data.ok) {
+            result.className = 'text-xs text-emerald-300';
+            var sample = data.sample_popularity != null
+                ? ' Sample: "' + data.sample_term + '" has Apple popularity ' + data.sample_popularity + '.'
+                : '';
+            result.textContent = 'Connection test passed - Apple Ads is ready.' + sample + ' Reloading...';
+            setTimeout(function () { window.location.reload(); }, 1200);
+        } else {
+            result.className = 'text-xs text-red-300';
+            result.textContent = data.error || 'Test failed.';
+            setSigninBusy(false);
+            if (window.refreshPopularityBanner) window.refreshPopularityBanner();
+        }
+    }).catch(function () {
+        result.className = 'text-xs text-red-300';
+        result.textContent = 'The test could not reach the app - check the log (respectaso.log in your data folder) and try again.';
+        setSigninBusy(false);
+        if (window.refreshPopularityBanner) window.refreshPopularityBanner();
+    });
+}
+
+function runSyncNow() {
+    var note = document.getElementById('sync-now-result');
+    note.textContent = 'Starting...';
+    fetch("{% url 'aso:apple_sync_now' %}", {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCsrf()},
+    }).then(function (r) { return r.json(); }).then(function (data) {
+        if (!data.started) {
+            note.textContent = data.error || 'Could not start.';
+            return;
+        }
+        note.textContent = 'Syncing...';
+        pollSync(note);
+    });
+}
+
+function pollSync(note) {
+    var timer = setInterval(function () {
+        fetch("{% url 'aso:apple_sync_status' %}").then(function (r) { return r.json(); }).then(function (s) {
+            if (s.running) {
+                note.textContent = 'Syncing... (' + s.completed_batches + '/' + s.total_batches + ' batches)';
+                return;
+            }
+            clearInterval(timer);
+            note.textContent = 'Done.';
+            document.getElementById('sync-last').textContent = s.last_sync_at || 'never';
+            document.getElementById('sync-state').textContent = s.last_sync_status || '—';
+            var errRow = document.getElementById('sync-error-row');
+            if (s.last_sync_error) {
+                errRow.classList.remove('hidden');
+                document.getElementById('sync-error').textContent = s.last_sync_error;
+            } else {
+                errRow.classList.add('hidden');
+            }
+            var cov = s.coverage || {};
+            document.getElementById('sync-coverage').textContent =
+                'Apple data for ' + (cov.tracked_matched || 0) + ' of ' + (cov.tracked_total || 0) + ' tracked keyword+country pairs';
+        });
+    }, 2000);
+}
+</script>
+{% endblock %}
