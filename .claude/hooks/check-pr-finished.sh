@@ -104,18 +104,32 @@ NUM="$(printf '%s' "$PR_JSON" | jq -r '.number // empty' 2>/dev/null || true)"
 #     that is structurally incapable of firing, which is precisely the shape of
 #     bug this file's own history is about.
 #
-#     The BARE `gh pr checks --watch` form carries no PR number (it watches the
-#     current branch), so it is matched without one, and a machine-wide pgrep
-#     cannot tell which repo that process belongs to. The resulting bias toward
-#     allowing is deliberate and is this section's whole rationale: a missed
-#     reminder costs one nudge, whereas a nudge that scolds correct behaviour
-#     teaches the reader to dismiss the guard — and a dismissed guard is how a
-#     genuinely abandoned PR gets through.
+#     The BARE `gh pr checks --watch` form carries NO PR number — it watches the
+#     current branch — so it is the one pattern matched without one. That makes
+#     it the dangerous one, and its anchor is load-bearing:
+#
+#       `gh pr checks --watch[^0-9]*$`   NOT   `gh pr checks --watch([^0-9]|$)`
+#
+#     The second version was shipped first and is wrong. `([^0-9]|$)` is
+#     satisfied by the SPACE in `gh pr checks --watch 990`, so a watcher on #990
+#     silenced the nudge for #4242 — defeating, through this pattern, the exact
+#     whole-token property the three patterns above exist to enforce. CI caught
+#     it within the hour because the runner was watching a real PR at the time.
+#     `[^0-9]*$` instead requires that NOTHING numeric follows `--watch`, so a
+#     numbered invocation falls through to the number-scoped patterns where it
+#     belongs. (`--watch --interval 5` also stops matching. That biases toward
+#     one extra reminder, which is the safe direction.)
+#
+#     For a genuinely bare watcher a machine-wide pgrep still cannot tell which
+#     repo it belongs to. Tolerating that is deliberate: a missed reminder costs
+#     one nudge, whereas a nudge that scolds correct behaviour teaches the reader
+#     to dismiss the guard — and a dismissed guard is how an abandoned PR gets
+#     through.
 for _re in \
   "finish-pr\.sh[^0-9]*${NUM}([^0-9]|\$)" \
   "gh pr checks[^0-9]*${NUM}([^0-9]|\$).*--watch" \
   "gh pr checks.*--watch[^0-9]*${NUM}([^0-9]|\$)" \
-  "gh pr checks --watch([^0-9]|\$)"
+  "gh pr checks --watch[^0-9]*\$"
 do
   if pgrep -f "$_re" >/dev/null 2>&1; then
     guard_allow "a CI watcher for #$NUM is already running"
