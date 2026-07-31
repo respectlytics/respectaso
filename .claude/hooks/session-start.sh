@@ -20,6 +20,10 @@
 #   5. Worktree bootstrap — when this session runs inside a linked worktree
 #                     that is missing its env, run setup-worktree.sh in the
 #                     background so pre-commit/test envs work.
+#   6. Guard self-check — do the hooks this repo WIRES actually exist on disk
+#                     here? Committed-but-absent is invisible to `git status`
+#                     and to any gate reading committed state; only the machine
+#                     about to run them can tell, and only right now.
 #
 # SessionStart hooks run before the agent sees any user message — fast (15s
 # budget) + non-destructive.
@@ -163,6 +167,66 @@ if [ "$PROJECT_DIR" != "$MAIN_ROOT" ] && [ -x "$PROJECT_DIR/.claude/hooks/setup-
     if [ ! -e "$PROJECT_DIR/.env" ] && [ ! -e "$PROJECT_DIR/backend/.env" ] && [ ! -e "$PROJECT_DIR/mac/daemon/.env" ]; then
         nohup "$PROJECT_DIR/.claude/hooks/setup-worktree.sh" "$PROJECT_DIR" "$MAIN_ROOT" >/dev/null 2>&1 &
         echo "[session-start] Worktree env bootstrap started in background (setup-worktree.sh)."
+    fi
+fi
+
+# ── 6. Guard self-check — is this checkout RUNNING the guards it declares? ──
+# On 2026-07-31 all three sibling repos had every phone-facing Stop hook COMMITTED
+# and not one of them on disk. Every audit agreed they were protected: `git status`
+# was clean (it compares the tree to LOCAL HEAD, and those checkouts were merely
+# behind), and CI's fleet gate reads committed state, so it passed too. Sessions
+# opened there ran completely ungated. Nothing that could actually EXECUTE a hook
+# ever checked whether the file was there — which is what this does, on the one
+# machine and at the one moment where it is answerable.
+#
+# The loud signal keys on PRESENCE, not content. An absent hook cannot fire on any
+# branch, so that has no false positives; a hook whose bytes differ from the shared
+# ref is normal on a feature branch (this very hook is edited that way), so it gets
+# a quiet line instead of a banner.
+GUARD_REF=""
+for _r in origin/main main origin/master master; do
+    if git rev-parse --verify -q "$_r" >/dev/null 2>&1; then GUARD_REF="$_r"; break; fi
+done
+if [ -z "$GUARD_REF" ]; then
+    # Three-valued on purpose: "could not look" is not "nothing wrong".
+    echo "[session-start] guards: CANNOT VERIFY (no main/master ref) — not a pass."
+else
+    GUARD_MISSING=""; GUARD_DIFFERS=0; GUARD_PRESENT=0
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        # A hook only matters here if this repo actually wires it; the playbook is
+        # not wired anywhere, so it is checked unconditionally.
+        case "$rel" in
+            *.sh) grep -q "$(basename "$rel")" "$PROJECT_DIR/.claude/settings.json" 2>/dev/null || continue ;;
+        esac
+        if [ ! -f "$PROJECT_DIR/$rel" ]; then
+            GUARD_MISSING="$GUARD_MISSING $rel"
+        else
+            GUARD_PRESENT=$((GUARD_PRESENT + 1))
+            git show "$GUARD_REF:$rel" 2>/dev/null | cmp -s - "$PROJECT_DIR/$rel" \
+                || GUARD_DIFFERS=$((GUARD_DIFFERS + 1))
+        fi
+    done <<EOF
+$(git ls-tree -r --name-only "$GUARD_REF" -- .claude/hooks .claude/SESSION_END_LOOP.md 2>/dev/null \
+    | grep -E '\.sh$|SESSION_END_LOOP\.md$' || true)
+EOF
+    if [ -n "$GUARD_MISSING" ]; then
+        echo "────────────────────────────────────────────────────────────────"
+        echo "[session-start] ⚠️  THIS SESSION IS RUNNING WITHOUT GUARDS IT DECLARES."
+        for _m in $GUARD_MISSING; do
+            echo "                absent from disk: $_m"
+        done
+        echo "                $GUARD_REF commits them; this checkout does not have them,"
+        echo "                so nothing enforces them here no matter what the docs say."
+        echo "                → git pull --ff-only    (then restart this session)"
+        echo "────────────────────────────────────────────────────────────────"
+    elif [ "$GUARD_PRESENT" -eq 0 ]; then
+        # Vacuity: examining nothing must never render as a clean bill of health.
+        echo "[session-start] guards: CANNOT VERIFY (found none to check) — not a pass."
+    elif [ "$GUARD_DIFFERS" -gt 0 ]; then
+        echo "[session-start] guards: $GUARD_PRESENT present, $GUARD_DIFFERS differing from $GUARD_REF (expected on a branch that edits one)."
+    else
+        echo "[session-start] guards: $GUARD_PRESENT present and matching $GUARD_REF."
     fi
 fi
 
