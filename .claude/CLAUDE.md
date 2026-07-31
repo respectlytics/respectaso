@@ -34,7 +34,11 @@ where calling it is wrong. Skip it only for a trivial one-line answer.
 
 Backstop: `.claude/hooks/check-mobile-summary.sh`.
 
-### 2. Never stop silently with sensible next steps left — MANDATORY
+### 2. Never stop silently with sensible next steps left
+
+**The full rules are in `.claude/SESSION_END_LOOP.md`** — the canonical core,
+byte-identical in all five repos and enforced by CI. What follows is the summary;
+where the two differ, the canonical core wins. — MANDATORY
 
 Default ending for an interactive session: fire an **`AskUserQuestion`** with
 `multiSelect: true`, offering a substantive next task, two further genuinely
