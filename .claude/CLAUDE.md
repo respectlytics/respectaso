@@ -16,6 +16,17 @@ At the terminal completion of a substantive task, call the **`PushNotification`*
 tool once, as the last action: a status prefix (✅ SUCCESS / ⚠️ FAILED /
 ❓ NEEDS_INPUT) plus one or two phone-readable sentences. No code, no file paths.
 
+Wrap that summary in the literal marker block the hook looks for:
+
+```
+[MOBILE_SUMMARY]
+✅ SUCCESS - one or two sentences a person can read on a phone.
+[/MOBILE_SUMMARY]
+```
+
+Both markers, spelled exactly like that. The hook scans only the CURRENT turn, so
+a summary from an earlier task does not vouch for this one.
+
 An open question already pushes to the phone; a task that merely *finishes* does
 not. `PushNotification` reaches the phone when Remote Control is connected and
 degrades to a harmless desktop notification otherwise, so there is no session
