@@ -120,11 +120,14 @@ class ResolvePopularityTest(TempDataDirMixin, TestCase):
         res = resolve_popularity(self.FAKE_APPS, "tiny", "us")
         self.assertTrue(res.is_fallback)
 
-    def test_fallback_enqueues_term_for_enrichment(self):
+    def test_fallback_has_no_side_effects_when_not_connected(self):
+        """No enrichment queue exists; an unconnected install's fallback
+        is a pure local decision."""
         self.set_source(SOURCE_APPLE)
-        with patch("aso.apple_ads.sync.enqueue_term") as mock_enqueue:
-            resolve_popularity(self.FAKE_APPS, "New Keyword", "de")
-        mock_enqueue.assert_called_once_with("new keyword", "de")
+        with patch("aso.apple_ads.sync.ensure_country_dataset") as mock_ensure:
+            res = resolve_popularity(self.FAKE_APPS, "New Keyword", "de")
+        mock_ensure.assert_not_called()  # not connected -> no download
+        self.assertTrue(res.is_fallback)
 
     def test_apple_lookup_dict_bypasses_db(self):
         self.set_source(SOURCE_APPLE)
@@ -134,53 +137,103 @@ class ResolvePopularityTest(TempDataDirMixin, TestCase):
         self.assertEqual(res.effective, 55)
         self.assertEqual(res.source, "apple")
 
-    def test_missing_term_fetched_inline(self):
-        """A term with no local row is fetched synchronously, so the first
-        score of a new keyword already carries the real Apple value."""
+    def _connect_apple(self, country="us", week="2026-08-09"):
+        """Simulate a verified v1 connection with an active dataset week."""
+        from aso.apple_ads import storage as apple_storage
+
+        apple_storage.save_apple_settings(apple_ads={
+            "tested_ok": True,
+            "client_id": "SEARCHADS.c", "team_id": "SEARCHADS.t",
+            "key_id": "k", "ad_account_id": "1",
+            "active_weeks": {country: week},
+        })
+        patcher = patch("aso.apple_ads.keys.has_private_key", return_value=True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _dataset_row(self, term, popularity, country="us", week="2026-08-09"):
+        from datetime import date
+
+        from aso.models import AppleTopTerm
+
+        AppleTopTerm.objects.create(
+            term=term, country=country, genre="BUSINESS",
+            week=date.fromisoformat(week), rank_in_genre=1,
+            popularity_in_genre=90, popularity=popularity,
+            popularity_tier=4,
+        )
+
+    def test_missing_term_materialized_from_local_dataset(self):
+        """A term with no cache row is materialized from the local weekly
+        dataset (a table read), so the first score of a new keyword
+        already carries the real Apple value - no network involved."""
         self.set_source(SOURCE_APPLE)
-
-        def fake_ensure(terms, country):
-            for t in terms:
-                AppleSearchPopularity.objects.create(
-                    term=t, country=country, popularity=91
-                )
-
-        with patch(
-            "aso.apple_ads.sync.ensure_apple_values", side_effect=fake_ensure
-        ) as mock_ensure:
+        self._connect_apple()
+        self._dataset_row("trading", 91)
+        with patch("aso.apple_ads.sync.ensure_country_dataset") as mock_ensure:
             res = resolve_popularity(self.FAKE_APPS, "Trading", "us")
-        mock_ensure.assert_called_once_with(["trading"], "us")
+        mock_ensure.assert_not_called()  # dataset present -> pure local
         self.assertEqual(res.effective, 91)
         self.assertEqual(res.source, "apple")
         self.assertFalse(res.is_fallback)
+        # The cache row was materialized for future lookups.
+        self.assertEqual(
+            AppleSearchPopularity.lookup("trading", "us"), 91
+        )
 
-    def test_inline_fetch_regardless_of_selected_source(self):
+    def test_materialization_regardless_of_selected_source(self):
         """Both values are displayed everywhere, so the Apple value is
-        fetched even while the internal source is selected."""
-        with patch("aso.apple_ads.sync.ensure_apple_values") as mock_ensure:
-            res = resolve_popularity(self.FAKE_APPS, "trading", "us")
-        mock_ensure.assert_called_once_with(["trading"], "us")
+        materialized even while the internal source is selected."""
+        self._connect_apple()
+        self._dataset_row("trading", 88)
+        res = resolve_popularity(self.FAKE_APPS, "trading", "us")
         self.assertEqual(res.source, "internal")
+        self.assertEqual(res.apple, 88)
 
-    def test_known_term_never_refetched(self):
-        """Null rows mean Apple was already asked - no repeat fetch."""
+    def test_absent_term_materializes_definitive_null(self):
+        """A term missing from the active week is below Apple's reporting
+        threshold - an explicit null row records that definitively."""
+        self.set_source(SOURCE_APPLE)
+        self._connect_apple()
+        self._dataset_row("other term", 55)
+        res = resolve_popularity(self.FAKE_APPS, "obscure tail", "us")
+        self.assertTrue(res.is_fallback)
+        rows = AppleSearchPopularity.objects.filter(
+            term="obscure tail", country="us"
+        )
+        self.assertEqual(rows.count(), 1)
+        self.assertIsNone(rows.first().popularity)
+
+    def test_first_use_of_country_triggers_bounded_download(self):
+        """A country with no dataset at all triggers the single bounded
+        synchronous download path."""
+        self.set_source(SOURCE_APPLE)
+        self._connect_apple()  # active week for us only
+        with patch("aso.apple_ads.sync.ensure_country_dataset") as mock_ensure:
+            resolve_popularity(self.FAKE_APPS, "trading", "de")
+        mock_ensure.assert_called_once_with("de")
+
+    def test_known_term_never_rematerialized(self):
+        """Null cache rows mean the dataset was already consulted."""
+        self._connect_apple()
         AppleSearchPopularity.objects.create(
             term="fitness", country="us", popularity=None
         )
-        with patch("aso.apple_ads.sync.ensure_apple_values") as mock_ensure:
+        with patch("aso.apple_ads.sync.ensure_country_dataset") as mock_ensure:
             resolve_popularity(self.FAKE_APPS, "fitness", "us")
         mock_ensure.assert_not_called()
 
-    def test_apple_lookup_dict_never_triggers_fetch(self):
+    def test_apple_lookup_dict_never_triggers_materialization(self):
         """Batch paths prefetch up front; per-term resolution must not
-        issue its own requests when a lookup dict is supplied."""
-        with patch("aso.apple_ads.sync.ensure_apple_values") as mock_ensure:
+        do its own work when a lookup dict is supplied."""
+        self._connect_apple()
+        with patch("aso.apple_ads.sync.ensure_country_dataset") as mock_ensure:
             resolve_popularity(self.FAKE_APPS, "fitness", "us", apple_lookup={})
         mock_ensure.assert_not_called()
 
-    def test_fetch_failure_never_breaks_scoring(self):
+    def test_materialization_failure_never_breaks_scoring(self):
         with patch(
-            "aso.apple_ads.sync.ensure_apple_values",
+            "aso.popularity._materialize_apple_rows",
             side_effect=RuntimeError("boom"),
         ):
             res = resolve_popularity(self.FAKE_APPS, "trading", "us")
@@ -197,8 +250,33 @@ class ResolvePopularityTest(TempDataDirMixin, TestCase):
                 "popularity_apple",
                 "popularity_source",
                 "popularity_fallback",
+                "popularity_cap",
+                "popularity_genre",
             },
         )
+        # Non-fallback rows carry no cap context.
+        self.assertFalse(res.is_fallback)
+        self.assertIsNone(fields["popularity_cap"])
+        self.assertEqual(fields["popularity_genre"], "")
+
+    def test_popularity_fields_carry_cap_context_on_fallback(self):
+        """Fallback rows feed the badge popover the applied cap and the
+        display label of the category it came from."""
+        from aso.models import AppleTopTerm
+
+        AppleTopTerm.clear_floor_cache()
+        self.set_source(SOURCE_APPLE)
+        self._connect_apple()
+        self._dataset_row("other term", 55)  # BUSINESS floor 55 -> cap 54
+        business_apps = [
+            {**app, "primaryGenreName": "Business"} for app in self.FAKE_APPS
+        ]
+        res = resolve_popularity(business_apps, "obscure tail", "us")
+        self.assertTrue(res.is_fallback)
+        self.assertEqual(res.genre_hint, "BUSINESS")
+        fields = popularity_fields(res)
+        self.assertEqual(fields["popularity_cap"], 54)
+        self.assertEqual(fields["popularity_genre"], "Business")
 
     def test_no_network_in_resolution_module(self):
         """aso.popularity must never import HTTP clients - DB lookups only."""
@@ -347,17 +425,17 @@ class RefreshRowsEffectiveTest(TempDataDirMixin, TestCase):
         self.assertEqual(row["popularity_source"], "apple")
         self.assertFalse(row["popularity_fallback"])
 
-    def test_missing_apple_terms_enqueued_for_enrichment(self):
-        from unittest.mock import patch
-
+    def test_missing_apple_terms_fall_back_without_side_effects(self):
+        """Absence from the dataset is definitive for the active week -
+        there is no enrichment queue to feed anymore."""
         from aso.popularity import refresh_rows_effective
 
         source_row = self._row()
         source_row["popularity_apple"] = None
         self.set_source(SOURCE_APPLE)
-        with patch("aso.apple_ads.sync.enqueue_term") as mock_enqueue:
-            refresh_rows_effective([source_row], "us")
-        mock_enqueue.assert_called_once_with("fitness", "us")
+        refreshed = refresh_rows_effective([source_row], "us")
+        self.assertTrue(refreshed[0]["popularity_fallback"])
+        self.assertEqual(refreshed[0]["popularity_source"], "internal")
 
 
 class RowsSourceUsedTest(TestCase):
@@ -396,8 +474,10 @@ class PromptSourceNoteTest(TempDataDirMixin, TestCase):
         storage.save_apple_settings(popularity_source=SOURCE_APPLE)
         note = prompt_source_note()
         self.assertIn("Apple Ads", note)
-        self.assertIn("internal estimate", note)  # fallback rule declared
-        # Floor semantics: the model must not read clusters of 5s as
-        # proof of irrelevance.
-        self.assertIn("lowest value", note)
-        self.assertIn("not as evidence", note)
+        self.assertIn("estimate", note)  # fallback rule declared
+        # Threshold semantics: the model must not read below-threshold
+        # keywords as proof of irrelevance, and must know banded values
+        # are low by design.
+        self.assertIn("top 500 terms", note)
+        self.assertIn("capped just below", note)
+        self.assertIn("does not make the", note)

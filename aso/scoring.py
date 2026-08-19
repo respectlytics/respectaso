@@ -8,31 +8,41 @@ Used by both free (Dashboard, Opportunity page) and Pro features
 import math
 
 # Popularity → estimated daily searches (US App Store baseline).
-# Mirrors DownloadEstimator._POP_TO_SEARCHES in aso/services.py.
-_POP_TO_SEARCHES = [
-    (5, 1),
-    (10, 3),
-    (15, 5),
-    (20, 10),
-    (25, 20),
-    (30, 35),
-    (35, 55),
-    (40, 90),
+# THE canonical curve - DownloadEstimator imports it (no duplicate).
+#
+# Anchored to Apple's official top-search-terms dataset (Apple Ads
+# Platform API v1): only terms with roughly >= 500 weekly searches
+# (~70/day) are reported, and the observed dataset floor sits around
+# popularity 40 - the first hard absolute calibration point Apple has
+# ever provided. Both popularity sources speak this 1-100 scale
+# (estimate v2 is fitted to it), so one curve serves both:
+#   * 1-39: the below-top-terms region - linear ramp from ~1/day up to
+#     just under the ~70/day anchor.
+#   * 40-100: log-linear growth (~15%/point) from the anchor, slope
+#     cross-checked against within-genre rank data (Zipf over 500 ranks
+#     gives a ~320x #1-vs-#500 spread, matching e.g. "indeed" - US
+#     BUSINESS #1, value 79 - at roughly 16k searches/day).
+POP_TO_SEARCHES = [
+    (1, 1),
+    (20, 35),
+    (39, 65),
+    (40, 70),
     (45, 140),
-    (50, 200),
-    (55, 290),
-    (60, 400),
-    (65, 550),
-    (70, 750),
-    (75, 1_100),
-    (80, 2_000),
-    (85, 4_000),
-    (90, 8_000),
-    (95, 16_000),
-    (100, 32_000),
+    (50, 280),
+    (55, 570),
+    (60, 1_150),
+    (65, 2_300),
+    (70, 4_600),
+    (75, 9_300),
+    (80, 19_000),
+    (85, 38_000),
+    (90, 76_000),
+    (95, 152_000),
+    (100, 300_000),
 ]
+_POP_TO_SEARCHES = POP_TO_SEARCHES  # internal alias
 
-_MAX_SEARCHES = 32_000  # pop=100 baseline
+_MAX_SEARCHES = 300_000  # pop=100 baseline
 
 
 def _pop_to_searches(popularity: int) -> float:

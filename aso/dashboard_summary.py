@@ -514,4 +514,62 @@ def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
         "last_refresh": last_refresh,
         "callouts": callouts,
         "cta": cta,
+        # Apple Ads impression share (None when the app has no rows -
+        # Apple only reports terms where the app's own ads served, so the
+        # template renders the section only when data exists).
+        "impression_share": _impression_share_summary(selected_app),
     }
+
+
+def _impression_share_summary(app_id):
+    """Latest-week impression-share rows for the app, display-ready.
+
+    Returns None when no rows exist (the common case: no ads serving) -
+    no dead UI ever renders for it.
+    """
+    from datetime import timedelta
+
+    from .models import AppleImpressionShare
+
+    latest_week = (
+        AppleImpressionShare.objects.filter(app_id=app_id)
+        .order_by("-week")
+        .values_list("week", flat=True)
+        .first()
+    )
+    if latest_week is None:
+        return None
+    rows = list(
+        AppleImpressionShare.objects.filter(app_id=app_id, week=latest_week)
+        .order_by("-low_share")[:8]
+    )
+    previous = {
+        (r.search_term, r.country): r.low_share
+        for r in AppleImpressionShare.objects.filter(
+            app_id=app_id, week=latest_week - timedelta(days=7)
+        )
+    }
+
+    def share_label(row):
+        if row.high_share == 0:
+            return "under 1%"
+        if row.low_share >= 0.91:
+            return "91-100%"
+        return f"{round(row.low_share * 100)}%"
+
+    display = []
+    for row in rows:
+        prev_share = previous.get((row.search_term, row.country))
+        delta = None
+        if prev_share is not None:
+            moved = round((row.low_share - prev_share) * 100)
+            delta = moved if abs(moved) >= 2 else None
+        display.append({
+            "term": row.search_term,
+            "country": row.country.upper(),
+            "share": share_label(row),
+            "rank": row.rank,
+            "tier": row.popularity_tier,
+            "delta": delta,
+        })
+    return {"week": latest_week, "rows": display}

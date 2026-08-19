@@ -125,6 +125,7 @@ def _refresh_pair(keyword_obj, country):
     return SearchResult.upsert_today(
         keyword=keyword_obj,
         popularity_score=pop.internal,
+        inferred_genre=pop.genre_hint,
         apple_popularity_score=pop.apple,
         difficulty_score=difficulty_score,
         difficulty_breakdown=breakdown,
@@ -296,7 +297,17 @@ _scheduler_lock = threading.Lock()
 
 
 def start_scheduler():
-    """Start the background scheduler thread (idempotent)."""
+    """Start the background scheduler thread (idempotent).
+
+    RESPECTASO_DISABLE_SCHEDULER=1 keeps it off - used by scratch/E2E
+    servers so background refreshes and Apple syncs never mutate seeded
+    data or hit live APIs mid-test.
+    """
+    import os
+
+    if os.environ.get("RESPECTASO_DISABLE_SCHEDULER") == "1":
+        logger.info("Auto-refresh scheduler disabled via environment.")
+        return
     global _scheduler_started
     with _scheduler_lock:
         if _scheduler_started:

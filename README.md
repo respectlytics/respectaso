@@ -18,7 +18,7 @@ RespectASO helps iOS developers research App Store keywords privately. Download 
 
 Most ASO tools require paid subscriptions, API keys, and send your keyword research to their servers. RespectASO takes a different approach:
 
-- **No API keys or credentials needed** — uses only the public iTunes Search API
+- **No API keys or credentials needed** - works out of the box with the public iTunes Search API; connecting Apple Ads for official popularity data is optional
 - **Runs entirely on your machine** — all API calls originate from your local network
 - **No telemetry, no analytics, no tracking** — zero data sent to any third party
 - **Free and open-source** — AGPL-3.0 licensed, forever
@@ -28,7 +28,7 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 
 | Feature | Description |
 |---------|-------------|
-| **Keyword Popularity** | Estimated popularity scores (1–100) based on analysis of iTunes Search API competitor data |
+| **Keyword Popularity** | Popularity scores (1–100): a built-in estimate calibrated against Apple's official search-popularity data - or, optionally, Apple's own weekly values via your Apple Ads connection |
 | **Difficulty Score** | Competition difficulty analysis across multiple factors with ranking tier breakdowns for Top 5, Top 10, and Top 20 |
 | **Ranking Tiers** | Separate difficulty analysis for Top 5, Top 10, and Top 20 positions — because breaking into the top 5 is different from reaching the top 20 |
 | **Download Estimates** | Estimated daily downloads per ranking position based on search volume, tap-through rates, and conversion rates |
@@ -119,7 +119,7 @@ docker compose down -v  # Also remove the volume (only after confirming native a
 
 ## How Scoring Works
 
-RespectASO uses the **iTunes Search API** as its only data source — no Apple Search Ads credentials, no scraping, no paid APIs.
+RespectASO uses the public **iTunes Search API** plus - when you choose to connect it - the official **Apple Ads Platform API** with your own free API key. No scraping, no private APIs, no paid data services.
 
 ### Popularity Score (1–100)
 
@@ -171,8 +171,8 @@ RespectASO is designed with privacy as a core principle:
 - **100% local** — the tool runs entirely on your machine as a native app
 - **No accounts** — no registration, no login, no user tracking
 - **No telemetry** — zero analytics, zero phone-home, zero data collection
-- **No API keys** — uses only the public iTunes Search API (no credentials required)
-- **No third-party services** — all API calls go directly from your machine to Apple's public API
+- **No API keys required** - the public iTunes Search API needs no credentials; the optional Apple Ads connection uses your own key, which never leaves your machine
+- **No third-party services** - all API calls go directly from your machine to Apple
 - **Your data stays yours** — keyword research, competitor analysis, and search history never leave your network
 
 We built RespectASO because we believe developers should be able to research keywords without handing their competitive intelligence to a third party.

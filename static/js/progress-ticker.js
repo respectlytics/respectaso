@@ -221,6 +221,13 @@
         if (oppEl) oppEl.textContent = Math.round(opp);
     }
 
+    /** Format seconds as a compact human duration: "45s", "3m 12s". */
+    function fmtThinkDuration(secs) {
+        secs = Math.max(0, Math.round(secs));
+        if (secs < 60) return secs + 's';
+        return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+    }
+
     /**
      * Show the AI thinking state with neural network animation.
      */
@@ -236,6 +243,12 @@
         var lg = data.local_gen;
         var isLocal = (data.phase_label || '').indexOf('Local AI') !== -1 || !!(lg && lg.running);
 
+        // Server-stamped start of the current AI phase (epoch seconds) -
+        // survives page reloads, so the elapsed display never lies.
+        var thinkSecs = data.thinking_since
+            ? Math.max(0, Date.now() / 1000 - data.thinking_since) : 0;
+        var deadlineMin = data.deadline_minutes || 60;
+
         // "It's alive" signal: loading vs writing + a word count that keeps moving.
         var subtext = document.getElementById('ai-thinking-subtext');
         if (subtext) {
@@ -246,21 +259,32 @@
                     var spd = lg.tps ? ' · ~' + lg.tps + ' tokens/sec' : '';
                     subtext.textContent = 'Writing the response… ~' + lg.words + ' words (' + Math.round(lg.secs) + 's)' + spd;
                 }
+            } else if (thinkSecs >= 5) {
+                subtext.textContent = 'Waiting for the model’s response… (' + fmtThinkDuration(thinkSecs) + ')';
             } else {
                 subtext.textContent = 'This may take a moment…';
             }
         }
 
-        // Escalating guidance when a single local step runs unusually long, so the
+        // Escalating guidance when a single step runs unusually long, so the
         // user knows it isn't frozen — and that switching models is an option.
         var guidance = document.getElementById('ai-thinking-guidance');
         if (guidance) {
             var msg = '';
             var secs = (isLocal && lg && lg.running) ? lg.secs : 0;
-            if (secs >= 1200) {            // 20+ minutes on one step
+            if (secs >= 1200) {            // 20+ minutes on one local step
                 msg = 'This step has been running over 20 minutes. It hasn’t frozen — local generation is just slow for this demanding workload. You can keep waiting, or cancel and use a cloud provider for a quick result.';
-            } else if (secs >= 480) {      // 8+ minutes on one step
+            } else if (secs >= 480) {      // 8+ minutes on one local step
                 msg = 'Still working — local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
+            } else if (!isLocal && thinkSecs >= 900) {   // 15+ minutes waiting on a cloud model
+                msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + ' — this model appears heavily '
+                    + 'queued right now. RespectASO gives up after ' + deadlineMin + ' minutes '
+                    + '(your AI response deadline). You can keep waiting, or cancel and pick a '
+                    + 'faster model in Settings → AI Configuration.';
+            } else if (!isLocal && thinkSecs >= 180) {   // 3+ minutes waiting on a cloud model
+                msg = 'The model is responding unusually slowly. Nothing is frozen — RespectASO '
+                    + 'is still waiting, and gives up after ' + deadlineMin + ' minutes '
+                    + '(your AI response deadline).';
             }
             if (msg) {
                 guidance.textContent = msg;

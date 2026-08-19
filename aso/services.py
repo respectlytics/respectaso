@@ -285,16 +285,61 @@ class PopularityEstimator:
          exact phrase in their title, the keyword itself is a known search term
     """
 
+    # Calibrated weights (estimate v2) - fitted 2026-08-17 against 327
+    # official Apple searchPopularity1to100 values (US, week of
+    # 2026-08-09) plus 90 below-top-terms negatives, via
+    # `manage.py apple_estimator_study`. Validation on a 30% holdout:
+    # Spearman 0.61, Pearson 0.65, MAE 8.6; brand-like subset Spearman
+    # 0.71 (previous hand-tuned weights: 0.09); head-vs-tail AUC 0.98.
+    # NEVER hand-tune these: refit with the study command under its
+    # pre-registered gates (see scoring-principles instructions).
+    V2_WEIGHTS = {
+        "intercept": 3.6672,
+        "f_result": 1.0404,
+        "f_leader": -1.9714,
+        "f_title": 0.6129,
+        "f_depth": 2.9001,
+        "f_spec": 0.8644,
+        "f_exact": -0.338,
+        "x_top1_exact": 2.1709,
+        "x_leader_mag": 8.1524,
+    }
+
     def estimate(self, competitors: list[dict], keyword: str) -> int | None:
         """
-        Estimate popularity score for a keyword based on competitor data.
+        Estimate popularity for a keyword, calibrated to Apple's scale.
 
-        Args:
-            competitors: List of app dicts from ITunesSearchService.
-            keyword: The search keyword.
+        The estimate is a weighted sum of observable signal components
+        (see signal_components), with weights fitted against Apple's
+        official search popularity values - so the output speaks the
+        same 1-100 language as the Apple Ads source: reported head
+        keywords land around 40+, below-top-terms keywords land lower.
 
         Returns:
-            Estimated popularity score (5–100), or None if no data.
+            Estimated popularity (1-100), or None if no data.
+        """
+        components = self.signal_components(competitors, keyword)
+        if components is None:
+            return None
+        raw = self.V2_WEIGHTS["intercept"] + sum(
+            weight * components[name]
+            for name, weight in self.V2_WEIGHTS.items()
+            if name != "intercept"
+        )
+        return int(round(max(1, min(100, raw))))
+
+    def signal_components(self, competitors: list[dict], keyword: str) -> dict | None:
+        """Observable signal components feeding estimate() - and the ONLY
+        feature extractor `manage.py apple_estimator_study` uses, so the
+        fitted weights and the shipped code can never drift apart.
+
+        Returns the six classic components (post-dampening, as before)
+        plus two brand-aware magnitudes:
+          x_top1_exact  - log10 review count of the strongest exact-title
+                          match in the top 5 (separates popular brands
+                          like "indeed" from unknown names)
+          x_leader_mag  - log10 review count of the strongest top-half app
+        or None when there are no competitors.
         """
         if not competitors:
             return None
@@ -303,30 +348,29 @@ class PopularityEstimator:
         kw_lower = keyword.lower().strip()
         word_count = len(kw_lower.split()) if kw_lower else 1
 
-        # Signal 1: Result count (0–25 points)
+        # Signal 1: Result count (0-25 points)
         # More results = broader / more-popular search term
         result_score = min(25, n * 2.5)
 
-        # Signal 2: Leader strength (0–30 points)
-        # Only consider apps in the top half — tail apps are often
+        # Signal 2: Leader strength (0-30 points)
+        # Only consider apps in the top half - tail apps are often
         # backfill from broader terms (e.g. Pokémon GO at #24).
-        # Uses smooth log interpolation (same approach as difficulty
-        # sub-scores) to avoid cliff effects between bands.
+        # Smooth log interpolation avoids cliff effects between bands.
         top_half = competitors[: max(n // 2, 1)]
         max_reviews = max(c.get("userRatingCount", 0) for c in top_half)
+        leader_bands = [
+            (10, 1),
+            (100, 5),
+            (1_000, 10),
+            (10_000, 17),
+            (100_000, 24),
+            (1_000_000, 30),
+        ]
         if max_reviews <= 0:
             leader_score = 0
         elif max_reviews >= 1_000_000:
             leader_score = 30
         else:
-            leader_bands = [
-                (10, 1),
-                (100, 5),
-                (1_000, 10),
-                (10_000, 17),
-                (100_000, 24),
-                (1_000_000, 30),
-            ]
             leader_score = 0
             for i, (threshold, score) in enumerate(leader_bands):
                 if max_reviews < threshold:
@@ -342,12 +386,15 @@ class PopularityEstimator:
             else:
                 leader_score = 30
 
-        # Signal 3: Title match density (0–20 points)
+        # Signal 3: Title match density (0-20 points)
         # Strong title targeting (exact/all-word) is demand evidence.
+        # Also collects the strongest exact-match leader in the top 5
+        # for the x_top1_exact brand signal.
         title_matches = 0
         exact_phrase_matches = 0
         relevance_sum = 0.0
-        for c in competitors:
+        best_exact_reviews = 0
+        for index, c in enumerate(competitors):
             evidence = _keyword_title_evidence(
                 kw_lower,
                 c.get("trackName", ""),
@@ -357,13 +404,16 @@ class PopularityEstimator:
             if evidence["exact_phrase"]:
                 title_matches += 1
                 exact_phrase_matches += 1
+                if index < 5:
+                    best_exact_reviews = max(
+                        best_exact_reviews, c.get("userRatingCount", 0)
+                    )
             elif evidence["all_words"]:
                 title_matches += 1
         match_ratio = title_matches / n if n > 0 else 0
         title_score = min(20, match_ratio * 40)
 
-        # Signal 4: Market depth — median reviews (0–10 points)
-        # Uses smooth log interpolation to avoid cliff effects.
+        # Signal 4: Market depth - median reviews (0-10 points)
         sorted_counts = sorted(
             c.get("userRatingCount", 0) for c in competitors
         )
@@ -373,19 +423,12 @@ class PopularityEstimator:
             median = (
                 sorted_counts[n // 2 - 1] + sorted_counts[n // 2]
             ) / 2
-
+        depth_bands = [(10, 0.5), (100, 3), (1_000, 5), (10_000, 8), (50_000, 10)]
         if median <= 0:
             depth_score = 0
         elif median >= 50_000:
             depth_score = 10
         else:
-            depth_bands = [
-                (10, 0.5),
-                (100, 3),
-                (1_000, 5),
-                (10_000, 8),
-                (50_000, 10),
-            ]
             depth_score = 0
             for i, (threshold, score) in enumerate(depth_bands):
                 if median < threshold:
@@ -402,21 +445,14 @@ class PopularityEstimator:
                 depth_score = 10
 
         # Signal 5: Keyword specificity penalty (-5 to -30 points)
-        # Long-tail keywords (more words) have inherently lower search
-        # volume. "card value scanner" (3 words) gets more searches
-        # than "card value scanner for pokemon" (5 words). This is the
-        # strongest differentiator between head and long-tail terms.
-        #
-        # Smooth interpolation between calibration points instead of
-        # hard step function.  Calibration: 1→0, 2→-3, 3→-8, 4→-15,
-        # 5→-22, 6+→-28.
+        # Long-tail keywords (more words) have inherently lower volume.
         _sp_points = [(1, 0), (2, -3), (3, -8), (4, -15), (5, -22), (6, -28)]
         if word_count <= 1:
             specificity_penalty = 0
         elif word_count >= 6:
             specificity_penalty = -28
         else:
-            # Linear interpolation between the two bracketing points
+            specificity_penalty = -28
             for i in range(len(_sp_points) - 1):
                 lo_w, lo_v = _sp_points[i]
                 hi_w, hi_v = _sp_points[i + 1]
@@ -424,47 +460,36 @@ class PopularityEstimator:
                     t = (word_count - lo_w) / (hi_w - lo_w)
                     specificity_penalty = lo_v + t * (hi_v - lo_v)
                     break
-            else:
-                specificity_penalty = -28
 
-        # Signal 6: Exact phrase match bonus (0–15 points)
-        # If competitors have the EXACT keyword phrase in their title,
-        # it's a known, established search term that developers target.
-        # "card value scanner" appears in many titles → real search term.
-        # "card value scanner for pokemon" appears in zero → niche query.
+        # Signal 6: Exact phrase match ratio (0-15 points)
         exact_ratio = exact_phrase_matches / n if n > 0 else 0
         exact_bonus = min(15, exact_ratio * 50)
 
-        # --- Small sample dampening ---
-        # Ratio-based signals (title_score, exact_bonus) are unreliable
-        # when there are few results: 1/1 = 100% is a math artifact,
-        # not real demand evidence.  Instead of a hard cutoff, we use
-        # a smooth linear ramp that reaches full strength at n = 10.
+        # Small-sample dampening: ratio signals are unreliable with few
+        # results; smooth ramp to full strength at n = 10.
         sample_dampening = min(1.0, n / 10)
         title_score *= sample_dampening
         exact_bonus *= sample_dampening
 
-        # --- Backfill-aware dampening ---
-        # When few competitors have the keyword in their title, Apple
-        # is padding results with unrelated apps.  The high result
-        # count is artificial and shouldn’t count at full weight.
-        #
-        # Partial overlap is allowed only as weak evidence.
+        # Backfill-aware dampening: when few competitors carry the
+        # keyword in their title, Apple padded the results - volume
+        # signals count at reduced weight.
         relevance_ratio = relevance_sum / n if n > 0 else 0
         relevance = max(0.3, min(1.0, relevance_ratio * 2.6))
         result_score *= relevance
         leader_score *= relevance
         depth_score *= relevance
 
-        total = int(
-            result_score
-            + leader_score
-            + title_score
-            + depth_score
-            + specificity_penalty
-            + exact_bonus
-        )
-        return max(5, min(100, total))
+        return {
+            "f_result": result_score,
+            "f_leader": leader_score,
+            "f_title": title_score,
+            "f_depth": depth_score,
+            "f_spec": specificity_penalty,
+            "f_exact": exact_bonus,
+            "x_top1_exact": math.log10(1 + best_exact_reviews),
+            "x_leader_mag": math.log10(1 + max_reviews),
+        }
 
 
 # --------------------------------------------------------------------------- #
@@ -997,41 +1022,30 @@ class DownloadEstimator:
     All numbers are rough estimates shown as ranges (low–high).
     """
 
-    # Popularity score → estimated daily searches.
-    # Piecewise-linear mapping from ASO industry data.
-    # Calibrated against real App Store data.
-    # Apple does not publish search volumes; these are conservative
-    # estimates cross-checked with real download / rank observations.
-    # Anchor: popularity 68, rank #8  →  low single-digit downloads/day
-    # for early-stage apps in competitive categories.
-    #
-    # The growth rate accelerates above pop 75 because Apple's
-    # popularity scale is roughly logarithmic — each point at
-    # the top represents a much larger absolute search increment
-    # than at the bottom.
-    _POP_TO_SEARCHES = [
-        # (popularity, daily_searches)
-        (5, 1),
-        (10, 3),
-        (15, 5),
-        (20, 10),
-        (25, 20),
-        (30, 35),
-        (35, 55),
-        (40, 90),
-        (45, 140),
-        (50, 200),
-        (55, 290),
-        (60, 400),
-        (65, 550),
-        (70, 750),
-        (75, 1_100),
-        (80, 2_000),
-        (85, 4_000),
-        (90, 8_000),
-        (95, 16_000),
-        (100, 32_000),
-    ]
+    # Popularity → estimated daily searches: the canonical curve lives
+    # in aso.scoring.POP_TO_SEARCHES (threshold-anchored to Apple's
+    # official dataset; see the derivation comment there). Both
+    # popularity sources speak the same calibrated 1-100 scale since
+    # estimate v2, so one curve serves everything - no source switching.
+
+    def _daily_searches(self, popularity: int) -> float:
+        """Interpolate daily search volume from popularity score."""
+        from .scoring import POP_TO_SEARCHES
+
+        if popularity is None or popularity <= 0:
+            return 0
+        pts = POP_TO_SEARCHES
+        if popularity <= pts[0][0]:
+            return pts[0][1] * (popularity / pts[0][0])
+        if popularity >= pts[-1][0]:
+            return pts[-1][1]
+        for i in range(1, len(pts)):
+            p0, s0 = pts[i - 1]
+            p1, s1 = pts[i]
+            if popularity <= p1:
+                ratio = (popularity - p0) / (p1 - p0)
+                return s0 + ratio * (s1 - s0)
+        return pts[-1][1]
 
     # Position → tap-through rate (fraction of searchers who tap).
     #
@@ -1080,7 +1094,7 @@ class DownloadEstimator:
     _CVR_HIGH = 0.20
 
     # Market-size multiplier: scales search volumes relative to US.
-    # _POP_TO_SEARCHES is calibrated for the US App Store (~180 M iPhones).
+    # POP_TO_SEARCHES is calibrated for the US App Store (~180 M iPhones).
     # Smaller markets have proportionally fewer searches for the same
     # popularity score.  Factors derived from estimated active-iPhone
     # installed base per country relative to the US.
@@ -1137,25 +1151,6 @@ class DownloadEstimator:
         "ug": 0.02,
     }
     _MARKET_SIZE_DEFAULT = 0.03
-
-
-
-    def _daily_searches(self, popularity: int) -> float:
-        """Interpolate daily search volume from popularity score."""
-        if popularity is None or popularity <= 0:
-            return 0
-        pts = self._POP_TO_SEARCHES
-        if popularity <= pts[0][0]:
-            return pts[0][1] * (popularity / pts[0][0])
-        if popularity >= pts[-1][0]:
-            return pts[-1][1]
-        for i in range(1, len(pts)):
-            p0, s0 = pts[i - 1]
-            p1, s1 = pts[i]
-            if popularity <= p1:
-                ratio = (popularity - p0) / (p1 - p0)
-                return s0 + ratio * (s1 - s0)
-        return pts[-1][1]
 
     def estimate(
         self,

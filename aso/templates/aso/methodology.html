@@ -51,13 +51,14 @@
                 <a href="{% url 'aso:settings_popularity' %}" class="text-purple-400 hover:text-purple-300">Settings → Popularity Source</a>:
                 the <span class="text-white font-medium">RespectASO estimate</span> (built-in, works everywhere) and
                 <span class="text-white font-medium">Apple Ads popularity</span> (Apple's own measurement, connected through your
-                Apple Ads account). Both are shown side by side wherever popularity appears; exactly one - your selected
+                Apple Ads account). Every popularity value shows which source produced it, and the other source's
+                value is always one hover away on its badge; exactly one - your selected
                 source - feeds opportunity, classification, and download estimates.
             </p>
             <h3 class="text-white font-medium text-sm">The RespectASO estimate</h3>
             <p>
-                The estimate (5–100) is derived from the competitive landscape of each keyword.
-                Since Apple doesn't publish exact search volumes, we read six observable signals:
+                The estimate (1–100) is derived from the competitive landscape of each keyword.
+                Since Apple doesn't publish exact search volumes, we read observable signals:
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <div class="flex items-start gap-3">
@@ -85,36 +86,67 @@
                     <div><span class="text-white font-medium">Exact phrase bonus</span> <span class="text-slate-500">— If many apps match the exact phrase in their title, the keyword likely has meaningful search volume.</span></div>
                 </div>
             </div>
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Calibrated against Apple's official data</h3>
+                <p class="text-slate-400">
+                    Since estimate v2, the signal weights are not hand-tuned: they are fitted against
+                    hundreds of official Apple search-popularity values from the Apple Ads top-terms
+                    dataset, plus keywords provably outside Apple's top terms. The estimate therefore
+                    speaks Apple's 1–100 scale - keywords Apple reports land around 40 and up, and the
+                    fit separates genuinely popular brand keywords from unknown names using the same
+                    observable signals (a dominant exact-match app with millions of ratings reads very
+                    differently from an obscure one). Validation on held-out data: rank correlation
+                    0.61 with Apple's values, and 0.71 on brand-like keywords - the previous hand-tuned
+                    weights measured 0.37 and 0.09.
+                </p>
+                <p class="text-slate-400">
+                    Honest limits: below Apple's reporting bar there is no ground truth, so ordering
+                    among long-tail keywords remains heuristic; and no signal-based method can see raw
+                    search logs. The estimate stays an estimate - now a measured one.
+                </p>
+            </div>
             <p>
                 Keep in mind that popularity is an estimate, not an exact measurement. A score of 60 doesn't mean "60 searches per day" — it
                 means the competitive signals suggest significantly above-average search volume.
             </p>
-            <h3 class="text-white font-medium text-sm">Apple Ads popularity</h3>
+            <h3 class="text-white font-medium text-sm">Apple Ads popularity (official API)</h3>
             <p>
-                When you connect your Apple Ads account, RespectASO can fetch Apple's own search popularity -
-                the same granular 5–100 values Apple's own keyword planner reports.
-                It works for any keyword you track (no ads or spend required), refreshed automatically once a day.
-                Note that 5 is the lowest value on Apple's scale and many keywords come back at exactly 5 -
-                Apple's data does not differentiate between them, while the RespectASO estimate keeps
-                differentiating in that range.
-                Very-low-volume keywords have no Apple value; those automatically use the RespectASO estimate
-                instead, marked with a visible <span class="text-amber-300 font-mono text-xs">EST*</span> indicator so
-                you always know which source produced a number.
+                When you connect Apple Ads (a free, one-time API key setup - no ads or spend required),
+                RespectASO syncs Apple's official <strong class="text-white">top search terms dataset</strong> from the
+                Apple Ads Platform API: per storefront and week, the most-searched terms in each of Apple's 15 categories,
+                with a granular 1–100 popularity value, category rank, and Apple's 1–5 tier.
+                A new week is published by Apple every Monday and picked up automatically.
+            </p>
+            <p>
+                Apple reports each category's top 500 most-searched terms per storefront, and reported values start
+                around 40 on the 1–100 scale. A keyword outside that list has no Apple value - which is itself real
+                information: Apple is indicating it ranks below every reported term of its category. Under the Apple
+                source such keywords score from the RespectASO estimate,
+                <span class="text-white">capped just below the least-reported value of their own category</span>, marked
+                with a visible <span class="text-slate-300 font-mono text-xs">EST*</span> indicator, so a keyword outside
+                Apple's list can never outrank its category's reported terms while long-tail keywords still rank
+                sensibly against each other. Hovering the indicator shows the exact numbers: the raw estimate, the cap,
+                and the category floor it came from.
+                Storefronts where Apple Ads does not operate (for example Russia) use the estimate unchanged.
+            </p>
+            <p class="text-slate-400 text-xs">
+                One honest nuance: an install using the Apple source and an install using the estimate speak different
+                units - the same keyword can carry different numbers in each, by design. Within one install, everything
+                is always consistent, and both values stay a hover away on every keyword's source badge.
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <h3 class="text-white font-medium text-sm">Why we offer both - and never just pass Apple's number through</h3>
                 <p class="text-slate-400">
-                    Apple's popularity looks authoritative - it comes from Apple - but it's a metric designed for ad
-                    bidders, not a measurement of organic search volume, and Apple publishes no methodology for it.
-                    It has also shifted without notice: in late September 2025 it collapsed 77% in four days across every
-                    tool that reads it - MobileAction, AppFigures, Phiture, Astro, Radaso, and APPlyzer all publicly
-                    confirmed the break. Similar silent shifts happened in June 2024 and March 2026.
+                    Apple's popularity is Apple's own measurement, now published through an official, documented API -
+                    but it covers only the top of the market (its top search terms per category), it is weekly rather
+                    than real-time, and Apple publishes no methodology for the value itself.
                 </p>
                 <p class="text-slate-400">
-                    That history is why the RespectASO estimate stays first-class: it's fully inspectable, works in every
-                    storefront for every keyword, and doesn't move when Apple's backend does. And it's why, when you choose
-                    Apple as your source, the estimate remains your automatic safety net for keywords Apple has no value for.
-                    Whichever source you pick, both numbers stay visible so nothing is hidden from you.
+                    That is why the RespectASO estimate stays first-class: it's fully inspectable, works in every
+                    storefront for every keyword instantly, and it is your automatic safety net wherever Apple has no
+                    value. Apple's threshold has also given the estimate its first hard calibration point - download
+                    estimates under the Apple source are anchored to Apple's roughly-500-searches-per-week reporting bar.
+                    Whichever source you pick, the other number is never hidden - it's one hover away on every badge.
                 </p>
                 <p>
                     <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
@@ -442,9 +474,12 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                All keyword research data comes from Apple's public <strong class="text-white">iTunes Search API</strong>.
+                Keyword research data comes from Apple's public <strong class="text-white">iTunes Search API</strong>,
+                plus - when you choose to connect it - the official <strong class="text-white">Apple Ads Platform API</strong>
+                using your own Apple Ads API credentials.
                 RespectASO does not use private APIs, scraping, or any data source that violates Apple's terms of service.
-                The free features run entirely on your machine — no data is sent to third-party servers.
+                The free features run entirely on your machine — no data is sent to third-party servers, and your Apple
+                Ads key never leaves your computer.
             </p>
             <p>
                 Pro AI features (AI Niche Researcher, AI Competitor Analyzer, ASO Score Simulator) send your keyword and metadata inputs to the AI provider you choose — OpenAI, Anthropic, Google Gemini, or OpenRouter (using your own API key), or a local AI model you run yourself. With OpenRouter, your request is routed onward to the host of the model you select. No data is sent anywhere else.

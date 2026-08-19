@@ -11,13 +11,20 @@
  *   popularity_apple      - Apple Ads value (null when Apple has none)
  *   popularity_source     - "internal" | "apple" (source of `popularity`)
  *   popularity_fallback   - true when Apple is selected but had no value
+ *   popularity_cap        - fallback rows: the cap applied to the estimate
+ *                           (genre floor - 1); null when the storefront has
+ *                           no Apple dataset (the estimate stands uncapped)
+ *   popularity_genre      - fallback rows: display label of the category
+ *                           the cap came from ("" when uninferred)
  *
- * Layout (centered): effective value + source badge (EST / ASA / amber EST*
- * fallback), with the other source's value on a second line when it exists.
- * When the Apple integration is connected (window.APPLE_POP_CONFIGURED,
- * set by base.html) but has no value for a keyword, an explicit muted
- * "no Apple data" line is shown - visible on screen, not tooltip-only.
- * When Apple was never connected, no second line renders.
+ * Layout: ONE number per cell - the effective value plus a source badge
+ * (EST / ASA / EST* fallback). Everything else lives in the badge's hover
+ * popover: what the source is, the other source's value for comparison,
+ * and on fallback rows the full cap story with the row's own numbers
+ * (raw estimate, cap, category floor) - the cap is explained, never
+ * hidden, but no longer competes with the score in the table.
+ * Rows from sessions stored before the cap fields existed degrade to a
+ * generic fallback explanation.
  */
 (function (global) {
     'use strict';
@@ -26,18 +33,17 @@
         est: {
             cls: 'bg-slate-700/40 text-slate-300 border border-white/10',
             label: 'EST',
-            tip: 'RespectASO estimate - the active source powering your scores.',
         },
         asa: {
             cls: 'bg-sky-900/40 text-sky-300 border border-sky-500/30',
             label: 'ASA',
-            tip: 'Apple Ads search popularity - the active source powering your scores.',
         },
+        // Deliberately as quiet as EST: fallback is the NORMAL case for
+        // long-tail keywords under the Apple source, not a warning. Blue
+        // ASA is the scannable "official value" signal.
         fallback: {
-            cls: 'bg-amber-900/40 text-amber-300 border border-amber-500/30',
+            cls: 'bg-slate-700/40 text-slate-300 border border-white/10',
             label: 'EST*',
-            tip: 'Apple Ads has no value for this keyword in this storefront, '
-                + 'so the RespectASO estimate is used instead.',
         },
     };
 
@@ -46,73 +52,181 @@
     }
 
     /**
-     * Resolve badge + optional secondary line for a scored row.
-     * Older stored sessions without the dual fields degrade to a plain
-     * EST badge with no secondary line.
+     * Badge + popover content for a scored row. Returns
+     * {badge, heading, paragraphs, note} - `note` is the muted footer line
+     * (the other source's value for comparison, when one exists).
      */
-    function resolveParts(row) {
+    function resolveTip(row) {
         var internal = ('popularity_internal' in row) ? row.popularity_internal : row.popularity;
         var apple = ('popularity_apple' in row) ? row.popularity_apple : null;
         var source = row.popularity_source || 'internal';
         var appleConfigured = !!global.APPLE_POP_CONFIGURED;
+        var hasInternal = internal !== null && internal !== undefined;
 
         if (row.popularity_fallback) {
-            return { badge: BADGES.fallback, secondary: 'no Apple data', muted: true };
+            if (!('popularity_cap' in row)) {
+                // Row stored before the cap fields existed.
+                return {
+                    badge: BADGES.fallback,
+                    heading: 'Not in Apple\'s top terms',
+                    paragraphs: [
+                        'This keyword is outside Apple\'s published top search terms '
+                        + 'for this storefront, so RespectASO\'s estimate powers the '
+                        + 'score - calibrated to the same 1-100 scale as Apple\'s values.',
+                    ],
+                    note: '',
+                };
+            }
+            var cap = row.popularity_cap;
+            if (cap === null || cap === undefined) {
+                return {
+                    badge: BADGES.fallback,
+                    heading: 'No Apple data for this storefront',
+                    paragraphs: [
+                        'Apple publishes no search-popularity data for this '
+                        + 'storefront, so RespectASO\'s estimate powers the score directly.',
+                    ],
+                    note: '',
+                };
+            }
+            var where = row.popularity_genre
+                ? 'the ' + row.popularity_genre + ' category' : 'its category';
+            var absentPara = 'Apple lists each category\'s ~500 most-searched terms, '
+                + 'and this keyword is not among them for ' + where
+                + ' in this storefront this week.';
+            if (hasInternal && internal > cap) {
+                return {
+                    badge: BADGES.fallback,
+                    heading: 'Not in Apple\'s top terms - capped',
+                    paragraphs: [
+                        absentPara,
+                        'It cannot score above Apple\'s lowest reported value there ('
+                        + (cap + 1) + '), so RespectASO\'s estimate of ' + internal
+                        + ' is scored as ' + cap + '.',
+                    ],
+                    note: '',
+                };
+            }
+            return {
+                badge: BADGES.fallback,
+                heading: 'Not in Apple\'s top terms',
+                paragraphs: [
+                    absentPara,
+                    'RespectASO\'s estimate' + (hasInternal ? ' (' + internal + ')' : '')
+                    + ' already sits below Apple\'s lowest reported value there ('
+                    + (cap + 1) + '), so it powers the score unchanged.',
+                ],
+                note: '',
+            };
         }
         if (source === 'apple') {
             return {
                 badge: BADGES.asa,
-                secondary: (internal !== null && internal !== undefined) ? 'EST: ' + internal : '',
-                muted: false,
+                heading: 'Apple Ads popularity',
+                paragraphs: [
+                    'Apple\'s official search popularity for this storefront, '
+                    + 'updated weekly - the active source powering your scores.',
+                ],
+                note: hasInternal ? 'RespectASO estimate for comparison: ' + internal : '',
             };
         }
+        var note = '';
         if (apple !== null && apple !== undefined) {
-            return { badge: BADGES.est, secondary: 'ASA: ' + apple, muted: false };
+            note = 'Apple\'s official value for comparison: ' + apple;
+        } else if (appleConfigured) {
+            note = 'Not among Apple\'s top terms in this storefront - Apple reports no value.';
         }
         return {
             badge: BADGES.est,
-            secondary: appleConfigured ? 'no Apple data' : '',
-            muted: true,
+            heading: 'RespectASO estimate',
+            paragraphs: [
+                'RespectASO\'s own estimate, calibrated to Apple\'s official '
+                + '1-100 popularity scale - the active source powering your scores.',
+            ],
+            note: note,
         };
     }
 
-    function badgeHtml(badge) {
-        return '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px '
-            + badge.cls + ' cursor-help" title="' + badge.tip + '">' + badge.label + '</span>';
+    /**
+     * Source badge with its hover popover. `idx`/`total` flip the popover
+     * below for top-half rows (avoids clipping against the table header)
+     * and above otherwise - same rule as formatDownloadCell.
+     */
+    function badgeHtml(tip, idx, total) {
+        var showBelow = total > 0 && idx < total / 2;
+        var pos = showBelow ? 'top-full mt-2' : 'bottom-full mb-2';
+        return '<span class="group/pop relative inline-flex">'
+            + '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px '
+            + tip.badge.cls + ' cursor-help">' + tip.badge.label + '</span>'
+            + '<div class="hidden group-hover/pop:block absolute z-20 ' + pos
+            + ' left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 rounded-lg p-3 '
+            + 'shadow-xl text-left normal-case font-normal tracking-normal whitespace-normal">'
+            + '<p class="text-[10px] text-slate-500 mb-1.5 font-medium uppercase tracking-wider">'
+            + tip.heading + '</p>'
+            + tip.paragraphs.map(function (p, i) {
+                return '<p class="text-[11px] leading-relaxed text-slate-300'
+                    + (i ? ' mt-1.5' : '') + '">' + p + '</p>';
+            }).join('')
+            + (tip.note
+                ? '<p class="text-[10px] leading-relaxed text-slate-500 mt-2 pt-1.5 border-t border-white/5">'
+                    + tip.note + '</p>'
+                : '')
+            + '</div></span>';
     }
 
-    function secondaryHtml(parts, sizeCls) {
-        if (!parts.secondary) return '';
-        var tone = parts.muted ? 'text-slate-600 italic' : 'text-slate-500';
-        return '<span class="block ' + sizeCls + ' mt-0.5 ' + tone + '">' + parts.secondary + '</span>';
+    // Minimum Apple week-over-week popularity move that renders a trend
+    // arrow. MUST match APPLE_TREND_MIN_DELTA in aso_tags.py (twin rule).
+    var APPLE_TREND_MIN_DELTA = 3;
+
+    function trendHtml(row) {
+        var delta = row.popularity_apple_trend;
+        if (typeof delta !== 'number' || Math.abs(delta) < APPLE_TREND_MIN_DELTA) return '';
+        var arrow = delta > 0 ? '▲' : '▼';
+        var tone = delta > 0 ? 'text-emerald-400' : 'text-red-400';
+        var signed = (delta > 0 ? '+' : '') + delta;
+        return '<span class="text-[9px] ' + tone + ' cursor-help" '
+            + 'title="Apple popularity vs previous week: ' + signed + '">' + arrow + '</span>';
     }
 
-    /** Standard centered two-line popularity cell. `extraHtml` appends to line 1. */
-    function formatPopularityCell(row, extraHtml) {
-        var parts = resolveParts(row);
+    /**
+     * Standard centered popularity cell: effective value + source badge
+     * with its explanatory popover. `extraHtml` appends inline content.
+     * Pass `idx`/`total` (0-based row index, row count) so the popover
+     * flips away from the nearest table edge.
+     */
+    function formatPopularityCell(row, extraHtml, idx, total) {
+        var tip = resolveTip(row);
         return '<div class="leading-tight inline-block text-center">'
             + '<span class="inline-flex items-center justify-center gap-1.5">'
             + '<span class="text-sm font-semibold text-purple-400">' + esc(row.popularity) + '</span>'
-            + badgeHtml(parts.badge)
+            + badgeHtml(tip, idx || 0, total || 0)
+            + trendHtml(row)
             + (extraHtml || '')
             + '</span>'
-            + secondaryHtml(parts, 'text-[10px]')
             + '</div>';
     }
 
     /**
      * Chip-style variant for the AI tab tables: wraps the tab's existing
-     * color-coded chip HTML with the source badge, keeping each tab's chip
-     * styling. Secondary line only when the other source has a value.
+     * color-coded chip HTML with the source badge + popover, keeping each
+     * tab's chip styling.
      */
     function formatPopularityChipCell(row, chipHtml) {
-        var parts = resolveParts(row);
+        var tip = resolveTip(row);
         return '<div class="leading-tight inline-block text-center">'
             + '<span class="inline-flex items-center justify-center gap-1">' + chipHtml
-            + badgeHtml(parts.badge)
+            + badgeHtml(tip, 0, 0)
             + '</span>'
-            + secondaryHtml(parts, 'text-[9px]')
             + '</div>';
+    }
+
+    /**
+     * Standalone source badge (with popover) for big-number layouts where
+     * the value is rendered by the caller - e.g. the Opportunity detail
+     * panel's "50 / 100" block.
+     */
+    function formatPopularityBadge(row) {
+        return badgeHtml(resolveTip(row), 0, 0);
     }
 
     /**
@@ -165,16 +279,15 @@
 
     // ── Source-context advisory ─────────────────────────────────────────
     // Data-driven Overview callout explaining when the OTHER popularity
-    // source would paint a different picture. Symmetric: ASA runs warn
-    // about Apple's scale-minimum clusters; EST runs warn about sharp
-    // divergence from available Apple data. States only observable facts
-    // about the data's resolution - never why Apple reports what it does,
-    // and never that either source is the truth.
+    // source would paint a different picture. Symmetric: ASA runs explain
+    // below-threshold coverage (Apple only publishes its top search terms,
+    // roughly 500+ weekly searches); EST runs warn about sharp divergence
+    // from available Apple data. States only observable facts - never why
+    // Apple reports what it does, and never that either source is truth.
     var ADVISORY_MIN_ROWS = 5;       // both triggers: minimum affected keywords
-    var FLOOR_SHARE = 0.4;           // ASA runs: share of Apple-scored rows at 5
+    var FALLBACK_SHARE = 0.5;        // ASA runs: share of rows below Apple's bar
     var DIVERGENCE_POINTS = 30;      // EST runs: |apple - internal| threshold
     var DIVERGENCE_SHARE = 0.3;      // EST runs: share of dual-value rows diverging
-    var APPLE_SCALE_MIN = 5;
 
     function advisoryHtml(paragraphs) {
         return '<div class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">'
@@ -203,25 +316,20 @@
         });
 
         if (usedApple) {
-            var appleRows = rows.filter(function (r) { return r && r.popularity_source === 'apple'; });
-            var floorRows = appleRows.filter(function (r) { return r.popularity_apple === APPLE_SCALE_MIN; });
-            if (floorRows.length < ADVISORY_MIN_ROWS
-                || floorRows.length / appleRows.length < FLOOR_SHARE) return '';
+            var fallbackRows = rows.filter(function (r) { return r && r.popularity_fallback; });
+            if (fallbackRows.length < ADVISORY_MIN_ROWS
+                || fallbackRows.length / rows.length < FALLBACK_SHARE) return '';
             var paras = [
-                '<strong class="text-amber-100">Apple reported its minimum popularity value ('
-                    + APPLE_SCALE_MIN + ') for ' + floorRows.length + ' of the ' + appleRows.length
-                    + ' keywords it scored in this analysis.</strong> '
-                    + APPLE_SCALE_MIN + ' is the lowest value on Apple\'s popularity scale, and '
-                    + 'Apple\'s data does not differentiate between keywords reported at '
-                    + APPLE_SCALE_MIN + ' - they may differ substantially in real search interest, '
-                    + 'but the data cannot show it. When many keywords cluster at the minimum, '
-                    + 'opportunity scores - and any aggregate score built on them - are capped by '
-                    + 'that limited resolution. A low score here reflects Apple\'s numbers, not '
-                    + 'necessarily misaligned metadata.',
-                'The RespectASO estimate beside each keyword rates search interest from observable '
-                    + 'App Store signals, and the two sources can disagree - sometimes strongly. '
-                    + 'Where they do, neither number is automatically right: treat a large gap as a '
-                    + 'keyword worth checking by hand, for example by searching it in the App Store.',
+                '<strong class="text-amber-100">' + fallbackRows.length + ' of the ' + rows.length
+                    + ' keywords in this analysis are outside Apple\'s published top '
+                    + 'terms.</strong> Apple publishes each category\'s 500 most-searched terms '
+                    + 'per storefront; keywords outside that group are scored with '
+                    + 'RespectASO\'s estimate, calibrated against Apple\'s official values and '
+                    + 'aligned to the same 1-100 scale - one consistent ruler across the '
+                    + 'whole analysis.',
+                'A modest aggregate score under the Apple source therefore reflects where '
+                    + 'these keywords sit against Apple\'s reporting bar - not necessarily '
+                    + 'misaligned metadata.',
             ];
             var altA = altReadinessSentence(opts, 'the RespectASO estimate');
             if (altA) paras.push(altA);
@@ -238,15 +346,14 @@
         });
         if (divergent.length < ADVISORY_MIN_ROWS
             || divergent.length / dualRows.length < DIVERGENCE_SHARE) return '';
-        var atFloor = divergent.filter(function (r) { return r.popularity_apple === APPLE_SCALE_MIN; }).length;
         var parasB = [
             '<strong class="text-amber-100">Apple Ads reports substantially different popularity for '
                 + divergent.length + ' of the ' + dualRows.length
-                + ' keywords with Apple data in this analysis'
-                + (atFloor ? ', often at Apple\'s scale minimum of ' + APPLE_SCALE_MIN : '')
-                + '.</strong> Under the Apple Ads source, opportunity and aggregate scores would '
-                + 'look different. Both values are shown beside each keyword; where they disagree '
-                + 'strongly, neither is automatically right - such keywords are worth checking by hand.',
+                + ' keywords with Apple data in this analysis.</strong> '
+                + 'Under the Apple Ads source, opportunity and aggregate scores would '
+                + 'look different. Hover a keyword\'s source badge to see both values; where they '
+                + 'disagree strongly, neither is automatically right - such keywords are worth '
+                + 'checking by hand.',
         ];
         var altB = altReadinessSentence(opts, 'Apple Ads popularity');
         if (altB) parasB.push(altB);
@@ -259,6 +366,7 @@
     global.formatRunSourceNote = formatRunSourceNote;
     global.formatRunSourceBadge = formatRunSourceBadge;
     global.formatPopularityChipCell = formatPopularityChipCell;
+    global.formatPopularityBadge = formatPopularityBadge;
     global.formatPopularityCompact = formatPopularityCompact;
     global.formatSourceContextAdvisory = formatSourceContextAdvisory;
 })(window);

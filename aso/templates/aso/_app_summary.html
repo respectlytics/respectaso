@@ -345,6 +345,35 @@
     </div>
     {% endif %}
 
+    {# ── Apple Ads impression share (renders ONLY when the app's own ads
+          served on search terms - Apple reports nothing otherwise) ────── #}
+    {% if summary.impression_share %}
+    <div class="m-4 mt-4 bg-sky-500/[0.05] border border-sky-500/20 rounded-lg p-3.5">
+        <p class="text-sm font-medium text-sky-200 mb-0.5">Search results impression share</p>
+        <p class="text-[11px] text-slate-500 mb-2">
+            How often your ads appeared in App Store search for these terms, per Apple
+            (week of {{ summary.impression_share.week|date:"M j" }}). Apple only reports terms where your ads served.
+        </p>
+        <ul class="space-y-1">
+            {% for row in summary.impression_share.rows %}
+            <li class="flex items-center justify-between text-xs">
+                <span class="text-slate-300 truncate">{{ row.term }}
+                    <span class="text-slate-600">· {{ row.country }}{% if row.tier %} · popularity {{ row.tier }}/5{% endif %}</span>
+                </span>
+                <span class="whitespace-nowrap ml-2">
+                    <span class="text-sky-300 font-medium">{{ row.share }}</span>
+                    {% if row.rank %}<span class="text-slate-500"> · rank #{{ row.rank }}</span>{% endif %}
+                    {% if row.delta %}
+                    {% if row.delta > 0 %}<span class="text-emerald-400">▲ +{{ row.delta }}</span>
+                    {% else %}<span class="text-red-400">▼ {{ row.delta }}</span>{% endif %}
+                    {% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     {# ── Contextual AI CTA ───────────────────────────────────────────────── #}
     {% if summary.cta %}
     <div class="m-4 mt-4 bg-gradient-to-r from-purple-500/[0.08] to-purple-500/[0.02] border border-purple-500/20 rounded-lg p-3.5">

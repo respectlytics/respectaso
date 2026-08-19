@@ -8,58 +8,47 @@ as the underlying state changes - no page reload needed. Because swapped
 innerHTML never executes scripts, this partial must stay script-free;
 all behavior lives in popularity-banner.js.
 
-Signal matrix (see apple-ads.instructions.md - severity matches impact):
-1. Non-dismissible "choose your source" banner until the user explicitly
-   selects a popularity source.
-2. Red non-dismissible banner while the APPLE source is selected but
-   broken - signed out or session expired. Scores are affected.
-3. Amber non-dismissible banner while the APPLE source is selected, the
-   user is signed in, but the connection test has not passed yet (syncing
-   paused; one actionable step left).
+Signal matrix v2 (see apple-ads.instructions.md - severity matches impact),
+in priority order:
+1. Red non-dismissible while the APPLE source is selected but broken:
+   upgrade_reconnect (cookie-era install, reconnect once with the official
+   API), not_connected (disconnected), credential_rejected. Scores are
+   affected: last-synced values keep serving but stop refreshing.
+2. Amber non-dismissible while the APPLE source is selected, credentials
+   saved, but verification has not passed yet (one actionable step left).
+3. Recommend banner (indigo, informational, NON-dismissible by product
+   decision): internal source active, Apple not connected, no explicit
+   opt-out. Silenced only by connecting or by "I'll stay on the estimate"
+   in Settings (reversible).
 4. Soft AMBER, DISMISSIBLE notice when the internal source is selected but
-   the Apple session expired: no score is affected (only the secondary
-   Apple values stop refreshing), so dismissal is allowed BY DESIGN -
-   unlike the update banner. The dismiss key includes the expiry
-   timestamp, so a later new expiry shows the notice again.
-   A deliberate sign-out under the internal source shows nothing: the
-   confirm dialog already explained the consequence.
+   previously working credentials got rejected: no score is affected (only
+   the secondary Apple values stop refreshing), so dismissal is allowed BY
+   DESIGN. The dismiss key includes the rejection timestamp, so a later
+   new rejection shows the notice again.
 
 Context flags come from aso.context_processors.popularity_source.
 {% endcomment %}
-{% if not popularity_source_selected %}
-<div id="popularity-source-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
-        <p class="text-xs text-amber-200/90">
-            <span class="font-semibold">Choose your popularity source.</span>
-            RespectASO can now use Apple Ads' own search popularity or its built-in estimate -
-            pick which one powers your scores. Both values stay visible either way.
-        </p>
-        <a href="{% url 'aso:settings_popularity' %}"
-           class="text-xs font-medium text-amber-100 bg-amber-600/40 hover:bg-amber-600/60 border border-amber-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
-            Choose source
-        </a>
-    </div>
-</div>
-{% elif apple_source_broken == "expired" %}
-<div id="apple-session-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
+{% if apple_source_broken == "upgrade_reconnect" %}
+<div id="apple-upgrade-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
-            <span class="font-semibold">Apple Ads sign-in expired.</span>
-            Popularity scores are using the internal estimate until you sign in again.
+            <span class="font-semibold">Apple Ads popularity now uses Apple's official API - reconnect once to keep it flowing.</span>
+            Your scores keep using the last-synced Apple data, but it stops refreshing until you connect
+            with the new one-time API key setup (about 5 minutes).
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
-            Sign in again
+            Reconnect
         </a>
     </div>
 </div>
-{% elif apple_source_broken == "signed_out" %}
-<div id="apple-signedout-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
+{% elif apple_source_broken == "not_connected" %}
+<div id="apple-notconnected-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple Ads is disconnected but still your popularity source.</span>
             Scores keep using your last-synced Apple data; new keywords use the estimate.
-            Sign in again - or switch to the RespectASO estimate in Settings.
+            Connect again - or switch to the RespectASO estimate in Settings.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -67,27 +56,56 @@ Context flags come from aso.context_processors.popularity_source.
         </a>
     </div>
 </div>
-{% elif apple_source_broken == "needs_test" %}
-<div id="apple-needstest-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
+{% elif apple_source_broken == "credential_rejected" %}
+<div id="apple-rejected-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
+    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+        <p class="text-xs text-red-200/90">
+            <span class="font-semibold">Apple rejected the API credentials.</span>
+            Popularity data stopped refreshing - the key may have been revoked or replaced at Apple.
+            Re-verify the connection in Settings.
+        </p>
+        <a href="{% url 'aso:settings_popularity' %}"
+           class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
+            Re-verify
+        </a>
+    </div>
+</div>
+{% elif apple_source_broken == "needs_verify" %}
+<div id="apple-needsverify-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
-            <span class="font-semibold">Apple Ads is reconnected - one step left.</span>
-            Run the connection test in Settings to resume Apple popularity syncing.
+            <span class="font-semibold">Apple Ads is almost connected - one step left.</span>
+            Run the connection verification in Settings to resume Apple popularity syncing.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-amber-100 bg-amber-600/40 hover:bg-amber-600/60 border border-amber-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
-            Run test
+            Verify connection
+        </a>
+    </div>
+</div>
+{% elif apple_recommend_connect %}
+<div id="apple-recommend-banner" class="bg-indigo-900/30 border-b border-indigo-500/30 px-4 py-2.5">
+    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+        <p class="text-xs text-indigo-200/90">
+            <span class="font-semibold">Recommended: connect Apple Ads for official search popularity.</span>
+            Apple now publishes its search popularity data through an official API - a free, read-only,
+            one-time key setup (about 5 minutes, no ads or spend required). Your scores currently use
+            RespectASO's estimate; prefer to keep it? Choose "stay on the estimate" in Settings.
+        </p>
+        <a href="{% url 'aso:settings_popularity' %}"
+           class="text-xs font-medium text-indigo-100 bg-indigo-600/40 hover:bg-indigo-600/60 border border-indigo-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
+            Connect Apple Ads
         </a>
     </div>
 </div>
 {% elif apple_secondary_stale %}
 <div id="apple-stale-banner" class="hidden bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5"
-     data-expired-at="{{ apple_session_expired_at }}">
+     data-expired-at="{{ apple_credentials_rejected_at }}">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
-            <span class="font-semibold">Apple Ads sign-in expired.</span>
+            <span class="font-semibold">Apple rejected the API credentials.</span>
             The Apple values shown beside your scores are no longer refreshing.
-            <a href="{% url 'aso:settings_popularity' %}" class="underline hover:text-amber-100">Sign in again</a>
+            <a href="{% url 'aso:settings_popularity' %}" class="underline hover:text-amber-100">Re-verify the connection</a>
             to keep them current.
         </p>
         <button type="button" onclick="dismissAppleStaleBanner()"

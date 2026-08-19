@@ -1,9 +1,15 @@
 import json
 
 from django import template
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 register = template.Library()
+
+# Minimum Apple week-over-week popularity move that renders a trend
+# arrow. MUST match APPLE_TREND_MIN_DELTA in popularity-display.js
+# (renderer-twin rule, guarded by test_scoring_consistency).
+APPLE_TREND_MIN_DELTA = 3
 
 
 @register.filter(is_safe=True)
@@ -48,7 +54,8 @@ def trend_arrow(delta, metric="higher_better"):
     color = "text-green-400" if is_good else "text-red-400"
     arrow = "↑" if delta > 0 else "↓"
     return mark_safe(
-        f'<span class="{color} ml-1.5" title="Change from previous">({arrow}{abs(delta)})</span>'
+        f'<span class="{color} ml-1.5" title="Change since this keyword&#x27;s '
+        f'previous check">({arrow}{abs(delta)})</span>'
     )
 
 # ISO 3166-1 alpha-2 → country name (covers all App Store countries)
@@ -341,27 +348,141 @@ def download_cell(estimates, idx=0, total=0):
     )
 
 
+# Badge chip classes - MUST match BADGES in popularity-display.js (twin
+# rule). EST* is deliberately as quiet as EST: fallback is the NORMAL case
+# for long-tail keywords under the Apple source, not a warning; blue ASA
+# is the scannable "official value" signal.
+_BADGE_EST_CLS = "bg-slate-700/40 text-slate-300 border border-white/10"
+_BADGE_ASA_CLS = "bg-sky-900/40 text-sky-300 border border-sky-500/30"
+
+
+def _badge_popover(badge_cls, label, heading, paragraphs, note="",
+                   idx=0, total=0):
+    """Source badge + hover popover. Mirror of badgeHtml() in the JS twin.
+
+    `idx`/`total` flip the popover below for top-half rows (avoids
+    clipping against the table header) and above otherwise - same rule
+    as download_cell.
+    """
+    show_below = total > 0 and idx < total / 2
+    pos = "top-full mt-2" if show_below else "bottom-full mb-2"
+    paras = "".join(
+        f'<p class="text-[11px] leading-relaxed text-slate-300'
+        f'{" mt-1.5" if i else ""}">{escape(p)}</p>'
+        for i, p in enumerate(paragraphs)
+    )
+    note_html = (
+        '<p class="text-[10px] leading-relaxed text-slate-500 mt-2 pt-1.5 '
+        f'border-t border-white/5">{escape(note)}</p>'
+        if note
+        else ""
+    )
+    return (
+        '<span class="group/pop relative inline-flex">'
+        '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
+        f'px-0.5 py-px {badge_cls} cursor-help">{label}</span>'
+        f'<div class="hidden group-hover/pop:block absolute z-20 {pos} '
+        'left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 '
+        'rounded-lg p-3 shadow-xl text-left normal-case font-normal '
+        'tracking-normal whitespace-normal">'
+        '<p class="text-[10px] text-slate-500 mb-1.5 font-medium uppercase '
+        f'tracking-wider">{escape(heading)}</p>'
+        f"{paras}{note_html}"
+        "</div></span>"
+    )
+
+
+def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
+                      apple_configured, idx=0, total=0):
+    """Badge + popover for a resolved popularity row. Mirror of
+    resolveTip() in the JS twin - same cases, same copy."""
+    if is_fallback:
+        if cap is None:
+            return _badge_popover(
+                _BADGE_EST_CLS, "EST*", "No Apple data for this storefront",
+                ["Apple publishes no search-popularity data for this "
+                 "storefront, so RespectASO's estimate powers the score "
+                 "directly."],
+                idx=idx, total=total,
+            )
+        where = f"the {genre} category" if genre else "its category"
+        absent_para = (
+            "Apple lists each category's ~500 most-searched terms, and "
+            f"this keyword is not among them for {where} in this "
+            "storefront this week."
+        )
+        if internal is not None and internal > cap:
+            return _badge_popover(
+                _BADGE_EST_CLS, "EST*", "Not in Apple's top terms - capped",
+                [absent_para,
+                 "It cannot score above Apple's lowest reported value "
+                 f"there ({cap + 1}), so RespectASO's estimate of "
+                 f"{internal} is scored as {cap}."],
+                idx=idx, total=total,
+            )
+        est_ref = f" ({internal})" if internal is not None else ""
+        return _badge_popover(
+            _BADGE_EST_CLS, "EST*", "Not in Apple's top terms",
+            [absent_para,
+             f"RespectASO's estimate{est_ref} already sits below Apple's "
+             f"lowest reported value there ({cap + 1}), so it powers the "
+             "score unchanged."],
+            idx=idx, total=total,
+        )
+    if source == "apple":
+        note = (
+            f"RespectASO estimate for comparison: {internal}"
+            if internal is not None else ""
+        )
+        return _badge_popover(
+            _BADGE_ASA_CLS, "ASA", "Apple Ads popularity",
+            ["Apple's official search popularity for this storefront, "
+             "updated weekly - the active source powering your scores."],
+            note=note, idx=idx, total=total,
+        )
+    if apple is not None:
+        note = f"Apple's official value for comparison: {apple}"
+    elif apple_configured:
+        note = ("Not among Apple's top terms in this storefront - Apple "
+                "reports no value.")
+    else:
+        note = ""
+    return _badge_popover(
+        _BADGE_EST_CLS, "EST", "RespectASO estimate",
+        ["RespectASO's own estimate, calibrated to Apple's official 1-100 "
+         "popularity scale - the active source powering your scores."],
+        note=note, idx=idx, total=total,
+    )
+
+
 @register.simple_tag
-def popularity_cell(result, extra_html=""):
-    """Render the dual-source popularity cell for a SearchResult row.
+def popularity_cell(result, extra_html="", idx=0, total=0):
+    """Render the popularity cell for a SearchResult row.
 
     Server-side counterpart of formatPopularityCell() in
     static/js/popularity-display.js - the two MUST stay visually identical
     (guarded by test_scoring_consistency).
 
-    Line 1 (centered): the effective value (feeds all calculations) + a
-        source badge - EST (RespectASO estimate), ASA (Apple Ads), or amber
-        EST* when Apple is selected but this keyword has no Apple value.
-    Line 2 (centered): the other source's value when it exists. When the
-        Apple integration is connected but has no value for this keyword,
-        an explicit muted "no Apple data" line is shown instead - visible
-        on screen, not tooltip-only. When Apple was never connected, no
-        second line renders (there is no second source to report on).
+    ONE number per cell: the effective value (feeds all calculations) +
+    a source badge (EST / ASA / EST* fallback). Everything else lives in
+    the badge's hover popover: what the source is, the other source's
+    value for comparison, and on fallback rows the full cap story with
+    the row's own numbers (raw estimate, cap, category floor) - the cap
+    is explained, never hidden, but no longer competes with the score in
+    the table.
 
-    `extra_html` lets callers append inline content (e.g. the trend arrow)
-    to line 1 without breaking the layout.
+    When the view attached `apple_trend` (Apple's week-over-week
+    popularity delta, see views._attach_apple_trends), an arrow renders
+    for moves of APPLE_TREND_MIN_DELTA or more - identical thresholds
+    and glyphs to the JS twin.
+
+    `extra_html` appends inline content without breaking the layout.
+    `idx`/`total` (0-based row index, row count) flip the popover away
+    from the nearest table edge - pass them in loops.
     """
     from ..apple_ads.storage import load_apple_settings
+    from ..popularity import absent_cap
+    from ..apple_ads.genres import genre_label
 
     effective = result.effective_popularity
     internal = result.popularity_score
@@ -369,52 +490,36 @@ def popularity_cell(result, extra_html=""):
     source = result.popularity_source_used
     is_fallback = result.popularity_is_fallback
     apple_configured = bool(load_apple_settings()["apple_ads"]["tested_ok"])
-
-    effective_txt = str(effective) if effective is not None else "—"
-    secondary = ""
-    secondary_muted = False
-    if is_fallback:
-        badge = (
-            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
-            'px-0.5 py-px bg-amber-900/40 text-amber-300 border border-amber-500/30 '
-            'cursor-help" title="Apple Ads has no value for this keyword in this '
-            'storefront, so the RespectASO estimate is used instead.">EST*</span>'
-        )
-        secondary, secondary_muted = "no Apple data", True
-    elif source == "apple":
-        badge = (
-            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
-            'px-0.5 py-px bg-sky-900/40 text-sky-300 border border-sky-500/30 '
-            'cursor-help" title="Apple Ads search popularity - the active source '
-            'powering your scores.">ASA</span>'
-        )
-        if internal is not None:
-            secondary = f"EST: {internal}"
-    else:
-        badge = (
-            '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
-            'px-0.5 py-px bg-slate-700/40 text-slate-300 border border-white/10 '
-            'cursor-help" title="RespectASO estimate - the active source powering '
-            'your scores.">EST</span>'
-        )
-        if apple is not None:
-            secondary = f"ASA: {apple}"
-        elif apple_configured:
-            secondary, secondary_muted = "no Apple data", True
-
-    tone = "text-slate-600 italic" if secondary_muted else "text-slate-500"
-    secondary_html = (
-        f'<span class="block text-[10px] mt-0.5 {tone}">{secondary}</span>'
-        if secondary
-        else ""
+    inferred_genre = getattr(result, "inferred_genre", "") or ""
+    cap = (
+        absent_cap(result.country, inferred_genre) if is_fallback else None
     )
+
+    trend = getattr(result, "apple_trend", None)
+    if trend is not None and abs(trend) >= APPLE_TREND_MIN_DELTA:
+        arrow = "▲" if trend > 0 else "▼"
+        tone = "text-emerald-400" if trend > 0 else "text-red-400"
+        extra_html = (
+            f'<span class="text-[9px] {tone} cursor-help" '
+            f'title="Apple popularity vs previous week: {trend:+d}">'
+            f"{arrow}</span>" + (extra_html or "")
+        )
+
+    try:
+        idx, total = int(idx), int(total)
+    except (TypeError, ValueError):
+        idx, total = 0, 0
+    badge = _popularity_badge(
+        internal, apple, source, is_fallback, cap,
+        genre_label(inferred_genre), apple_configured, idx=idx, total=total,
+    )
+    effective_txt = str(effective) if effective is not None else "—"
     return mark_safe(
         '<div class="leading-tight inline-block text-center">'
         '<span class="inline-flex items-center justify-center gap-1.5">'
         f'<span class="text-sm font-semibold text-purple-400">{effective_txt}</span>'
         f'{badge}{extra_html}'
         "</span>"
-        f"{secondary_html}"
         "</div>"
     )
 

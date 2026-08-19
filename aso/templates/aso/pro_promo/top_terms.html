@@ -1,0 +1,64 @@
+{% extends "aso/base.html" %}
+
+{% block title %}Top Search Terms — RespectASO Pro{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8">
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-4 py-1.5 mb-4">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span class="text-xs font-medium text-emerald-300">Pro Feature</span>
+        </div>
+        <h1 class="text-3xl font-bold text-slate-50 mb-3">Top Search Terms</h1>
+        <p class="text-lg text-slate-400 max-w-xl mx-auto">
+            Browse Apple's official ranking of what people actually search on the App Store -
+            per storefront and category, refreshed weekly, with movement and history.
+        </p>
+    </div>
+
+    <!-- What it does -->
+    <div class="bg-slate-800/50 border border-white/10 rounded-xl p-8 mb-6">
+        <h2 class="text-lg font-semibold text-slate-50 mb-4">What You Get</h2>
+        <div class="space-y-4">
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">1</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Apple's Official Ranking</p>
+                    <p class="text-sm text-slate-400">The most-searched terms per App Store category and storefront - up to 500 per category, straight from the Apple Ads Platform API, synced weekly through your own Apple Ads connection.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">2</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">Weekly Movement &amp; History</p>
+                    <p class="text-sm text-slate-400">Climbing, falling, and brand-new terms each week, plus a week-over-week history chart for every term - up to 65 weeks deep for the keywords you track.</p>
+                </div>
+            </div>
+            <div class="flex items-start gap-3">
+                <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="text-emerald-400 text-xs font-bold">3</span>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-200">One-Click Actions</p>
+                    <p class="text-sm text-slate-400">Track any term through the full scoring pipeline, or open the AI Researcher with it as the seed to explore the niche, competitors, and app ideas around it.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center">
+        <a href="https://respectaso.com/pricing/" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-6 py-3 rounded-lg transition-colors">
+            Get RespectASO Pro
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+        <p class="text-xs text-slate-500 mt-3">Requires a free Apple Ads account connection (one-time, about 5 minutes).</p>
+    </div>
+</div>
+{% endblock %}

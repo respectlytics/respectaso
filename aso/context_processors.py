@@ -5,53 +5,77 @@ from django.apps import apps as django_apps
 from .apple_ads import storage
 
 
-def popularity_source(request):
-    """Expose the popularity-source selection state to every template.
+def whats_new(request):
+    """One-time "see what's new" notice after a feature update.
 
-    Drives the "choose your popularity source" banner (shown until a source
-    is explicitly selected) and the "Apple sign-in expired" banner. Reads
-    are mtime-cached in storage - no per-request disk cost.
+    Tiered by version bump (aso/release_notes.py): minor/major updates
+    show it once; patch updates and fresh installs are absorbed silently.
+    """
+    from .release_notes import should_show_notice
+
+    try:
+        return {"show_whats_new_notice": should_show_notice()}
+    except Exception:  # The notice must never break a page render.
+        return {"show_whats_new_notice": False}
+
+
+def popularity_source(request):
+    """Expose the popularity-source connection state to every template.
+
+    Drives the banner matrix (partials/popularity_banner.html). Reads are
+    mtime-cached in storage - no per-request disk cost.
     """
     data = storage.load_apple_settings()
     source = data["popularity_source"]
     block = data["apple_ads"]
+    connected = storage.has_credentials()
 
-    # Signal matrix (apple-ads.instructions.md): the ACTIVE source being
-    # broken is loud and persistent; secondary-data staleness under the
-    # internal source is a soft dismissible notice; a deliberate sign-out
-    # under the internal source (and never-connected) stays silent.
+    # Signal matrix v2 (apple-ads.instructions.md): the ACTIVE source
+    # being broken is loud and persistent; secondary-data staleness under
+    # the internal source is a soft dismissible notice; the standing
+    # recommendation to connect Apple is informational, non-dismissible,
+    # and silenced only by connecting or by the explicit opt-out.
     apple_source_broken = ""
     if source == storage.SOURCE_APPLE:
-        if not block["cookies"]:
-            # Truly signed out - no session at all.
-            apple_source_broken = "signed_out"
-        elif block["session_expired"]:
-            apple_source_broken = "expired"
+        if block["legacy_upgrade_pending"]:
+            apple_source_broken = "upgrade_reconnect"
+        elif not connected:
+            apple_source_broken = "not_connected"
+        elif block["credentials_rejected"]:
+            apple_source_broken = "credential_rejected"
         elif not block["tested_ok"]:
-            # Signed back in but the connection test has not passed yet -
-            # syncing stays paused until it does (one actionable step left).
-            apple_source_broken = "needs_test"
+            apple_source_broken = "needs_verify"
+
+    apple_ready = storage.apple_source_ready()
 
     return {
         "popularity_source": source,
-        "popularity_source_selected": source != storage.SOURCE_UNSET,
-        "apple_session_expired": (
-            source == storage.SOURCE_APPLE and bool(block["session_expired"])
-        ),
-        # "" | "expired" | "signed_out" - only ever set while apple is the
-        # selected source (drives the red non-dismissible banners).
+        # "" | "upgrade_reconnect" | "not_connected" | "credential_rejected"
+        # | "needs_verify" - only ever set while apple is the selected
+        # source (drives the red/amber non-dismissible banners).
         "apple_source_broken": apple_source_broken,
-        # Internal source selected but the Apple session expired: the
-        # secondary "ASA: n" values stopped refreshing (soft notice).
+        # Standing recommendation: internal source, Apple not yet fully
+        # connected, no explicit opt-out. A rejected previously working
+        # connection is excluded - the specific stale notice below wins
+        # over the generic recommendation.
+        "apple_recommend_connect": (
+            source != storage.SOURCE_APPLE
+            and not apple_ready
+            and not block["estimate_opt_out"]
+            and not block["credentials_rejected"]
+        ),
+        # Internal source selected but the previously working credentials
+        # got rejected: the secondary "ASA: n" values stopped refreshing
+        # (soft dismissible notice keyed by the rejection timestamp).
         "apple_secondary_stale": (
             source == storage.SOURCE_INTERNAL
-            and bool(block["session_expired"])
+            and bool(block["credentials_rejected"])
         ),
-        "apple_session_expired_at": block.get("session_expired_at", ""),
-        # True once the Apple Ads integration passed its connection test.
-        # Display code uses this to decide whether "no Apple data" is a
-        # meaningful statement (integration active, keyword below Apple's
-        # threshold) or just noise (integration never set up).
+        "apple_credentials_rejected_at": block["credentials_rejected_at"],
+        # True once the Apple Ads integration passed verification.
+        # Display code uses this to decide whether "below Apple's
+        # threshold" is a meaningful statement (integration active) or
+        # just noise (integration never set up).
         "apple_popularity_configured": bool(block["tested_ok"]),
         # Free edition ships without aso_pro; templates use this to decide
         # whether Pro settings tabs exist.

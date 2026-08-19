@@ -19,6 +19,7 @@ from .models import App, Keyword, SearchResult
 from .dashboard_summary import compute_app_summary
 from .popularity import (
     annotate_effective_popularity,
+    popularity_fields,
     prefetch_apple_values,
     resolve_popularity,
 )
@@ -44,6 +45,27 @@ HISTORY_PER_PAGE_DEFAULT = 25
 def methodology_view(request):
     """Our Methodology page — explains how RespectASO works."""
     return render(request, "aso/methodology.html")
+
+
+def whats_new_view(request):
+    """What's New page — the app's release history, newest first.
+
+    Opening the page counts as having seen the current version's notes,
+    which clears the one-time update notice.
+    """
+    from .release_notes import RELEASES, mark_seen
+
+    mark_seen()
+    return render(request, "aso/whats_new.html", {"releases": RELEASES})
+
+
+@require_POST
+def whats_new_seen_view(request):
+    """Dismiss the one-time update notice without opening the page."""
+    from .release_notes import mark_seen
+
+    mark_seen()
+    return JsonResponse({"ok": True})
 
 
 def setup_view(request):
@@ -318,19 +340,32 @@ def dashboard_view(request):
             .values(
                 "keyword_id", "country", "searched_at",
                 "popularity_score", "apple_popularity_score",
-                "difficulty_score", "app_rank",
+                "difficulty_score", "app_rank", "inferred_genre",
             )
         )
         for row in snapshot_rows:
             history_by_pair[(row["keyword_id"], row["country"])].append(row)
 
-    from .popularity import effective_from_pair, get_popularity_source
+    from .popularity import (
+        SOURCE_APPLE,
+        absent_cap,
+        effective_from_pair,
+        get_popularity_source,
+    )
 
     source_setting = get_popularity_source()
+    _cap_cache: dict = {}
 
     def _row_effective(row):
+        ceiling = None
+        if source_setting == SOURCE_APPLE:
+            key = (row["country"], row.get("inferred_genre", ""))
+            if key not in _cap_cache:
+                _cap_cache[key] = absent_cap(*key)
+            ceiling = _cap_cache[key]
         return effective_from_pair(
-            row["popularity_score"], row["apple_popularity_score"], source_setting
+            row["popularity_score"], row["apple_popularity_score"],
+            source_setting, absent_ceiling=ceiling,
         )[0]
 
     for result in history_results:
@@ -362,6 +397,8 @@ def dashboard_view(request):
             result.popularity_delta = None
             result.difficulty_delta = None
             result.rank_delta = None
+
+    _attach_apple_trends(history_results)
 
     # Determine if any filters are active
     has_filters = bool(valid_insights or pop_min is not None or diff_max is not None or search_q)
@@ -411,6 +448,40 @@ def dashboard_view(request):
             "has_filters": has_filters,
         },
     )
+
+
+def _attach_apple_trends(results) -> None:
+    """Attach `apple_trend` (Apple popularity delta vs the previous
+    dataset week) to SearchResult rows - bulk per country, local reads
+    only. None when the country has no dataset or the term is not in
+    both weeks; the popularity cell renders the arrow from it."""
+    import datetime as dt
+
+    from .apple_ads import storage as apple_storage
+    from .models import AppleTopTerm
+    from .popularity import normalize_term
+
+    for result in results:
+        result.apple_trend = None
+    active_weeks = apple_storage.load_apple_settings()["apple_ads"][
+        "active_weeks"
+    ]
+    by_country: dict = {}
+    for result in results:
+        by_country.setdefault((result.country or "").lower(), []).append(result)
+    for country, country_results in by_country.items():
+        active = active_weeks.get(country)
+        if not active:
+            continue
+        trends = AppleTopTerm.trend_lookup(
+            [normalize_term(r.keyword.keyword) for r in country_results],
+            country,
+            dt.date.fromisoformat(active),
+        )
+        for result in country_results:
+            result.apple_trend = trends.get(
+                normalize_term(result.keyword.keyword)
+            )
 
 
 @require_POST
@@ -522,6 +593,7 @@ def search_view(request):
             search_result = SearchResult.upsert_today(
                 keyword=keyword_obj,
                 popularity_score=pop.internal,
+                inferred_genre=pop.genre_hint,
                 apple_popularity_score=pop.apple,
                 difficulty_score=difficulty_score,
                 difficulty_breakdown=breakdown,
@@ -537,10 +609,7 @@ def search_view(request):
                     "keyword": kw_text,
                     "country": country,
                     "popularity_score": popularity,
-                    "popularity_internal": pop.internal,
-                    "popularity_apple": pop.apple,
-                    "popularity_source": pop.source,
-                    "popularity_fallback": pop.is_fallback,
+                    **popularity_fields(pop),
                     "difficulty_score": difficulty_score,
                     "opportunity_score": opportunity,
                     "difficulty_label": search_result.difficulty_label,
@@ -674,10 +743,7 @@ def opportunity_search_country_view(request):
     return JsonResponse({
         "country": country_code,
         "popularity": popularity,
-        "popularity_internal": pop.internal,
-        "popularity_apple": pop.apple,
-        "popularity_source": pop.source,
-        "popularity_fallback": pop.is_fallback,
+        **popularity_fields(pop),
         "difficulty": difficulty_score,
         "difficulty_label": diff_label,
         "difficulty_breakdown": breakdown,
@@ -772,10 +838,7 @@ def opportunity_search_view(request):
         results.append({
             "country": country_code,
             "popularity": popularity,
-            "popularity_internal": pop.internal,
-            "popularity_apple": pop.apple,
-            "popularity_source": pop.source,
-            "popularity_fallback": pop.is_fallback,
+            **popularity_fields(pop),
             "difficulty": difficulty_score,
             "difficulty_label": diff_label,
             "difficulty_breakdown": breakdown,
@@ -1200,6 +1263,7 @@ def keyword_refresh_view(request, keyword_id):
     search_result = SearchResult.upsert_today(
         keyword=keyword_obj,
         popularity_score=pop.internal,
+        inferred_genre=pop.genre_hint,
         apple_popularity_score=pop.apple,
         difficulty_score=difficulty_score,
         difficulty_breakdown=breakdown,
@@ -1215,10 +1279,7 @@ def keyword_refresh_view(request, keyword_id):
             "keyword_id": keyword_obj.pk,
             "result_id": search_result.pk,
             "popularity_score": popularity,
-            "popularity_internal": pop.internal,
-            "popularity_apple": pop.apple,
-            "popularity_source": pop.source,
-            "popularity_fallback": pop.is_fallback,
+            **popularity_fields(pop),
             "difficulty_score": difficulty_score,
             "difficulty_label": search_result.difficulty_label,
             "difficulty_color": search_result.difficulty_color,
@@ -1314,6 +1375,7 @@ def export_history_csv_view(request):
         "Keyword", "App", "Country", "Popularity",
         "Popularity (RespectASO)", "Popularity (Apple Ads)",
         "Popularity Source", "Popularity Fallback",
+        "Apple Popularity Trend",
         "Difficulty", "Difficulty Label", "Opportunity", "Insight", "Rank",
         "Competitors", "Date",
     ]
@@ -1325,7 +1387,9 @@ def export_history_csv_view(request):
     ]
     writer.writerow(base_columns + app_columns if apps_limit else base_columns)
 
-    for r in results_qs:
+    export_results = list(results_qs)
+    _attach_apple_trends(export_results)
+    for r in export_results:
         # "Popularity" is the effective value (per the user's source
         # selection); the per-source columns carry both raw values.
         effective = r.effective_popularity
@@ -1344,6 +1408,7 @@ def export_history_csv_view(request):
             r.apple_popularity_score if r.apple_popularity_score is not None else "",
             r.popularity_source_used,
             "yes" if r.popularity_is_fallback else "no",
+            r.apple_trend if r.apple_trend is not None else "",
             r.difficulty_score,
             r.difficulty_label,
             opportunity,
@@ -1543,6 +1608,11 @@ def keyword_trend_view(request, keyword_id):
 def pro_promo_researcher_view(request):
     """Promotional page for AI Niche Researcher (free version)."""
     return render(request, "aso/pro_promo/ai_researcher.html")
+
+
+def pro_promo_top_terms_view(request):
+    """Promotional page for Top Search Terms (free version)."""
+    return render(request, "aso/pro_promo/top_terms.html")
 
 
 def pro_promo_competitor_view(request):

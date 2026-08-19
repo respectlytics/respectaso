@@ -18,25 +18,27 @@ class PopToSearchesTest(TestCase):
         self.assertEqual(_pop_to_searches(None), 0)
 
     def test_exact_table_points(self):
-        self.assertEqual(_pop_to_searches(50), 200)
-        self.assertEqual(_pop_to_searches(100), 32_000)
-        self.assertEqual(_pop_to_searches(5), 1)
+        # Threshold-anchored curve: the dataset floor (40) maps to the
+        # ~500-searches/week eligibility bar (~70/day).
+        self.assertEqual(_pop_to_searches(40), 70)
+        self.assertEqual(_pop_to_searches(50), 280)
+        self.assertEqual(_pop_to_searches(100), 300_000)
+        self.assertEqual(_pop_to_searches(1), 1)
 
     def test_interpolation_between_points(self):
         val = _pop_to_searches(55)
-        self.assertEqual(val, 290)
-        # Midpoint between 50→200 and 55→290 should be between them
+        self.assertEqual(val, 570)
+        # Midpoint between 50→280 and 55→570 should be between them
         mid = _pop_to_searches(52)
-        self.assertGreater(mid, 200)
-        self.assertLess(mid, 290)
+        self.assertGreater(mid, 280)
+        self.assertLess(mid, 570)
 
-    def test_below_first_point(self):
-        val = _pop_to_searches(2)
-        self.assertGreater(val, 0)
-        self.assertLess(val, 1)
+    def test_below_top_terms_region_stays_under_anchor(self):
+        for value in (1, 20, 39):
+            self.assertLess(_pop_to_searches(value), 70)
 
     def test_above_last_point(self):
-        self.assertEqual(_pop_to_searches(110), 32_000)
+        self.assertEqual(_pop_to_searches(110), 300_000)
 
 
 class CalcOpportunityTest(TestCase):
@@ -61,11 +63,11 @@ class CalcOpportunityTest(TestCase):
         self.assertEqual(calc_opportunity(100, 50), 75)
         self.assertEqual(calc_opportunity(100, 70), 51)
         self.assertEqual(calc_opportunity(100, 90), 18)
-        self.assertEqual(calc_opportunity(80, 30), 66)
-        self.assertEqual(calc_opportunity(50, 0), 51)
-        self.assertEqual(calc_opportunity(50, 50), 38)
-        self.assertEqual(calc_opportunity(30, 20), 33)
-        self.assertEqual(calc_opportunity(10, 10), 13)
+        self.assertEqual(calc_opportunity(80, 30), 71)
+        self.assertEqual(calc_opportunity(50, 0), 44)
+        self.assertEqual(calc_opportunity(50, 50), 33)
+        self.assertEqual(calc_opportunity(30, 20), 30)
+        self.assertEqual(calc_opportunity(10, 10), 22)
 
     def test_monotonic_popularity(self):
         """Higher popularity → higher opportunity (same difficulty)."""
@@ -131,7 +133,7 @@ class ClassifyKeywordTest(TestCase):
         self.assertEqual(classify_keyword(20, 60), "Avoid")
 
     def test_moderate(self):
-        self.assertEqual(classify_keyword(35, 45), "Moderate")
+        self.assertEqual(classify_keyword(45, 50), "Moderate")
 
     def test_zero_popularity(self):
         self.assertEqual(classify_keyword(0, 50), "Low Volume")

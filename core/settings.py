@@ -7,13 +7,22 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "2.21.1"
+VERSION = "2.22.0"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
 
 # Data directory: ~/Library/Application Support/RespectASO/ (native) or ./data (Docker)
 DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data"))
+
+# Test isolation: the test runner must NEVER see the real data dir - a test
+# without an explicit DATA_DIR override would otherwise read real Apple Ads
+# credentials from settings.json and could hit Apple's live API.
+if "test" in sys.argv:
+    import tempfile
+
+    DATA_DIR = Path(tempfile.mkdtemp(prefix="respectaso-test-data-"))
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load .env from project root (dev) or DATA_DIR (production/Docker)
@@ -70,6 +79,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.version",
                 "aso.context_processors.popularity_source",
+                "aso.context_processors.whats_new",
             ],
         },
     },

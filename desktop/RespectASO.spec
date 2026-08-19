@@ -103,7 +103,6 @@ shared_hiddenimports = [
         "llm_providers.openrouter_provider",
         "llm_providers.local_provider",
         "llm_providers.structured_json",
-        "llm_providers.model_catalog",
         "llm_providers.token_counter",
         # Licensing
         "licensing",
