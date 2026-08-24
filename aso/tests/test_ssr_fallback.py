@@ -10,8 +10,10 @@ Verifies:
 """
 
 import json
+import unittest
 from unittest.mock import MagicMock, patch
 
+from django.apps import apps as django_apps
 from django.test import TestCase
 
 from aso.services import (
@@ -294,6 +296,10 @@ class SSRRetryTest(TestCase):
         self.assertEqual(mock_get.call_count, 1)
 
 
+@unittest.skipUnless(
+    django_apps.is_installed("aso_pro"),
+    "tokenize_words lives in aso_pro (this file syncs to the free repo, which has no aso_pro)",
+)
 class TokenizeWordsTest(TestCase):
     """Test tokenize_words() Unicode handling and word splitting."""
 
