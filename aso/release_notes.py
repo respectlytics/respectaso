@@ -38,7 +38,20 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.24.0',
+RELEASES = [{'version': '2.24.1',
+  'date': '2026-08-25',
+  'title': 'The Invite a friend panel and license renewal reach respectaso.com again',
+  'kind': 'patch',
+  'sections': [{'heading': 'Fixed',
+                'items': ['<strong>"Couldn\'t reach respectaso.com" in the Invite a friend '
+                          'panel.</strong> The panel showed this even with a working '
+                          "connection, because respectaso.com turned the app's requests "
+                          'away. The app now introduces itself properly when it talks to '
+                          'respectaso.com, so the panel loads.',
+                          '<strong>Renewed and extended licenses are picked up again.</strong> '
+                          'The same problem kept a renewal from arriving automatically or '
+                          'through "Check for renewed license". Both work again.']}]},
+ {'version': '2.24.0',
   'date': '2026-08-25',
   'title': 'Invite a friend, queue your AI runs, use any AI service',
   'kind': 'feature',
