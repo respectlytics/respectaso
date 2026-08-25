@@ -529,9 +529,14 @@ class ITunesSearchService:
     # Timestamp of last SSR request — rate-limit to 1 req/sec minimum.
     _last_ssr_request: float = 0.0
 
-    def lookup_by_id(self, track_id: int, country: str = "us") -> dict | None:
+    def lookup_by_id(
+        self, track_id: int, country: str = "us", timeout: int = 30
+    ) -> dict | None:
         """
         Look up a single app by its iTunes trackId.
+
+        Pass a shorter ``timeout`` when the caller is on a request path and
+        would rather give up than keep the user waiting.
 
         Returns app dict or None.
         """
@@ -539,7 +544,7 @@ class ITunesSearchService:
             response = requests.get(
                 self.LOOKUP_URL,
                 params={"id": track_id, "country": country},
-                timeout=30,
+                timeout=timeout,
             )
             response.raise_for_status()
             results = response.json().get("results", [])

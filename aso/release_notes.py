@@ -38,7 +38,83 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.22.0',
+RELEASES = [{'version': '2.24.0',
+  'date': '2026-08-25',
+  'title': 'Invite a friend, queue your AI runs, use any AI service',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'Invite a friend, and both of you get 3 months',
+       'intro': ['Settings \u2192 License has a new Invite a friend panel. Generate a code, '
+                 'send it to someone who does ASO, and when they buy Pro your license '
+                 'grows by three months.'],
+       'items': [
+           '<strong>Three months per friend, with no limit.</strong> Every friend who buys '
+           'Pro with one of your codes adds three months to your license. Invite as many '
+           'people as you like.',
+           '<strong>Your friend gets 15 months instead of 12.</strong> A first RespectASO '
+           'Pro license bought with an invite code runs fifteen months for the price of '
+           'twelve.',
+           '<strong>Codes work once and last 90 days.</strong> Generate up to five at a '
+           'time, copy a code or a ready-made message with one click, and see at a glance '
+           'which ones have been used.',
+       ]},
+      {'heading': 'Line up as many runs as you like',
+       'intro': ['The input form no longer disappears while a run is in progress. Start '
+                 'another one and it waits its turn, so you can set up a whole afternoon '
+                 'of research in a couple of minutes and come back to the results.'],
+       'items': [
+           '<strong>Add to Queue.</strong> While something is running, the button on every '
+           'AI tab reads "Add to Queue" - fill in the form, submit, tweak a country or a '
+           'title, submit again.',
+           '<strong>One run at a time.</strong> Runs from the AI Niche Researcher, the AI '
+           'Competitor Analyzer and the ASO Score Simulator all share one queue and run in '
+           'the order you started them, which keeps every run comfortably inside the App '
+           "Store's request limits instead of two analyses competing for them.",
+           '<strong>See and change what is up next.</strong> Every AI tab shows the run '
+           'that is executing (and which tab it belongs to) plus everything waiting behind '
+           'it. Remove a single run, or clear the queue, from wherever you happen to be.',
+           '<strong>Results find you.</strong> If you are still on the tab when a run '
+           'finishes, its results open as before. If you moved on to something else, a '
+           'short notice tells you it finished and takes you straight to it.',
+       ]},
+      {'heading': 'Retry a failed run with one click',
+       'items': [
+           '<strong>Same inputs, one click.</strong> A failed or cancelled run on any AI '
+           'tab can be retried without re-typing the title, subtitle, keywords, country '
+           'or language. Failed and cancelled runs in your history get a Retry button too.',
+           '<strong>One card, not two.</strong> A retried run updates its card in place - '
+           'in queue, running, then done - instead of leaving the failed card next to a '
+           'new one.',
+           'A retry uses your current AI settings, so switching provider or model and '
+           'clicking Retry is the way to try again with a different model.',
+       ]},
+      {'heading': 'Connect any OpenAI-compatible AI service',
+       'intro': ['Settings \u2192 AI has a new Custom endpoint option next to the existing '
+                 'providers.'],
+       'items': [
+           "<strong>Base URL, API key, model ID.</strong> Enter the service's Base URL, "
+           'your key and a model ID, run the built-in compatibility test once, and it is '
+           'active. Works with OpenCode Zen, Groq, a LiteLLM proxy or any other service '
+           'that speaks the OpenAI API.',
+           'Your requests go only to the service whose Base URL you entered, and your key '
+           'stays on your computer - RespectASO never sees it.',
+       ]},
+      {'heading': 'Nothing gets stuck any more',
+       'items': [
+           'A run that was in progress when you closed RespectASO now shows up as failed '
+           'with a Retry button, instead of looking like it is still running forever. '
+           'Anything that was waiting in the queue picks up again when you reopen the app.',
+           'The run timer counts only the time a run was actually working, not the time it '
+           'spent waiting for its turn.',
+       ]},
+      {'heading': 'Quality of life',
+       'items': [
+           'Your license extension arrives automatically - there is no key to paste.',
+           'The Respectlytics banner no longer shows while you have an active Pro '
+           'license, and without one you can hide it with one click.',
+       ]},
+  ]},
+ {'version': '2.22.0',
   'date': '2026-08-19',
   'title': "Apple's official search data, a smarter estimate, and Top Search Terms",
   'kind': 'feature',

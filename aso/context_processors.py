@@ -81,3 +81,14 @@ def popularity_source(request):
         # whether Pro settings tabs exist.
         "pro_edition": django_apps.is_installed("aso_pro"),
     }
+
+
+def ui_state(request):
+    """Dismissed-notice flags for templates (see aso.ui_state)."""
+    from . import ui_state as state
+
+    try:
+        dismissed = state.is_dismissed(state.RESPECTLYTICS_BANNER)
+    except Exception:  # A dismissal flag must never break a page render.
+        dismissed = False
+    return {"respectlytics_banner_dismissed": dismissed}

@@ -71,6 +71,7 @@ shared_hiddenimports = [
         "aso.popularity",
         "aso.context_processors",
         "aso.settings_views",
+        "aso.ui_state",
         "aso.dashboard_summary",
         "aso.apple_ads",
         "aso.apple_ads.auth",
@@ -82,6 +83,7 @@ shared_hiddenimports = [
         "aso_pro.apps",
         "aso_pro.models",
         "aso_pro.views",
+        "aso_pro.run_queue",
         "aso_pro.urls",
         "aso_pro.researcher",
         "aso_pro.competitor_analyzer",
@@ -106,9 +108,12 @@ shared_hiddenimports = [
         "llm_providers.token_counter",
         # Licensing
         "licensing",
+        "licensing.api_client",
         "licensing.apps",
         "licensing.decorators",
         "licensing.middleware",
+        "licensing.referral",
+        "licensing.refresh",
         "licensing.storage",
         "licensing.validator",
         # Third-party LLM SDKs

@@ -9,6 +9,8 @@ urlpatterns = [
     path("methodology/", views.methodology_view, name="methodology"),
     path("whats-new/", views.whats_new_view, name="whats_new"),
     path("whats-new/seen/", views.whats_new_seen_view, name="whats_new_seen"),
+    path("banner/respectlytics/dismiss/", views.respectlytics_banner_dismiss_view,
+         name="respectlytics_banner_dismiss"),
     path("setup/", views.setup_view, name="setup"),
     path("setup/apple-ads/", views.apple_ads_setup_view, name="apple_ads_setup"),
     # Popularity source (free feature): selection + Apple Ads integration

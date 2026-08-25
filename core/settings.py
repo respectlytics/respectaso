@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "2.22.0"
+VERSION = "2.24.0"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -80,6 +80,7 @@ TEMPLATES = [
                 "core.context_processors.version",
                 "aso.context_processors.popularity_source",
                 "aso.context_processors.whats_new",
+                "aso.context_processors.ui_state",
             ],
         },
     },

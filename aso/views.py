@@ -68,6 +68,20 @@ def whats_new_seen_view(request):
     return JsonResponse({"ok": True})
 
 
+@require_POST
+def respectlytics_banner_dismiss_view(request):
+    """Hide the Respectlytics banner for good on this install.
+
+    Pro users never see the banner at all (base.html); this is the free
+    edition's opt-out. Stored server-side so it survives a restart in the
+    desktop app, where localStorage is not available.
+    """
+    from . import ui_state
+
+    ui_state.dismiss(ui_state.RESPECTLYTICS_BANNER)
+    return JsonResponse({"ok": True})
+
+
 def setup_view(request):
     """Setup guide — custom domain, Docker config, and getting started."""
     return render(request, "aso/setup.html")

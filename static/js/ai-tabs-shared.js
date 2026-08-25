@@ -199,6 +199,30 @@
             '</div></div>';
     }
 
+    // ---- Run status badge (the three AI tabs' "Recent" lists) --------------
+    // Complete class strings - Tailwind only extracts whole literals.
+    var STATUS_BADGES = {
+        queued:    {label: 'In queue', color: 'bg-purple-900/30 text-purple-300'},
+        running:   {label: 'running',  color: 'bg-blue-900/30 text-blue-400'},
+        completed: {label: 'completed', color: 'bg-emerald-900/30 text-emerald-400'},
+        failed:    {label: 'failed',   color: 'bg-red-900/30 text-red-400'},
+        cancelled: {label: 'cancelled', color: 'bg-slate-700 text-slate-400'},
+    };
+
+    /**
+     * The status pill for one run in a history list.
+     *
+     * "queued" reads "In queue" because it only ever appears on a card whose
+     * run is being retried - the user needs to see that their click landed,
+     * and that clicking again would not add anything.
+     */
+    function formatRunStatusBadge(status) {
+        var badge = STATUS_BADGES[status] ||
+            {label: status || '', color: 'bg-slate-700 text-slate-400'};
+        return '<span class="text-xs px-2 py-0.5 rounded-full whitespace-nowrap ' +
+            badge.color + '">' + escapeHtml(badge.label) + '</span>';
+    }
+
     // Expose under a namespace AND as bare globals so existing inline template
     // code that calls e.g. formatSourceBadge() / fmt() / escapeHtml() keeps working
     // without any rename.
@@ -213,6 +237,7 @@
         fmt: fmt,
         formatDownloadCell: formatDownloadCell,
         formatSourceBadge: formatSourceBadge,
+        formatRunStatusBadge: formatRunStatusBadge,
     };
     window.escapeHtml = escapeHtml;
     window.formatSourceLabel = formatSourceLabel;
@@ -221,4 +246,5 @@
     window.fmt = fmt;
     window.formatDownloadCell = formatDownloadCell;
     window.formatSourceBadge = formatSourceBadge;
+    window.formatRunStatusBadge = formatRunStatusBadge;
 })();
