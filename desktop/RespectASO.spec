@@ -78,6 +78,7 @@ shared_hiddenimports = [
         "aso.keyword_cleanup",
         "aso.pro_access",
         "aso.dashboard_summary",
+        "aso.top_terms_preview",
         "aso.apple_ads",
         "aso.apple_ads.auth",
         "aso.apple_ads.client",

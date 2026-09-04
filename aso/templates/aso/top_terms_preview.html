@@ -1,0 +1,71 @@
+{% extends "aso/base.html" %}
+{% load static %}
+{% comment %}
+The Top Search Terms tab whenever the live page cannot render yet:
+the free edition, a Pro install without a valid license, or a licensed
+install whose Apple Ads connection is missing or has not synced a week.
+Context comes from aso.top_terms_preview.preview_context(state): the
+hero explains why it is a preview and what fixes that; the sample-data
+preview below shows the actual page with the search terms blurred.
+{% endcomment %}
+
+{% block title %}Top Search Terms - RespectASO{% endblock %}
+
+{% block content %}
+<div class="max-w-[1200px] mx-auto">
+
+    <div class="mb-5">
+        <h1 class="text-2xl font-bold text-white mb-1">Top Search Terms</h1>
+        <p class="text-sm text-slate-400">
+            Apple's official most-searched App Store terms per storefront and category - up to 500 per
+            category, refreshed weekly from your Apple Ads connection. Spot demand, watch it move week
+            over week, and act on it: track a term or hand it to the AI Researcher in one click.
+        </p>
+    </div>
+
+    <!-- Why this is a preview, and what turns it into the real page -->
+    <section class="bg-gradient-to-br from-sky-950/50 to-[#1e293b] border border-sky-500/20 rounded-xl p-5 mb-5">
+        <div class="flex items-start justify-between gap-8">
+            <div class="min-w-0">
+                <p class="text-[10px] uppercase tracking-wider text-sky-300/80 font-medium mb-1">{{ preview.cta.eyebrow }}</p>
+                <h2 class="text-lg font-semibold text-white mb-1.5">{{ preview.cta.headline }}</h2>
+                <p class="text-sm text-slate-300 max-w-3xl leading-relaxed">{{ preview.cta.body }}</p>
+            </div>
+            <div class="flex flex-col items-end gap-2 flex-shrink-0 pt-1">
+                <a href="{{ preview.cta.primary_url }}"{% if preview.cta.primary_external %} target="_blank" rel="noopener"{% endif %}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-white px-5 py-2.5 rounded-lg transition-colors {% if preview.cta.primary_tone == 'sky' %}bg-sky-600 hover:bg-sky-500{% elif preview.cta.primary_tone == 'amber' %}bg-amber-600 hover:bg-amber-500{% else %}bg-purple-600 hover:bg-purple-500{% endif %}">
+                    {{ preview.cta.primary_label }}
+                    {% if preview.cta.primary_external %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>{% endif %}
+                </a>
+                {% if preview.cta.secondary_label %}
+                <a href="{{ preview.cta.secondary_url }}" class="text-xs text-slate-400 hover:text-white transition-colors">
+                    {{ preview.cta.secondary_label }} →
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-white/5">
+            <div class="flex items-start gap-2.5 text-xs">
+                <span class="text-base leading-none mt-px">📊</span>
+                <span class="text-slate-400"><span class="block text-slate-200 font-medium mb-0.5">Apple's official ranking</span>Up to 500 most-searched terms per category and storefront, from the Apple Ads Platform API.</span>
+            </div>
+            <div class="flex items-start gap-2.5 text-xs">
+                <span class="text-base leading-none mt-px">📈</span>
+                <span class="text-slate-400"><span class="block text-slate-200 font-medium mb-0.5">Weekly movement</span>Climbing, falling and brand-new terms each week, plus per-term history charts up to 65 weeks deep.</span>
+            </div>
+            <div class="flex items-start gap-2.5 text-xs">
+                <span class="text-base leading-none mt-px">💡</span>
+                <span class="text-slate-400"><span class="block text-slate-200 font-medium mb-0.5">One-click actions</span>Track any term through the full scoring pipeline, or open the AI Researcher with it as the seed.</span>
+            </div>
+            <div class="flex items-start gap-2.5 text-xs">
+                <span class="text-base leading-none mt-px">🤖</span>
+                <span class="text-slate-400"><span class="block text-slate-200 font-medium mb-0.5">Also through MCP</span>Your AI assistant browses the same data with the get_top_search_terms tool.</span>
+            </div>
+        </div>
+    </section>
+
+    {% include "aso/partials/top_terms_preview.html" %}
+</div>
+<script src="{% static 'js/sparkline.js' %}"></script>
+<script>renderSparklines(document);</script>
+{% endblock %}

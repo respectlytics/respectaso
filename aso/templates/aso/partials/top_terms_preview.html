@@ -1,0 +1,161 @@
+{% comment %}
+Sample-data preview of the Top Search Terms page (aso/top_terms_preview.py).
+
+Mirrors the live page block for block - filter bar, mover cards, terms
+table with sparklines - but every search term is blurred and every
+control is inert: the filter bar and action chips are plain spans (no
+form, no handlers), the rows cannot be selected, and the only clickable
+thing is the state-specific call to action on the card over the table.
+Expects `preview` from preview_context(). Column headers come from the
+shared partials/top_terms_head.html, so the preview can never drift from
+the real column set.
+{% endcomment %}
+
+<!-- Preview label -->
+<div class="flex items-center justify-between gap-3 mb-3">
+    <span class="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        Preview with sample data · search terms locked
+    </span>
+    <span class="text-xs text-slate-500">The live page looks like this, with Apple's real terms for your storefronts.</span>
+</div>
+
+<!-- Filters (inert replica of the live filter bar) -->
+<div class="bg-[#1e293b] border border-white/10 rounded-xl p-4 mb-4 flex flex-wrap items-end gap-3 pointer-events-none select-none" aria-hidden="true">
+    <span class="block">
+        <span class="block text-[10px] uppercase tracking-wide text-slate-500">Storefront</span>
+        <span class="mt-0.5 inline-flex items-center gap-2 text-xs bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-200">United States <span class="text-[9px] text-slate-500">▼</span></span>
+    </span>
+    <span class="block">
+        <span class="block text-[10px] uppercase tracking-wide text-slate-500">Category</span>
+        <span class="mt-0.5 inline-flex items-center gap-2 text-xs bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-200">All categories <span class="text-[9px] text-slate-500">▼</span></span>
+    </span>
+    <span class="block">
+        <span class="block text-[10px] uppercase tracking-wide text-slate-500">Week</span>
+        <span class="mt-0.5 inline-flex items-center gap-2 text-xs bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-200">Latest week <span class="text-[9px] text-slate-500">▼</span></span>
+    </span>
+    <span class="block">
+        <span class="block text-[10px] uppercase tracking-wide text-slate-500">Per page</span>
+        <span class="mt-0.5 inline-flex items-center gap-2 text-xs bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-200">50 <span class="text-[9px] text-slate-500">▼</span></span>
+    </span>
+    <span class="block flex-1 min-w-[160px]">
+        <span class="block text-[10px] uppercase tracking-wide text-slate-500">Search within terms</span>
+        <span class="mt-0.5 block w-full text-xs bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-slate-600">e.g. tracker</span>
+    </span>
+    <span class="text-xs font-medium text-sky-300 bg-sky-900/40 border border-sky-500/30 rounded-lg px-3 py-1.5">Apply</span>
+</div>
+
+<!-- Movers + new entries -->
+<div class="grid md:grid-cols-3 gap-4 mb-4 select-none" aria-hidden="true">
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl flex flex-col">
+        <h2 class="text-sm font-semibold text-emerald-300 px-4 pt-4 pb-2 flex items-center justify-between">
+            <span>▲ Climbing this week</span>
+            <span class="text-[10px] font-normal text-slate-600">{{ preview.risers|length }} terms</span>
+        </h2>
+        <ul class="px-4 pb-4 space-y-1 pointer-events-none">
+            {% for m in preview.risers %}
+            <li class="flex items-center justify-between gap-2 text-xs">
+                <span class="text-slate-300 truncate"><span class="preview-term blur-sm">{{ m.term }}</span>
+                    <span class="text-slate-600">· {{ m.genre_pretty }}</span></span>
+                <span class="flex items-center gap-1.5 whitespace-nowrap">
+                    <span class="text-emerald-400">#{{ m.prev_rank }} → #{{ m.rank }}</span>
+                    <span class="text-[10px] font-medium text-sky-300/80 border border-sky-500/20 rounded px-1.5 py-px">+ Track</span>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl flex flex-col">
+        <h2 class="text-sm font-semibold text-red-300 px-4 pt-4 pb-2 flex items-center justify-between">
+            <span>▼ Falling this week</span>
+            <span class="text-[10px] font-normal text-slate-600">{{ preview.fallers|length }} terms</span>
+        </h2>
+        <ul class="px-4 pb-4 space-y-1 pointer-events-none">
+            {% for m in preview.fallers %}
+            <li class="flex items-center justify-between gap-2 text-xs">
+                <span class="text-slate-300 truncate"><span class="preview-term blur-sm">{{ m.term }}</span>
+                    <span class="text-slate-600">· {{ m.genre_pretty }}</span></span>
+                <span class="flex items-center gap-1.5 whitespace-nowrap">
+                    <span class="text-red-400">#{{ m.prev_rank }} → #{{ m.rank }}</span>
+                    <span class="text-[10px] font-medium text-sky-300/80 border border-sky-500/20 rounded px-1.5 py-px">+ Track</span>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    <section class="bg-[#1e293b] border border-white/10 rounded-xl flex flex-col">
+        <h2 class="text-sm font-semibold text-sky-300 px-4 pt-4 pb-2 flex items-center justify-between">
+            <span>✦ New this week</span>
+            <span class="text-[10px] font-normal text-slate-600">{{ preview.new_terms|length }} terms</span>
+        </h2>
+        <ul class="px-4 pb-4 space-y-1 pointer-events-none">
+            {% for m in preview.new_terms %}
+            <li class="flex items-center justify-between gap-2 text-xs">
+                <span class="text-slate-300 truncate"><span class="preview-term blur-sm">{{ m.term }}</span>
+                    <span class="text-slate-600">· {{ m.genre_pretty }}</span></span>
+                <span class="flex items-center gap-1.5 whitespace-nowrap">
+                    <span class="text-sky-300">{{ m.popularity }}</span>
+                    <span class="text-[10px] font-medium text-sky-300/80 border border-sky-500/20 rounded px-1.5 py-px">+ Track</span>
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+
+<!-- Terms table, fading into the call to action -->
+<section class="relative bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+    <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <p class="text-xs text-slate-500">
+            {{ preview.rows|length }} sample terms · the live page lists up to 500 per category and storefront, week by week
+        </p>
+    </div>
+    <div class="overflow-x-auto select-none" aria-hidden="true">
+        <table class="w-full text-sm">
+            {% include "aso/partials/top_terms_head.html" %}
+            <tbody class="pointer-events-none">
+                {% for row in preview.rows %}
+                <tr class="border-b border-white/5">
+                    <td class="px-4 py-2 text-slate-500 text-xs">#{{ row.rank }}</td>
+                    <td class="px-4 py-2 text-slate-200"><span class="preview-term blur-sm">{{ row.term }}</span></td>
+                    <td class="px-4 py-2 text-slate-500 text-xs">{{ row.genre_pretty }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <span class="text-sm font-semibold text-sky-300">{{ row.popularity }}</span>
+                        <span class="block text-[10px] text-slate-600">in category: {{ row.popularity_in_genre }}</span>
+                    </td>
+                    <td class="px-4 py-2 text-center text-xs text-slate-400">{{ row.tier }}/5</td>
+                    <td class="px-4 py-2 text-center">
+                        <span class="spark-btn inline-flex items-center gap-1.5 rounded px-1 py-0.5" data-series="{{ row.series_json }}">
+                            <svg class="spark-svg" width="72" height="22" viewBox="0 0 72 22"></svg>
+                            {% if row.trend > 0 %}<span class="text-[10px] text-emerald-400">+{{ row.trend }}</span>
+                            {% elif row.trend < 0 %}<span class="text-[10px] text-red-400">{{ row.trend }}</span>
+                            {% else %}<span class="text-[10px] text-slate-600">=</span>{% endif %}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <span class="inline-block text-[11px] font-medium text-sky-300 bg-sky-900/40 border border-sky-500/30 rounded px-2 py-0.5 mr-1">+ Track</span>
+                        <span class="inline-block text-[11px] font-medium text-purple-300 bg-purple-900/30 border border-purple-500/30 rounded px-2 py-0.5">💡 Research</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-[#1e293b] via-[#1e293b]/90 to-transparent pointer-events-none"></div>
+    <div class="absolute inset-x-0 bottom-8 flex justify-center px-4">
+        <div class="bg-slate-900 border border-white/10 rounded-xl shadow-2xl px-6 py-5 flex items-center gap-5 max-w-2xl">
+            <div class="w-10 h-10 rounded-full bg-sky-500/15 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-sky-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            </div>
+            <div class="min-w-0">
+                <p class="text-sm font-medium text-white">{{ preview.cta.table_line }}</p>
+                <p class="text-xs text-slate-400 mt-0.5">The live page shows Apple's official ranking for your storefronts, refreshed weekly.</p>
+            </div>
+            <a href="{{ preview.cta.primary_url }}"{% if preview.cta.primary_external %} target="_blank" rel="noopener"{% endif %}
+               class="flex-shrink-0 inline-flex items-center gap-2 text-sm font-medium text-white px-4 py-2 rounded-lg transition-colors {% if preview.cta.primary_tone == 'sky' %}bg-sky-600 hover:bg-sky-500{% elif preview.cta.primary_tone == 'amber' %}bg-amber-600 hover:bg-amber-500{% else %}bg-purple-600 hover:bg-purple-500{% endif %}">
+                {{ preview.cta.primary_label }}
+                {% if preview.cta.primary_external %}<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>{% endif %}
+            </a>
+        </div>
+    </div>
+</section>

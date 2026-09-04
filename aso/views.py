@@ -1701,8 +1701,13 @@ def pro_promo_researcher_view(request):
 
 
 def pro_promo_top_terms_view(request):
-    """Promotional page for Top Search Terms (free version)."""
-    return render(request, "aso/pro_promo/top_terms.html")
+    """Top Search Terms in the free edition: the sample-data preview of the
+    Pro page, with the search terms blurred (aso/top_terms_preview.py)."""
+    from .top_terms_preview import STATE_FREE, preview_context
+
+    return render(
+        request, "aso/top_terms_preview.html", preview_context(STATE_FREE)
+    )
 
 
 def pro_promo_competitor_view(request):
