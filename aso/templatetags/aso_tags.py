@@ -1,8 +1,11 @@
 import json
+import re
 
 from django import template
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+
+from aso.services import compound_form
 
 register = template.Library()
 
@@ -605,76 +608,92 @@ def format_release_date(value):
         return str(value)[:10]
 
 
+# Highlight tiers shared with static/js/keyword-highlight.js. The two
+# renderers MUST emit identical HTML (aso/tests/test_keyword_highlight.py
+# runs the JS under node and compares the output).
+_HL_CLS_EXACT = "bg-green-500/25 text-green-300 rounded px-0.5"
+_HL_CLS_ALL = "bg-amber-500/25 text-amber-300 rounded px-0.5"
+_HL_CLS_PART = "bg-slate-400/20 text-slate-300 rounded px-0.5"
+
+
+def _compound_span(title, compound):
+    """(start, end) of the keyword's run-together form where it starts a
+    word of the title ("ScrollLess" for "scroll less"), or None."""
+    if not compound:
+        return None
+    for m in re.finditer(r"[^\W_]+", title):
+        if m.group().lower().startswith(compound):
+            return (m.start(), m.start() + len(compound))
+    return None
+
+
+def _render_marks(title, spans, cls):
+    """Wrap each span in a <mark>. Touching spans are merged into ONE mark,
+    so a run-together word ("ScrollLess") is never drawn as two padded
+    chips that read like two words."""
+    merged = []
+    for start, end in sorted(spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    parts = []
+    pos = 0
+    for start, end in merged:
+        parts.append(escape(title[pos:start]))
+        parts.append(f'<mark class="{cls}">{escape(title[start:end])}</mark>')
+        pos = end
+    parts.append(escape(title[pos:]))
+    return mark_safe("".join(parts))
+
+
 @register.filter(needs_autoescape=True, is_safe=True)
 def highlight_keyword(title, keyword, autoescape=True):
-    """Highlight keyword words in app title with 3-tier colour coding.
+    """Highlight keyword words in an app title with 3-tier colour coding.
 
-    Tier 1 (green)  – exact phrase appears in title.
-    Tier 2 (amber)  – all words present but not as exact phrase.
-    Tier 3 (slate)  – only some keyword words appear.
+    Tier 1 (green)  - exact phrase in the title, or its run-together
+                      spelling ("ScrollLess" for "scroll less").
+    Tier 2 (amber)  - all words present but not as the exact phrase.
+    Tier 3 (slate)  - only some keyword words appear.
+
+    Client-side twin: highlightKeyword() in static/js/keyword-highlight.js.
 
     Usage: {{ comp.trackName|highlight_keyword:result.keyword.keyword }}
     """
-    import re
-    from django.utils.html import escape
-    from django.utils.safestring import mark_safe
-
-    if not keyword or not title:
-        return escape(str(title)) if title else ""
-
+    if not title:
+        return ""
     title_str = str(title)
-    kw_str = str(keyword).strip()
-    words = [w for w in kw_str.split() if w]
+    if not keyword:
+        return escape(title_str)
+    words = [w for w in str(keyword).strip().split() if w]
     if not words:
         return escape(title_str)
 
     title_lower = title_str.lower()
-    kw_lower = kw_str.lower()
-
-    # Determine which keyword words appear in the title
+    kw_lower = " ".join(words).lower()
     present = [w for w in words if w.lower() in title_lower]
-    has_exact_phrase = len(words) > 1 and kw_lower in title_lower
-    all_present = len(present) == len(words)
 
-    # Pick highlight class
-    # Exact phrase → green | All words scattered → amber | Partial → slate
-    CLS_EXACT = 'bg-green-500/25 text-green-300 rounded px-0.5'
-    CLS_ALL   = 'bg-amber-500/25 text-amber-300 rounded px-0.5'
-    CLS_PART  = 'bg-slate-400/20 text-slate-300 rounded px-0.5'
+    if len(words) > 1 and kw_lower in title_lower:
+        phrase_re = re.compile(re.escape(kw_lower), re.IGNORECASE)
+        spans = [m.span() for m in phrase_re.finditer(title_str)]
+        return _render_marks(title_str, spans, _HL_CLS_EXACT)
 
-    if has_exact_phrase:
-        # Highlight the full phrase with green, remaining individual words
-        # also green (they're part of the phrase context)
-        phrase_re = re.compile(f"({re.escape(kw_str)})", re.IGNORECASE)
-        parts = phrase_re.split(title_str)
-        result_parts = []
-        for part in parts:
-            if phrase_re.fullmatch(part):
-                result_parts.append(f'<mark class="{CLS_EXACT}">{escape(part)}</mark>')
-            else:
-                result_parts.append(escape(part))
-        return mark_safe("".join(result_parts))
+    compound = _compound_span(
+        title_str, compound_form([w.lower() for w in words])
+    )
+    if compound:
+        return _render_marks(title_str, [compound], _HL_CLS_EXACT)
 
     if not present:
         return escape(title_str)
-
-    # For single-word keywords, decide colour by presence
     if len(words) == 1:
-        cls = CLS_EXACT  # single word = exact match if present
-    elif all_present:
-        cls = CLS_ALL
+        cls = _HL_CLS_EXACT
+    elif len(present) == len(words):
+        cls = _HL_CLS_ALL
     else:
-        cls = CLS_PART
-
+        cls = _HL_CLS_PART
     word_re = re.compile(
-        "(" + "|".join(re.escape(w) for w in present) + ")",
-        re.IGNORECASE,
+        "|".join(re.escape(w) for w in present), re.IGNORECASE
     )
-    parts = word_re.split(title_str)
-    result_parts = []
-    for part in parts:
-        if word_re.fullmatch(part):
-            result_parts.append(f'<mark class="{cls}">{escape(part)}</mark>')
-        else:
-            result_parts.append(escape(part))
-    return mark_safe("".join(result_parts))
+    spans = [m.span() for m in word_re.finditer(title_str)]
+    return _render_marks(title_str, spans, cls)

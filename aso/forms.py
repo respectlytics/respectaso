@@ -62,16 +62,22 @@ COUNTRY_CHOICES = [
 class KeywordSearchForm(forms.Form):
     """Form for searching keywords."""
 
+    # A textarea that looks like a one-line input: whole keyword lists are
+    # pasted here, comma-separated or one per line. It grows with the content
+    # up to five lines, then scrolls inside (static/js/keyword-search-job.js).
+    # Same height as the Search button beside it. The limit per search
+    # depends on the edition and is enforced by aso.search_jobs, never here.
     keywords = forms.CharField(
-        widget=forms.TextInput(
+        widget=forms.Textarea(
             attrs={
-                "class": "w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500",
+                "class": "block w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm leading-5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none overflow-hidden",
                 "placeholder": "meditation app, fitness tracker, sleep sounds",
                 "autofocus": True,
+                "rows": 1,
+                "id": "id_keywords",
             }
         ),
         label="Keywords",
-        help_text="Enter one or more keywords, separated by commas (max 20).",
     )
     app_id = forms.IntegerField(
         required=False,

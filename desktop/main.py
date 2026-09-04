@@ -134,16 +134,14 @@ def main():
     call_command("migrate", "--no-input", verbosity=0)
     call_command("collectstatic", "--no-input", verbosity=0)
 
-    # Resume the AI run queue now that the schema is up to date: runs that were
-    # executing when the app was last closed are marked interrupted (with a
-    # Retry offer) and anything still queued starts again. Pro only - this same
-    # file ships in the Free edition, which has no aso_pro app.
-    from django.conf import settings as django_settings
+    # Resume the run queue now that the schema is up to date: a keyword search
+    # that was executing when the app was last closed continues from the first
+    # keyword that was not finished, AI runs that were executing are marked
+    # interrupted (with a Retry offer), and anything still queued starts again.
+    # Both editions: the Free build has keyword searches too.
+    from aso.run_queue import resume_after_startup
 
-    if "aso_pro" in django_settings.INSTALLED_APPS:
-        from aso_pro.run_queue import resume_after_startup
-
-        resume_after_startup()
+    resume_after_startup()
 
     # Pick a free port and start Gunicorn in a daemon thread
     port = find_free_port()

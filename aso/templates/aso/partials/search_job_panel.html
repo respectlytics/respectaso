@@ -1,0 +1,39 @@
+{% comment %}
+The keyword search status panel (aso/search_jobs.py): the search that is
+running, paused or queued. Every element is named so static/js/
+keyword-search-job.js can draw each state (section 4.3 of
+docs/development/KEYWORD_SEARCH_QUEUE_PLAN.md); the buttons are built by
+the JS with a data-action each. Finished searches render their results in
+#results-container below this panel.
+{% endcomment %}
+<section id="search-job-panel" class="hidden bg-[#1e293b] border border-white/10 rounded-xl p-5">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div id="sjp-spinner" class="hidden animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full shrink-0"></div>
+                <svg id="sjp-pause-icon" class="hidden w-4 h-4 text-amber-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg id="sjp-clock-icon" class="hidden w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <h3 id="sjp-title" class="text-sm font-semibold text-white truncate"></h3>
+            </div>
+            <p id="sjp-line" class="text-sm text-slate-300 mt-1.5"></p>
+            <p id="sjp-position" class="hidden text-xs text-slate-500 mt-1"></p>
+        </div>
+        <div id="sjp-actions" class="flex flex-wrap items-center gap-2 shrink-0"></div>
+    </div>
+    <div id="sjp-progress" class="hidden mt-4">
+        <div class="flex items-center justify-between gap-3 text-xs mb-1.5">
+            <span id="sjp-ticker" class="text-slate-400 truncate min-w-0"></span>
+            <span id="sjp-percent" class="text-slate-500 tabular-nums shrink-0"></span>
+        </div>
+        <div class="w-full bg-slate-700/50 rounded-full h-1.5">
+            <div id="sjp-fill" class="bg-purple-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="sjp-throttle" class="hidden text-xs text-amber-300 mt-2"></p>
+    </div>
+    <p id="sjp-picked-up" class="hidden text-xs text-emerald-300/80 mt-3"></p>
+    <p id="sjp-note" class="hidden text-xs text-slate-500 mt-3"></p>
+    <div id="sjp-others" class="hidden mt-4 pt-4 border-t border-white/5">
+        <p class="text-xs font-medium text-slate-400 mb-2">Also paused</p>
+        <div id="sjp-others-list" class="space-y-2"></div>
+    </div>
+</section>

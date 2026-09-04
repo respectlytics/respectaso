@@ -92,3 +92,17 @@ def ui_state(request):
     except Exception:  # A dismissal flag must never break a page render.
         dismissed = False
     return {"respectlytics_banner_dismissed": dismissed}
+
+
+def search_job_strip(request):
+    """The keyword search the global strip shows on every page but the
+    dashboard: the active job, else the newest finished one not yet
+    dismissed (see aso.search_jobs). Never breaks a page render."""
+    from . import search_jobs
+
+    try:
+        job = search_jobs.strip_job()
+        payload = search_jobs.job_payload(job) if job else None
+    except Exception:  # e.g. the table does not exist yet on first migrate
+        payload = None
+    return {"search_job_strip": payload}

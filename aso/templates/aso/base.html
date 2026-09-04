@@ -409,7 +409,10 @@
 
     {% block scripts %}{% endblock %}
 
-    <!-- Global navigation protection while searches are running -->
+    <!-- Keyword search strip: the search in progress, on every page but the dashboard -->
+    {% include "aso/partials/search_job_strip.html" %}
+
+    <!-- Global navigation protection while the Opportunity scan is running -->
     <script>
     window.searchInProgress = false;
     document.addEventListener('click', function(e) {

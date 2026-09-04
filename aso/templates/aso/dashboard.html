@@ -51,16 +51,18 @@
         </div>
         <form id="search-form" method="post" action="{% url 'aso:search' %}" class="mt-4 pt-4 border-t border-white/5">
             {% csrf_token %}
-            <div class="flex gap-3">
-                <div class="flex-1">
+            {# Field and button side by side, level with each other; on a phone the button goes under the field (like App and Countries above) #}
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex-1 min-w-0">
                     <label for="id_keywords" class="block text-xs font-medium text-slate-300 mb-1.5">
-                        Keywords <span class="text-slate-500">(comma-separated, max 20)</span>
+                        Keywords <span class="text-slate-500">(comma-separated, or one per line with Shift+Enter)</span>
                     </label>
                     {{ search_form.keywords }}
                 </div>
                 <div class="flex items-end">
+                    {# border-transparent: the same height as the bordered keyword field, so both stay level #}
                     <button type="submit" id="search-btn"
-                            class="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+                            class="w-full sm:w-auto justify-center bg-purple-600 hover:bg-purple-700 text-white text-sm leading-5 font-medium px-6 py-2.5 border border-transparent rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
@@ -68,28 +70,40 @@
                     </button>
                 </div>
             </div>
+            {# The live keyword count and the limit for this edition (static/js/keyword-search-job.js) #}
+            <p id="keyword-counter" class="text-xs text-slate-500 tabular-nums mt-1.5"></p>
+            {% if not keyword_limit_context.is_pro %}
+            <div id="keyword-limit-nudge" class="hidden mt-3 bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                <p class="text-sm text-purple-100 flex-1">
+                    Need more? Pro researches up to 1,000 keywords per search in the background, keeps going while you use other tabs, and picks up where it left off after a restart.
+                </p>
+                <a href="{{ keyword_limit_context.upgrade_url }}"{% if not pro_edition %} target="_blank" rel="noopener"{% endif %}
+                   class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap text-center transition-colors">
+                    {{ keyword_limit_context.upgrade_label }}
+                </a>
+            </div>
+            {% endif %}
+            <div id="search-error" class="hidden mt-3 bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-sm text-red-200"></div>
+            <p id="search-queued-note" class="hidden mt-3 text-sm text-emerald-300"></p>
         </form>
     </div>
 
-    <!-- Results Container -->
-    <div id="results-container" class="space-y-4 hidden">
-        <!-- Results will be dynamically inserted here -->
-    </div>
+    <!-- The keyword search in progress (running, paused or queued) -->
+    {% include "aso/partials/search_job_panel.html" %}
 
-    <!-- Loading State -->
-    <div id="loading-state" class="hidden">
-        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
-            <p class="text-slate-400 text-sm mt-3" id="loading-text">Analyzing keywords...</p>
-            <div class="flex justify-center mt-4">
-                <img src="{% static 'gif/respectaso_processing.gif' %}" alt="Processing..." class="w-48 h-48 rounded-full object-cover shadow-lg shadow-purple-500/10 opacity-90">
-            </div>
-        </div>
-    </div>
+    <!-- Results of the newest finished search (rendered by static/js/keyword-search-job.js) -->
+    <div id="results-container" class="space-y-4 hidden"></div>
+
+    {% if keyword_limit_context.is_pro %}
+    <!-- The run queue: keyword searches and AI runs, reorderable (Pro) -->
+    {% include "aso/partials/_queue_section.html" %}
+    {% endif %}
 
     {% if app_summary %}
     {% include "aso/_app_summary.html" with summary=app_summary %}
     {% endif %}
+
+    {% include "aso/partials/keyword_cleanup_banner.html" %}
 
     <!-- Search History -->
     <div id="history-section" class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
@@ -104,12 +118,13 @@
                     {{ keyword_count }} keyword{{ keyword_count|pluralize }}{% if total_pages > 1 %} · Page {{ page }} of {{ total_pages }}{% endif %}
                 </p>
                 {% endif %}
-                {% if last_refresh and not app_summary %}
-                <p class="text-slate-500 text-[11px] mt-1 inline-flex items-center gap-1" title="{{ last_refresh|date:'Y-m-d H:i:s' }}">
-                    <svg class="w-3 h-3 text-emerald-400/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    Rankings auto-refreshed {{ last_refresh|timesince }} ago — runs daily in the background while the app is open.
+                {% comment %}The one place that says to keep the app open: the daily refresh
+                only happens while it is. The App Summary carries its own "Refreshed X ago"
+                badge, so the timestamp is repeated here only when that panel is hidden.{% endcomment %}
+                <p id="refresh-hint" class="text-slate-500 text-[11px] mt-1 inline-flex items-center gap-1"{% if last_refresh %} title="{{ last_refresh|date:'Y-m-d H:i:s' }}"{% endif %}>
+                    <svg class="w-3 h-3 text-emerald-400/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>{% if IS_NATIVE_APP %}Keep RespectASO open and your Mac awake: rankings refresh once a day in the background{% else %}Rankings refresh once a day while the container runs{% endif %}{% if last_refresh and not app_summary %} - last refreshed {{ last_refresh|timesince }} ago{% endif %}.</span>
                 </p>
-                {% endif %}
             </div>
             <div class="flex items-center gap-2">
                 {% comment %}Show the dropdown whenever there are multiple countries OR when a country
@@ -447,7 +462,7 @@
                                 </div>
                                 <span class="text-slate-500 text-xs block">{{ result.difficulty_label }}</span>
                                 {% if result.difficulty_breakdown.is_brand_keyword %}
-                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword — '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's reviews.">🏷️ Brand</span>
+                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword - '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's ratings.">🏷️ Brand</span>
                                 {% endif %}
                             </td>
                             <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.opportunity_score }}">
@@ -787,6 +802,11 @@
 
 {% block scripts %}
 <script src="{% static 'js/popularity-display.js' %}"></script>
+<script src="{% static 'js/keyword-highlight.js' %}"></script>
+<script src="{% static 'js/clipboard.js' %}"></script>
+<script src="{% static 'js/keyword-search-job.js' %}"></script>
+{% if keyword_limit_context.is_pro %}<script src="{% static 'js/run-queue.js' %}"></script>{% endif %}
+{{ search_job|json_script:"search-job-data" }}
 <script>
 const csrfToken = '{{ csrf_token }}';
 const selectedApp = {{ selected_app|default:"null" }};
@@ -1517,22 +1537,6 @@ syncHistorySelectionUI();
 })();
 
 // --- Auto-refresh history section after search ---
-function clearSearchResults() {
-    const container = document.getElementById('results-container');
-    container.classList.add('hidden');
-    container.innerHTML = '';
-}
-
-// Escape clears search results
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const container = document.getElementById('results-container');
-        if (!container.classList.contains('hidden')) {
-            clearSearchResults();
-        }
-    }
-});
-
 async function refreshHistorySection() {
     try {
         // Build the same URL the page was loaded with (preserves ?app= filter)
@@ -1986,9 +1990,6 @@ window.renderRankingTiers = function(tiers) {
 // --- Search Form & Result Cards ---
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('search-form');
-    const resultsContainer = document.getElementById('results-container');
-    const loadingState = document.getElementById('loading-state');
-    const loadingText = document.getElementById('loading-text');
     const searchBtn = document.getElementById('search-btn');
     const globalApp = document.getElementById('global-app');
 
@@ -2075,116 +2076,154 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const formData = new FormData(form);
         const keywords = formData.get('keywords');
-        if (!keywords || !keywords.trim()) return;
+        if (!keywords || !keywords.trim() || SearchJob.overLimit()) return;
 
         // Append shared filter values
         formData.set('app_id', globalApp.value);
         formData.set('countries', getSelectedCountries().join(','));
 
-        resultsContainer.classList.add('hidden');
-        resultsContainer.innerHTML = '';
-        loadingState.classList.remove('hidden');
-        window.searchInProgress = true;
-
-        // Disable button with spinner
+        SearchJob.hideError();
         searchBtn.disabled = true;
         searchBtn.classList.add('opacity-50', 'cursor-not-allowed');
         const searchBtnOriginalHTML = searchBtn.innerHTML;
-        searchBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Searching…`;
-
-        const keywordList = keywords.split(',').map(k => k.trim()).filter(k => k);
-        const countryCount = getSelectedCountries().length;
-        const totalCalls = keywordList.length * countryCount;
-        loadingText.textContent = `Analyzing ${keywordList.length} keyword${keywordList.length > 1 ? 's' : ''} × ${countryCount} countr${countryCount > 1 ? 'ies' : 'y'}... (~${totalCalls * 2}s)`;
+        searchBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Starting…`;
 
         try {
-            const response = await fetch('{% url "aso:search" %}', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Search failed');
-            }
-
+            // The search runs in the background: the server answers at once
+            // with the job, and the panel below the form follows it.
+            const response = await fetch('{% url "aso:search" %}', { method: 'POST', body: formData });
             const data = await response.json();
-            loadingState.classList.add('hidden');
-            resultsContainer.classList.remove('hidden');
-
-            // Clear search field after successful search
-            document.getElementById('id_keywords').value = '';
-
-            const countries = data.countries || [];
-            const resultsByCountry = data.results_by_country || {};
-
-            // Flatten all results into a single array
-            const allResults = [];
-            countries.forEach(c => {
-                (resultsByCountry[c] || []).forEach(r => allResults.push(r));
-            });
-
-            // Results panel header with dismiss button
-            const header = document.createElement('div');
-            header.className = 'bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 flex items-center justify-between';
-            header.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <span class="text-lg">🔎</span>
-                    <div>
-                        <h3 class="text-sm font-semibold text-white">Search Results</h3>
-                        <p class="text-xs text-slate-500">${allResults.length} result${allResults.length !== 1 ? 's' : ''} · Saved to your search history below</p>
-                    </div>
-                </div>
-                <button onclick="clearSearchResults()"
-                        class="text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                        title="Dismiss results (Esc)">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                    Done
-                </button>`;
-            resultsContainer.appendChild(header);
-
-            // Show warning for skipped keywords
-            if (data.warning) {
-                const warn = document.createElement('div');
-                warn.className = 'bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-3 text-yellow-200 text-sm flex items-start gap-2';
-                warn.innerHTML = `<span class="text-yellow-400 flex-shrink-0">⚠️</span><span>${data.warning}</span>`;
-                resultsContainer.appendChild(warn);
+            if (!response.ok) {
+                SearchJob.showError(data);
+            } else {
+                document.getElementById('id_keywords').value = '';
+                document.getElementById('id_keywords').dispatchEvent(new Event('input'));
+                SearchJob.started(data);
             }
-
-            // Show opportunity ranking when multiple countries
-            if (data.opportunity_ranking && data.opportunity_ranking.length > 0) {
-                resultsContainer.appendChild(renderOpportunityRanking(data.opportunity_ranking));
-            }
-
-            // Tabbed results: one tab per keyword+country, show one at a time
-            if (allResults.length > 1) {
-                resultsContainer.appendChild(renderResultTabs(allResults));
-            } else if (allResults.length === 1) {
-                resultsContainer.appendChild(createResultCard(allResults[0]));
-            }
-
-            if (allResults.length > 0) {
-                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                refreshHistorySection();
-            }
-
         } catch (error) {
-            loadingState.classList.add('hidden');
-            resultsContainer.classList.remove('hidden');
-            resultsContainer.innerHTML = `
-                <div class="bg-red-900/30 border border-red-500/30 rounded-xl p-4 text-red-200">
-                    <strong>Error:</strong> ${error.message}
-                </div>`;
+            SearchJob.showError({ error: error.message || 'Search failed' });
         }
 
-        // Re-enable button
-        window.searchInProgress = false;
         searchBtn.disabled = false;
         searchBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         searchBtn.innerHTML = searchBtnOriginalHTML;
+        document.getElementById('id_keywords').focus();
     });
+
+    // The results of a finished search: the same cards the blocking search
+    // drew, fed from the stored rows (aso.search_jobs.job_payload).
+    function renderSearchResults(container, job) {
+        const fmt = SearchJob.fmt, plural = SearchJob.plural, esc = SearchJob.esc;
+        const results = job.results || [];
+        const header = document.createElement('div');
+        header.className = 'bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 flex items-start sm:items-center justify-between gap-3';
+        const title = job.status === 'cancelled'
+            ? `Stopped at ${fmt(job.keywords_done)} of ${fmt(job.total_keywords)} keywords`
+            : `Done - ${plural(job.total_keywords, 'keyword')} researched in ${esc(job.countries_text)}`;
+        const subtitle = job.status === 'cancelled'
+            ? `The remaining ${plural(job.remaining_count, 'keyword')} were discarded. Everything researched so far is in your Search History.`
+            : `${plural(job.results_total, 'result')} · Saved to your Search History below`;
+        header.innerHTML = `
+            <div class="flex items-start gap-3 min-w-0">
+                <span class="text-lg">${job.status === 'cancelled' ? '⏹' : '🔎'}</span>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-white">${title}</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">${subtitle}</p>
+                </div>
+            </div>
+            <button type="button" data-action="dismiss"
+                    class="text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+                    title="Dismiss results (Esc)">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Done
+            </button>`;
+        container.appendChild(header);
+
+        if (job.warning) {
+            const warn = document.createElement('div');
+            warn.className = 'bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-3 text-yellow-200 text-sm flex items-start gap-2';
+            warn.innerHTML = `<span class="text-yellow-400 flex-shrink-0">⚠️</span><span>${esc(job.warning)}</span>`;
+            container.appendChild(warn);
+        }
+
+        if (job.failed_text) {
+            const failed = document.createElement('div');
+            failed.className = 'bg-red-900/20 border border-red-500/30 rounded-xl p-3 text-red-200 text-sm flex flex-col sm:flex-row sm:items-center gap-3';
+            failed.innerHTML = `<span class="flex-1">${esc(job.failed_text)}</span>
+                <button type="button" data-action="retry-failed"
+                        class="shrink-0 text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-3 py-1.5 transition-colors">
+                    Search these ${fmt(job.failed_count)} again
+                </button>`;
+            container.appendChild(failed);
+        }
+
+        if (job.results_total > results.length) {
+            const note = document.createElement('p');
+            note.className = 'text-xs text-slate-500 px-1';
+            note.textContent = `Showing the first ${fmt(results.length)} of ${fmt(job.results_total)} results - all of them are in your Search History below.`;
+            container.appendChild(note);
+        }
+
+        if (job.opportunity_ranking && job.opportunity_ranking.length > 0) {
+            container.appendChild(renderOpportunityRanking(job.opportunity_ranking));
+        }
+
+        if (results.length > 1) {
+            container.appendChild(renderResultTabs(results));
+        } else if (results.length === 1) {
+            container.appendChild(createResultCard(results[0]));
+        }
+    }
+
+    SearchJob.init({
+        currentUrl: '{% url "aso:search_job_current" %}',
+        resultsUrl: '{% url "aso:search_job_detail" 0 %}',
+        pauseUrl: '{% url "aso:search_job_pause" 0 %}',
+        resumeUrl: '{% url "aso:search_job_resume" 0 %}',
+        discardUrl: '{% url "aso:search_job_discard" 0 %}',
+        retryFailedUrl: '{% url "aso:search_job_retry_failed" 0 %}',
+        dismissUrl: '{% url "aso:search_job_dismiss" 0 %}',
+        queueRunNowUrl: '{% url "aso:queue_run_now" %}',
+        queueMoveUrl: '{% url "aso:queue_move" %}',
+        csrfToken: csrfToken,
+        isPro: {{ keyword_limit_context.is_pro|yesno:"true,false" }},
+        isNative: {{ IS_NATIVE_APP|yesno:"true,false" }},
+        limit: {{ keyword_limit_context.limit }},
+        upgradeUrl: '{{ keyword_limit_context.upgrade_url|default:"" }}',
+        upgradeNewTab: {% if pro_edition %}false{% else %}true{% endif %},
+        bootstrap: JSON.parse(document.getElementById('search-job-data').textContent),
+        renderResults: renderSearchResults,
+        onProgress: refreshHistorySection,
+        onFinished: function(job) {
+            const container = document.getElementById('results-container');
+            if (container && job.results && job.results.length) {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
+
+    {% if keyword_limit_context.is_pro %}
+    // The shared run queue (AI runs and keyword searches), reorderable from
+    // here too. The keyword search's own progress lives in the panel above.
+    AsoRunQueue.init({
+        feature: 'keyword_search',
+        statusUrl: "{% url 'aso:queue_status' %}?feature=keyword_search",
+        removeUrl: "{% url 'aso:queue_remove' %}",
+        clearUrl: "{% url 'aso:queue_clear' %}",
+        moveUrl: "{% url 'aso:queue_move' %}",
+        runNowUrl: "{% url 'aso:queue_run_now' %}",
+        cancelUrl: null,
+        progressUrl: null,
+        csrfToken: csrfToken,
+        startLabel: 'Search',
+        queueLabel: 'Search',
+        runningTitle: '',
+        refiningTitle: '',
+        onChanged: function() { SearchJob.refresh(); }
+    });
+    {% endif %}
 
     function getAppRankDisplay(result) {
         if (!result.app_name) return '';
@@ -2388,39 +2427,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const brandBadge = result.difficulty_breakdown.is_brand_keyword
             ? `<span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" title="Brand keyword — '${result.keyword}' matches the #1 app's publisher. Difficulty reflects the full competitive field.">🏷️ Brand</span>`
             : '';
-
-        function highlightKeyword(title, keyword) {
-            if (!keyword || !title) return title || '';
-            const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const words = keyword.trim().split(/\s+/).filter(Boolean);
-            if (!words.length) return escHtml(title);
-
-            const titleLower = title.toLowerCase();
-            const kwLower = keyword.trim().toLowerCase();
-            const present = words.filter(w => titleLower.includes(w.toLowerCase()));
-            const hasExactPhrase = words.length > 1 && titleLower.includes(kwLower);
-            const allPresent = present.length === words.length;
-
-            // Tier colours: exact phrase → green, all scattered → amber, partial → slate
-            const CLS_EXACT = 'bg-green-500/25 text-green-300 rounded px-0.5';
-            const CLS_ALL   = 'bg-amber-500/25 text-amber-300 rounded px-0.5';
-            const CLS_PART  = 'bg-slate-400/20 text-slate-300 rounded px-0.5';
-
-            if (hasExactPhrase) {
-                const re = new RegExp(`(${esc(keyword.trim())})`, 'gi');
-                return title.replace(re, `<mark class="${CLS_EXACT}">$1</mark>`);
-            }
-            if (!present.length) return escHtml(title);
-
-            let cls;
-            if (words.length === 1) cls = CLS_EXACT;
-            else if (allPresent) cls = CLS_ALL;
-            else cls = CLS_PART;
-
-            const re = new RegExp(`(${present.map(w => esc(w)).join('|')})`, 'gi');
-            return title.replace(re, `<mark class="${cls}">$1</mark>`);
-        }
 
         let competitorsRows = '';
         result.competitors.forEach((app, i) => {

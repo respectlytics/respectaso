@@ -49,6 +49,19 @@ def _update_status(**kwargs):
         _refresh_status.update(kwargs)
 
 
+# The run queue (keyword searches, AI runs) shares Apple's request budget
+# with the ranking refresh: neither starts while the other runs.
+from . import run_queue  # noqa: E402
+
+run_queue.busy_probes.append(lambda: "the ranking refresh" if get_status()["running"] else None)
+
+
+def _refresh_finished(**kwargs):
+    """The last status write of a refresh, then start whatever waited."""
+    _update_status(running=False, current_keyword="", **kwargs)
+    run_queue.kick()
+
+
 # ── Core refresh logic ────────────────────────────────────────────────────
 
 def _needs_refresh_today():
@@ -80,9 +93,9 @@ def _get_pairs_to_refresh():
 
 
 def _refresh_pair(keyword_obj, country):
-    """Refresh a single keyword+country pair. Returns the new SearchResult."""
-    from .models import SearchResult
-    from .popularity import resolve_popularity
+    """Refresh a single keyword+country pair. Returns the new SearchResult,
+    or None when App Store search data is unavailable (logged, skipped)."""
+    from .keyword_scoring import score_keyword_pair
     from .services import (
         DifficultyCalculator,
         DownloadEstimator,
@@ -90,49 +103,18 @@ def _refresh_pair(keyword_obj, country):
         SearchAPIUnavailableError,
     )
 
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    download_est = DownloadEstimator()
-
     try:
-        competitors = itunes_service.search_apps(
-            keyword_obj.keyword, country=country, limit=25
+        return score_keyword_pair(
+            keyword_obj, country,
+            itunes_service=ITunesSearchService(),
+            difficulty_calc=DifficultyCalculator(),
+            download_est=DownloadEstimator(),
         )
     except SearchAPIUnavailableError as e:
         logger.warning(
             f"Skipping refresh for {keyword_obj.keyword} ({country}): {e}"
         )
         return None
-
-    difficulty_score, breakdown = difficulty_calc.calculate(
-        competitors, keyword=keyword_obj.keyword
-    )
-
-    app_rank = None
-    if keyword_obj.app and keyword_obj.app.track_id:
-        try:
-            app_rank = itunes_service.find_app_rank(
-                keyword_obj.keyword, keyword_obj.app.track_id, country=country
-            )
-        except SearchAPIUnavailableError:
-            pass  # Rank is optional
-
-    pop = resolve_popularity(competitors, keyword_obj.keyword, country)
-
-    download_estimates = download_est.estimate(pop.effective or 0, country=country)
-    breakdown["download_estimates"] = download_estimates
-
-    return SearchResult.upsert_today(
-        keyword=keyword_obj,
-        popularity_score=pop.internal,
-        inferred_genre=pop.genre_hint,
-        apple_popularity_score=pop.apple,
-        difficulty_score=difficulty_score,
-        difficulty_breakdown=breakdown,
-        competitors_data=competitors,
-        app_rank=app_rank,
-        country=country,
-    )
 
 
 def _cleanup_old_results():
@@ -184,12 +166,7 @@ def _run_daily_refresh():
         except Exception as e:
             logger.warning(f"Auto-refresh failed for {keyword_obj.keyword} ({country}): {e}")
 
-    _update_status(
-        running=False,
-        completed=total,
-        current_keyword="",
-        last_completed_at=timezone.now().isoformat(),
-    )
+    _refresh_finished(completed=total, last_completed_at=timezone.now().isoformat())
 
     # Cleanup old results after refresh
     _cleanup_old_results()
@@ -199,29 +176,39 @@ def _run_daily_refresh():
 
 # ── Scheduler thread ─────────────────────────────────────────────────────
 
+def _tick():
+    """One hourly check: sync Apple popularity, then run today's refresh if
+    it is still due and nothing else holds the Apple budget."""
+    try:
+        # Apple popularity sync first, so today's refresh snapshots can
+        # pick up fresh Apple values (the sync also patches rows created
+        # before it finished). Internally a no-op unless configured.
+        from .apple_ads.sync import maybe_run_sync
+
+        maybe_run_sync()
+    except Exception as e:
+        logger.error(f"Apple popularity sync scheduling error: {e}")
+
+    try:
+        if _needs_refresh_today():
+            if run_queue.lane_state() != "idle":
+                # A keyword search or an AI run holds the Apple budget;
+                # try again next hour.
+                logger.info("Daily refresh postponed: the run lane is busy.")
+            else:
+                _run_daily_refresh()
+    except Exception as e:
+        logger.error(f"Scheduler error: {e}")
+        _refresh_finished(error=str(e))
+
+
 def _scheduler_loop():
     """Main scheduler loop. Checks hourly if a refresh is needed."""
     # Wait 30 seconds for the app to fully start
     time.sleep(30)
 
     while True:
-        try:
-            # Apple popularity sync first, so today's refresh snapshots can
-            # pick up fresh Apple values (the sync also patches rows created
-            # before it finished). Internally a no-op unless configured.
-            from .apple_ads.sync import maybe_run_sync
-
-            maybe_run_sync()
-        except Exception as e:
-            logger.error(f"Apple popularity sync scheduling error: {e}")
-
-        try:
-            if _needs_refresh_today():
-                _run_daily_refresh()
-        except Exception as e:
-            logger.error(f"Scheduler error: {e}")
-            _update_status(running=False, error=str(e))
-
+        _tick()
         # Sleep 1 hour before checking again
         time.sleep(3600)
 
@@ -234,17 +221,20 @@ def run_manual_refresh(pairs):
     refreshed.  Uses the same in-memory progress state as the automatic
     scheduler so the dashboard progress bar works identically.
 
-    Returns immediately.  If a refresh (manual or automatic) is already
-    running, does nothing.
+    Returns True when the refresh started and False when it could not: a
+    refresh (manual or automatic) is already running, or the run lane is
+    busy with a keyword search or an AI run (they share Apple's budget).
     """
     from .models import Keyword
 
     with _status_lock:
         if _refresh_status["running"]:
-            return  # Already busy
+            return False  # Already busy
 
     if not pairs:
-        return
+        return False
+    if run_queue.lane_state() != "idle":
+        return False
 
     def _work():
         total = len(pairs)
@@ -280,16 +270,12 @@ def run_manual_refresh(pairs):
                     f"Manual refresh failed for {keyword_obj.keyword} ({country}): {e}"
                 )
 
-        _update_status(
-            running=False,
-            completed=total,
-            current_keyword="",
-            last_completed_at=timezone.now().isoformat(),
-        )
+        _refresh_finished(completed=total, last_completed_at=timezone.now().isoformat())
         logger.info(f"Manual bulk refresh complete: {total} pairs refreshed.")
 
     thread = threading.Thread(target=_work, daemon=True, name="aso-manual-refresh")
     thread.start()
+    return True
 
 
 _scheduler_started = False

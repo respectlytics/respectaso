@@ -38,7 +38,75 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.24.1',
+RELEASES = [{'version': '2.25.0',
+  'date': '2026-09-05',
+  'title': 'Research up to 1,000 keywords in one search',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'Paste a whole keyword list and get on with your day',
+       'intro': ['The Keyword Research tab now takes up to 1,000 keywords per search with '
+                 'Pro (3 per search in the free version) and does the work in the '
+                 'background, one keyword at a time.'],
+       'items': [
+           '<strong>Switch tabs freely.</strong> A search keeps going while you use the rest '
+           'of RespectASO, and its results stream into your Search History as they come in. '
+           'A small strip at the bottom of every other page shows how far it is.',
+           '<strong>Quit and it continues.</strong> Close RespectASO in the middle of a long '
+           'search and it picks up where it left off the next time you open the app - the '
+           'same after a crash or a restart.',
+           '<strong>Pause and resume.</strong> Pause a search at any point; everything '
+           'researched so far is already in your Search History. Resume when you like, copy '
+           'the remaining keywords, or discard the rest. Nothing is ever thrown away without '
+           'asking you first.',
+           '<strong>A quick check while a long search runs.</strong> Need one keyword now? '
+           'Search it and press Run now: the long search steps aside for a moment and '
+           'resumes by itself right after.',
+           '<strong>Reorder the queue.</strong> Keyword searches and AI runs line up in one '
+           'queue you can see from every tab. Move a run up or down, put it next, or start '
+           'it now.',
+           '<strong>Nothing is silently dropped.</strong> A keyword Apple would not answer '
+           'for is listed at the end of the search with a one-click "Search these again". '
+           'Over the limit? The search tells you the count instead of quietly cutting the '
+           'list.',
+       ]},
+      {'heading': 'Keep your daily refresh short',
+       'items': [
+           'Once the daily ranking refresh of your tracked keywords takes an hour or more, '
+           'the dashboard says so and shows the Low Volume and Avoid keywords you could '
+           'drop, with a one-click filter to review and delete them.',
+       ]},
+      {'heading': 'Quality of life',
+       'items': [
+           'The keyword field takes one keyword per line as well as comma-separated lists, '
+           'grows as you paste, and counts the keywords as you type.',
+           'The Search History header says when rankings were last refreshed and reminds '
+           'you that they refresh once a day while RespectASO is open.',
+           'The "+ Track" button on Top Search Terms scores the keyword right away, even '
+           'while a long search is running.',
+           'The "Unable to check for updates" note no longer appears in the top corner '
+           'after a busy session. RespectASO now looks for a new version a few times an '
+           'hour instead of on every page.',
+       ]},
+      {'heading': 'See Top Search Terms before you unlock it',
+       'items': [
+           'Without a Pro license, or before Apple Ads is connected, the Top Search Terms '
+           'tab now shows the real page filled with sample data, the search terms locked, '
+           'and the one step that unlocks it: get or renew a license, activate a key, '
+           'connect Apple Ads, or wait for the first weekly sync.',
+       ]},
+      {'heading': 'Fixed',
+       'items': [
+           '<strong>Run-together title spellings count.</strong> An app called "ScrollLess" '
+           'now counts as using "scroll less" in its title, so the "apps use this keyword '
+           'in their title" figure matches the list you see, and the keyword is '
+           'highlighted as one chip instead of two.',
+           'The tier cards, insights and signals say "ratings", the column they are read '
+           'against, instead of "reviews".',
+           'A stray line of template text no longer appears above the AI button in the '
+           "dashboard's App Summary.",
+       ]},
+  ]},
+ {'version': '2.24.1',
   'date': '2026-08-25',
   'title': 'The Invite a friend panel and license renewal reach respectaso.com again',
   'kind': 'patch',

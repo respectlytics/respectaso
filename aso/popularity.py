@@ -114,6 +114,21 @@ def absent_cap(country, genre=""):
         return None
 
 
+def make_absent_cap_lookup():
+    """A memoized ``absent_cap`` for loops over many stored rows: one lookup
+    per (country, genre) instead of one per row. Fresh per call, so a weekly
+    dataset sync is never served from a stale memo."""
+    cache: dict = {}
+
+    def lookup(country, genre):
+        key = ((country or "").lower(), genre or "")
+        if key not in cache:
+            cache[key] = absent_cap(*key)
+        return cache[key]
+
+    return lookup
+
+
 def resolve_popularity(competitors, keyword, country, apple_lookup=None):
     """Resolve popularity for a keyword from both sources.
 

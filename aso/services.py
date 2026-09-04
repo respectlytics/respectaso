@@ -117,15 +117,44 @@ def _has_finance_context(title_tokens: set[str], genre: str) -> bool:
     return False
 
 
+def compound_form(tokens: list[str]) -> str:
+    """Run-together spelling of a multi-word keyword: "scroll less" -> "scrollless".
+
+    Apple matches "ScrollLess" and "Scroll Less" the same way, and a
+    developer reading the results list sees the same keyword in both, so
+    a title that runs the words together counts as using the exact
+    phrase. Single-word keywords have no compound form (empty string).
+    Shared with the title highlighter (aso_tags.highlight_keyword) so the
+    list and the scores agree on what "in the title" means.
+    """
+    return "".join(tokens) if len(tokens) > 1 else ""
+
+
+def _has_compound_form(kw_tokens: list[str], title_tokens: list[str]) -> bool:
+    """True when a title token starts with the keyword's run-together form.
+
+    Anchored to the start of a token so "smartapp" never matches "art app",
+    while "scrolllessapp" still matches "scroll less".
+    """
+    compound = compound_form(kw_tokens)
+    return bool(compound) and any(
+        tok.startswith(compound) for tok in title_tokens
+    )
+
+
 def _keyword_title_evidence(keyword: str, title: str, genre: str = "") -> dict[str, float | bool]:
     """
     Match hierarchy: exact phrase > all words(any order) > partial overlap(weak).
+
+    The exact-phrase tier also accepts the run-together spelling of the
+    keyword ("ScrollLess" for "scroll less"), see compound_form().
 
     Returns a normalized evidence score in [0, 1] plus match flags.
     """
     kw = (keyword or "").lower().strip()
     title_lower = (title or "").lower()
-    kw_tokens = set(_tokenize(kw))
+    kw_token_list = _tokenize(kw)
+    kw_tokens = set(kw_token_list)
     title_tokens_list = _tokenize(title_lower)
     title_tokens = set(title_tokens_list)
 
@@ -138,7 +167,9 @@ def _keyword_title_evidence(keyword: str, title: str, genre: str = "") -> dict[s
             "evidence": 0.0,
         }
 
-    exact_phrase = bool(kw and kw in title_lower)
+    exact_phrase = bool(kw and kw in title_lower) or _has_compound_form(
+        kw_token_list, title_tokens_list
+    )
     all_words = all(tok in title_tokens for tok in kw_tokens)
     overlap = len(kw_tokens & title_tokens) / len(kw_tokens)
 
@@ -1636,9 +1667,9 @@ class DifficultyCalculator:
                     "icon": "🏷️",
                     "type": "info",
                     "text": (
-                        f"Brand keyword — '{kw_lower}' matches publisher "
+                        f"Brand keyword - '{kw_lower}' matches publisher "
                         f"{brand_name}. The #1 app ({leader_name}) has few "
-                        f"reviews because it's a brand companion app, not "
+                        f"ratings because it's a brand companion app, not "
                         f"because the keyword is easy. Difficulty reflects "
                         f"the full competitive landscape."
                     ),
@@ -1651,7 +1682,7 @@ class DifficultyCalculator:
                 override_text = (
                     f"Score adjusted from {raw_total} → {total}. "
                     f"Only {n} app{'s' if n > 1 else ''} found for this "
-                    f"keyword — very little competition exists."
+                    f"keyword - very little competition exists."
                 )
             else:
                 leader_name = competitors[0].get("trackName", "#1 app")
@@ -1662,18 +1693,18 @@ class DifficultyCalculator:
                         f"Score adjusted from {raw_total} → {total}. "
                         f"The #1 app ({leader_name}) has only "
                         f"{leader_reviews:,} "
-                        f"review{'s' if leader_reviews != 1 else ''}, "
+                        f"rating{'s' if leader_reviews != 1 else ''}, "
                         f"but {title_match_count} of {n} competitors "
-                        f"target this keyword — real competition exists."
+                        f"target this keyword - real competition exists."
                     )
                 else:
                     override_text = (
                         f"Score adjusted from {raw_total} → {total}. "
                         f"The #1 app ({leader_name}) has only "
                         f"{leader_reviews:,} "
-                        f"review{'s' if leader_reviews != 1 else ''}. "
+                        f"rating{'s' if leader_reviews != 1 else ''}. "
                         f"The remaining results are generic backfill "
-                        f"from broader search terms — not real "
+                        f"from broader search terms - not real "
                         f"competition for this specific keyword."
                     )
 
@@ -1799,7 +1830,7 @@ class DifficultyCalculator:
                     "total_apps": 0,
                     "tier_score": 0,
                     "label": "Easy",
-                    "highlights": ["No competitors found — wide open."],
+                    "highlights": ["No competitors found - wide open."],
                 }
                 continue
 
@@ -1987,36 +2018,36 @@ class DifficultyCalculator:
             open_spots = tier_size - n
             highlights.append(
                 f"Only {n} app{'s' if n != 1 else ''} rank here "
-                f"— {open_spots} open spot{'s' if open_spots != 1 else ''}."
+                f"- {open_spots} open spot{'s' if open_spots != 1 else ''}."
             )
             return highlights
 
         # Review barrier
         if min_reviews < 100:
             highlights.append(
-                f"The easiest app to beat has just {min_reviews:,} reviews."
+                f"The easiest app to beat has just {min_reviews:,} ratings."
             )
         elif min_reviews < 1_000:
             highlights.append(
-                f"You need ~{min_reviews:,}+ reviews to compete "
+                f"You need ~{min_reviews:,}+ ratings to compete "
                 f"(weakest: {weakest_app})."
             )
         elif min_reviews < 10_000:
             highlights.append(
-                f"You need ~{min_reviews:,}+ reviews to break in."
+                f"You need ~{min_reviews:,}+ ratings to break in."
             )
         else:
             highlights.append(
-                f"Requires ~{min_reviews:,}+ reviews — established market."
+                f"Requires ~{min_reviews:,}+ ratings - established market."
             )
 
         # Weak spots
         if weak > 0:
             highlights.append(
-                f"{weak} of {n} apps have under 1K reviews — beatable."
+                f"{weak} of {n} apps have under 1K ratings - beatable."
             )
         else:
-            highlights.append("Every app here has 1K+ reviews — no easy targets.")
+            highlights.append("Every app here has 1K+ ratings - no easy targets.")
 
         # Fresh entrants
         if fresh > 0:
@@ -2028,7 +2059,7 @@ class DifficultyCalculator:
         # Title keyword usage
         if title_opt == 0:
             highlights.append(
-                "No app uses this exact keyword in its title — ASO opportunity!"
+                "No app uses this exact keyword in its title - ASO opportunity!"
             )
         elif title_opt < n // 2:
             highlights.append(
@@ -2066,7 +2097,7 @@ class DifficultyCalculator:
                     "type": "barrier",
                     "text": (
                         f"{ultra} app{'s' if ultra > 1 else ''} with 1M+ "
-                        "reviews — dominated by major brands"
+                        "ratings - dominated by major brands"
                     ),
                 }
             )
@@ -2077,7 +2108,7 @@ class DifficultyCalculator:
                     "type": "barrier",
                     "text": (
                         f"{mega} app{'s' if mega > 1 else ''} with 100K+ "
-                        "reviews — strong incumbents"
+                        "ratings - strong incumbents"
                     ),
                 }
             )
@@ -2089,7 +2120,7 @@ class DifficultyCalculator:
                     "icon": "📊",
                     "type": "info",
                     "text": (
-                        f"Review distribution is skewed — median "
+                        f"Rating distribution is skewed - median "
                         f"({median:,.0f}) is much lower than mean "
                         f"({avg:,.0f}). A few giants inflate the average."
                     ),
@@ -2104,7 +2135,7 @@ class DifficultyCalculator:
                     "type": "opportunity",
                     "text": (
                         "No competitors have this exact keyword in their "
-                        "title — potential title optimization gap"
+                        "title - potential title optimization gap"
                     ),
                 }
             )
@@ -2138,7 +2169,7 @@ class DifficultyCalculator:
                     "icon": "⭐",
                     "type": "barrier",
                     "text": (
-                        f"High quality bar — avg rating is "
+                        f"High quality bar - avg rating is "
                         f"{avg_quality:.1f} stars. Users expect excellence."
                     ),
                 }
@@ -2153,7 +2184,7 @@ class DifficultyCalculator:
                     "type": "opportunity",
                     "text": (
                         f"{weak_count} of {n} competitors have <1,000 "
-                        "reviews — beatable with a quality app"
+                        "ratings - beatable with a quality app"
                     ),
                 }
             )
@@ -2215,10 +2246,10 @@ class DifficultyCalculator:
                         "Strong" if len(weak_apps) >= 3 else "Moderate"
                     ),
                     "detail": (
-                        f"{len(weak_apps)} of {n} apps have <1,000 reviews."
+                        f"{len(weak_apps)} of {n} apps have <1,000 ratings."
                         f" The weakest ({weakest.get('trackName', 'Unknown')})"
                         f" has only "
-                        f"{weakest.get('userRatingCount', 0):,} reviews — "
+                        f"{weakest.get('userRatingCount', 0):,} ratings - "
                         "these positions are displaceable."
                     ),
                 }
@@ -2248,7 +2279,7 @@ class DifficultyCalculator:
                     "detail": (
                         f"{len(fresh_apps)} "
                         f"app{'s' if len(fresh_apps) > 1 else ''} launched "
-                        "in the last 12 months — this market is still "
+                        "in the last 12 months - this market is still "
                         "attracting new entrants."
                     ),
                 }

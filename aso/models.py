@@ -212,6 +212,42 @@ class SearchResult(models.Model):
             absent_ceiling=ceiling,
         )
 
+    def popularity_resolution(self):
+        """Both popularity sources and their provenance, resolved once.
+
+        The same ``PopularityResolution`` live scoring produces, rebuilt from
+        the stored values, so ``popularity_fields()`` renders a stored row
+        exactly like a fresh one (one lookup instead of one per property).
+        """
+        from .popularity import (
+            SOURCE_APPLE,
+            PopularityResolution,
+            absent_cap,
+            effective_from_pair,
+            get_popularity_source,
+        )
+
+        source_setting = get_popularity_source()
+        ceiling = (
+            absent_cap(self.country, self.inferred_genre)
+            if source_setting == SOURCE_APPLE else None
+        )
+        effective, source, is_fallback = effective_from_pair(
+            self.popularity_score,
+            self.apple_popularity_score,
+            source_setting,
+            absent_ceiling=ceiling,
+        )
+        return PopularityResolution(
+            effective=effective,
+            internal=self.popularity_score,
+            apple=self.apple_popularity_score,
+            source=source,
+            is_fallback=is_fallback,
+            genre_hint=self.inferred_genre or "",
+            absent_ceiling=ceiling,
+        )
+
     @property
     def effective_popularity(self):
         """The popularity value that feeds all calculations for this row."""
@@ -285,6 +321,121 @@ class SearchResult(models.Model):
         from .services import DownloadEstimator
 
         return DownloadEstimator().estimate(effective, country=self.country)
+
+
+
+class KeywordSearchJob(models.Model):
+    """One keyword search from the Keyword Research tab, as a persistent job.
+
+    The list of keywords and countries is the work; ``next_index`` is the
+    cursor into it (pair order is keyword-major: pair ``i`` is keyword
+    ``i // n_countries`` in country ``i % n_countries``, so "214 of 1,000
+    keywords done" is literally true and a resumed job continues with the
+    next keyword). The run queue (aso/run_queue.py) executes one job at a
+    time; a job survives quitting the app, a crash and a container restart
+    because everything it needs is in this row.
+
+    Statuses: queued (waiting its turn), running, paused (by the user, by a
+    throttle, after an error, or to let another run go first), completed,
+    failed (the dispatcher's backstop; treated like paused after an error),
+    cancelled (the user discarded the rest). Nothing is ever discarded by
+    the system.
+    """
+
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("running", "Running"),
+        ("paused", "Paused"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),   # the user discarded the rest
+    ]
+    ACTIVE_STATUSES = ("queued", "running", "paused", "failed")
+    TERMINAL_STATUSES = ("completed", "cancelled")
+    THROTTLE_CHOICES = [
+        ("normal", "Normal"),
+        ("slowed_down", "Slowed down"),
+        ("paused", "Paused by throttling"),
+        ("cooldown", "Cooling down"),
+    ]
+
+    app = models.ForeignKey(
+        App, on_delete=models.SET_NULL, null=True, blank=True, related_name="search_jobs",
+    )
+    countries = models.JSONField(default=list)     # ["us", "de"], validated, max 5, order kept
+    keywords = models.JSONField(default=list)      # parsed list, original spelling, deduped, order kept
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="queued")
+    queue_rank = models.IntegerField(null=True, blank=True)   # queue order; NULL = append
+    # Paused so another run could go first; restored to the front of the
+    # queue by the dispatcher once that run is done.
+    auto_resume = models.BooleanField(default=False)
+    yielded_for_feature = models.CharField(max_length=32, blank=True, default="")
+    yielded_for_id = models.IntegerField(null=True, blank=True)
+    yielded_for_label = models.CharField(max_length=220, blank=True, default="")
+    next_index = models.PositiveIntegerField(default=0)   # pair index of the next unit of work
+    done_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    skipped_items = models.JSONField(default=list)   # ["invoice maker (US)", ...]
+    failed_items = models.JSONField(default=list)    # [{"keyword", "country", "error"}], capped
+    current_pair = models.CharField(max_length=220, blank=True, default="")   # 'meditation timer (DE)'
+    progress_message = models.CharField(max_length=200, blank=True, default="")
+    error_message = models.TextField(blank=True, default="")
+    throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
+    seconds_per_pair = models.FloatField(null=True, blank=True)   # running average, feeds the ETA
+    elapsed_seconds = models.FloatField(default=0)                # active time across resumes
+    acknowledged = models.BooleanField(default=False)             # "Done" pressed on a finished job
+    restart_resumes = models.PositiveIntegerField(default=0)      # continued after the app was closed mid-run
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.total_keywords} keywords ({', '.join(c.upper() for c in self.countries)}) - {self.status}"
+
+    @property
+    def total_keywords(self) -> int:
+        return len(self.keywords or [])
+
+    @property
+    def total_pairs(self) -> int:
+        return len(self.keywords or []) * len(self.countries or [])
+
+    @property
+    def keywords_done(self) -> int:
+        """Keywords fully worked through (every country), from the cursor."""
+        n = len(self.countries or [])
+        return self.next_index // n if n else 0
+
+    @property
+    def remaining_keywords(self) -> list:
+        """The keywords not finished yet, in order - what Copy copies."""
+        return list((self.keywords or [])[self.keywords_done:])
+
+    @property
+    def remaining_count(self) -> int:
+        return self.total_keywords - self.keywords_done
+
+    @property
+    def progress_percent(self) -> int:
+        total = self.total_pairs
+        return int(self.next_index * 100 / total) if total else 0
+
+    @property
+    def is_active(self) -> bool:
+        return self.status in self.ACTIVE_STATUSES
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in self.TERMINAL_STATUSES
+
+    def pair(self, index):
+        """(keyword, country) for pair ``index``."""
+        n = len(self.countries)
+        return self.keywords[index // n], self.countries[index % n]
 
 
 class AppleSearchPopularity(models.Model):

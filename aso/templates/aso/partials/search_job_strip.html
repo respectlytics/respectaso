@@ -1,0 +1,36 @@
+{% load static %}
+{% comment %}
+The keyword search strip (fixed bottom, every page but the dashboard):
+"Keyword research running: 214 of 1,000 keywords" with a link back to the
+Keyword Research tab. Rendered server-side from the search_job_strip
+context processor so it is right on arrival, then kept live by
+static/js/keyword-search-job.js while the search is active.
+{% endcomment %}
+{% if request.resolver_match.url_name != "dashboard" %}
+<div id="search-job-strip" class="fixed bottom-0 left-0 right-0 z-50 {% if not search_job_strip %}hidden{% endif %}">
+    <div class="bg-[#1e293b] border-t border-white/10 px-4 py-2">
+        <div class="max-w-5xl mx-auto flex items-center gap-3">
+            <div id="sjs-spinner" class="hidden animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full shrink-0"></div>
+            <svg id="sjs-pause-icon" class="hidden w-4 h-4 text-amber-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <svg id="sjs-done-icon" class="hidden w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-3 text-xs">
+                    <span id="sjs-text" class="text-slate-300 truncate"></span>
+                    <a id="sjs-link" href="{% url 'aso:dashboard' %}" class="text-purple-300 hover:text-purple-200 font-medium shrink-0"></a>
+                </div>
+                <div id="sjs-bar" class="hidden w-full bg-slate-700/50 rounded-full h-1.5 mt-1">
+                    <div id="sjs-fill" class="bg-purple-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{ search_job_strip|json_script:"search-job-strip-data" }}
+<script src="{% static 'js/keyword-search-job.js' %}"></script>
+<script>
+    SearchJob.initStrip({
+        currentUrl: "{% url 'aso:search_job_current' %}",
+        job: JSON.parse(document.getElementById('search-job-strip-data').textContent)
+    });
+</script>
+{% endif %}

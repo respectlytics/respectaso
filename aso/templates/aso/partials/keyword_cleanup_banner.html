@@ -1,0 +1,43 @@
+{% comment %}
+The keyword cleanup suggestion (aso/keyword_cleanup.py), shown above Search
+History once the daily refresh of every tracked keyword and country pair
+takes an hour or more and at least ten of them are Low Volume or Avoid.
+"Show them" filters the History table to those rows, where the existing
+multi-select delete does the rest; "Remind me in 30 days" snoozes it
+server-side (aso.ui_state), because the desktop edition has no
+localStorage.
+{% endcomment %}
+{% if cleanup %}
+<div id="keyword-cleanup-banner" class="bg-amber-900/20 border border-amber-500/30 rounded-xl p-4">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-amber-300 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-semibold text-amber-100">Your daily refresh is getting long</h3>
+            <p class="text-sm text-amber-200/80 mt-1">
+                RespectASO re-checks {{ cleanup.pairs_text }} keyword and country pairs every day, which takes {{ cleanup.refresh_text }}{% if IS_NATIVE_APP %} while the app is open{% endif %}.
+                {{ cleanup.candidates_text }} of them are Low Volume or Avoid.
+                Review those and remove the ones you don't need, and tomorrow's refresh gets shorter.
+            </p>
+            <div class="flex flex-wrap items-center gap-3 mt-3">
+                <a href="{{ cleanup.filter_url }}"
+                   class="bg-amber-600/40 hover:bg-amber-600/60 border border-amber-500/30 text-amber-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                    Show them
+                </a>
+                <button type="button" id="keyword-cleanup-snooze"
+                        class="text-xs text-amber-300/80 hover:text-amber-100 transition-colors">
+                    Remind me in 30 days
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    document.getElementById('keyword-cleanup-snooze').addEventListener('click', function () {
+        fetch('{% url "aso:keyword_cleanup_snooze" %}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'}
+        }).catch(function () {});
+        document.getElementById('keyword-cleanup-banner').remove();
+    });
+</script>
+{% endif %}

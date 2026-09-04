@@ -139,6 +139,7 @@
 
 {% block scripts %}
 <script src="{% static 'js/popularity-display.js' %}"></script>
+<script src="{% static 'js/keyword-highlight.js' %}"></script>
 <script>
 const csrfToken = '{{ csrf_token }}';
 
@@ -428,31 +429,6 @@ function classificationBadge(label) {
         </div>`;
 }
 
-function highlightKeyword(title, keyword) {
-    if (!keyword || !title) return title || '';
-    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const words = keyword.trim().split(/\s+/).filter(Boolean);
-    if (!words.length) return escHtml(title);
-    const titleLower = title.toLowerCase();
-    const kwLower = keyword.trim().toLowerCase();
-    const present = words.filter(w => titleLower.includes(w.toLowerCase()));
-    const hasExactPhrase = words.length > 1 && titleLower.includes(kwLower);
-    const CLS_EXACT = 'bg-green-500/25 text-green-300 rounded px-0.5';
-    const CLS_ALL   = 'bg-amber-500/25 text-amber-300 rounded px-0.5';
-    const CLS_PART  = 'bg-slate-400/20 text-slate-300 rounded px-0.5';
-    if (hasExactPhrase) {
-        const re = new RegExp(`(${esc(keyword.trim())})`, 'gi');
-        return title.replace(re, `<mark class="${CLS_EXACT}">$1</mark>`);
-    }
-    if (!present.length) return escHtml(title);
-    let cls;
-    if (words.length === 1) cls = CLS_EXACT;
-    else if (present.length === words.length) cls = CLS_ALL;
-    else cls = CLS_PART;
-    const re = new RegExp(`(${present.map(w => esc(w)).join('|')})`, 'gi');
-    return title.replace(re, `<mark class="${cls}">$1</mark>`);
-}
 
 // --- Table sorting ---
 let oppSortCol = -1;

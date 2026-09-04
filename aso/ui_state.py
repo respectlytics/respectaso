@@ -13,6 +13,7 @@ licensing.
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from django.conf import settings
@@ -24,6 +25,7 @@ _FILENAME = "ui_state.json"
 # Dismissible notices, by key. One entry per notice so a future one does
 # not need a new file.
 RESPECTLYTICS_BANNER = "respectlytics_banner"
+KEYWORD_CLEANUP_BANNER = "keyword_cleanup_banner"
 
 
 def _path() -> Path:
@@ -39,8 +41,29 @@ def _load() -> dict:
 
 
 def is_dismissed(key: str) -> bool:
-    """True once the user has dismissed the notice named `key`."""
-    return bool(_load().get("dismissed", {}).get(key))
+    """True once the user has dismissed the notice named `key` for good, or
+    snoozed it and the snooze has not run out yet."""
+    data = _load()
+    if data.get("dismissed", {}).get(key):
+        return True
+    until = data.get("snoozed", {}).get(key)
+    if not until:
+        return False
+    try:
+        return datetime.fromisoformat(until) > datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+
+def snooze(key: str, days: int) -> None:
+    """Hide the notice named `key` for `days` days; it comes back after."""
+    data = _load()
+    snoozed = data.get("snoozed")
+    if not isinstance(snoozed, dict):
+        snoozed = {}
+    snoozed[key] = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat()
+    data["snoozed"] = snoozed
+    _save(data)
 
 
 def dismiss(key: str) -> None:
@@ -51,6 +74,10 @@ def dismiss(key: str) -> None:
         dismissed = {}
     dismissed[key] = True
     data["dismissed"] = dismissed
+    _save(data)
+
+
+def _save(data: dict) -> None:
     try:
         path = _path()
         path.parent.mkdir(parents=True, exist_ok=True)

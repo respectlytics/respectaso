@@ -1,0 +1,46 @@
+{% load static %}
+<!-- Run queue - shared by the three Pro AI tabs and the Keyword Research tab
+     (hidden until there is something to show). Rendered entirely by
+     static/js/run-queue.js from the aso:queue_status endpoint. -->
+<section id="queue-section" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-6 hidden">
+
+    <!-- A run finished while the user was looking at something else. -->
+    <div id="queue-notice" class="hidden flex items-start gap-3 mb-4 rounded-lg border border-white/10 bg-slate-800/60 px-3 py-2.5">
+        <p id="queue-notice-text" class="text-sm text-slate-200 flex-1 min-w-0"></p>
+        <button type="button" id="queue-notice-action"
+                class="shrink-0 text-xs px-2.5 py-1 rounded-full border border-purple-500/30 text-purple-300 hover:bg-purple-600/20 transition-colors">
+            View results
+        </button>
+        <button type="button" id="queue-notice-dismiss" title="Dismiss this message"
+                class="shrink-0 text-slate-500 hover:text-slate-300 transition-colors p-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+
+    <!-- The lane is busy with a run that belongs to another tab. -->
+    <div id="queue-running-elsewhere" class="hidden flex items-center gap-3 mb-4 rounded-lg border border-white/5 bg-slate-800/50 px-3 py-2.5">
+        <div class="animate-spin h-4 w-4 border-2 border-purple-500 border-t-transparent rounded-full shrink-0"></div>
+        <p id="queue-running-elsewhere-text" class="text-sm text-slate-300 flex-1 min-w-0"></p>
+        <a id="queue-running-elsewhere-link" href="#"
+           class="shrink-0 text-xs px-2.5 py-1 rounded-full border border-purple-500/30 text-purple-300 hover:bg-purple-600/20 transition-colors">
+            Open
+        </a>
+    </div>
+
+    <!-- A cancelled run is still finishing its step, or a ranking refresh
+         holds the Apple budget: the text says which. -->
+    <p id="queue-winding-down" class="hidden text-sm text-slate-400 mb-4"></p>
+
+    <!-- Up next -->
+    <div id="queue-header" class="hidden flex items-center justify-between gap-3 mb-3">
+        <h2 class="text-base font-semibold text-white">
+            Up next
+            <span id="queue-count" class="ml-1 text-xs font-normal text-slate-400"></span>
+        </h2>
+        <button type="button" id="queue-clear-btn"
+                class="text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg px-3 py-1.5 transition-colors">
+            Clear queue
+        </button>
+    </div>
+    <div id="queue-list" class="space-y-2"></div>
+</section>

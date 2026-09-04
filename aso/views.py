@@ -3,7 +3,6 @@ import json
 import logging
 import re
 import time
-import urllib.request
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +13,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from . import run_queue, search_jobs, update_check
 from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
-from .models import App, Keyword, SearchResult
+from .keyword_scoring import score_keyword_pair
+from .models import App, Keyword, KeywordSearchJob, SearchResult
+from .pro_access import pro_required_json
 from .dashboard_summary import compute_app_summary
 from .popularity import (
     annotate_effective_popularity,
     popularity_fields,
-    prefetch_apple_values,
     resolve_popularity,
 )
 from .scoring import calc_opportunity, classify_keyword, CLASSIFICATION_LABELS
@@ -362,21 +363,18 @@ def dashboard_view(request):
 
     from .popularity import (
         SOURCE_APPLE,
-        absent_cap,
         effective_from_pair,
         get_popularity_source,
+        make_absent_cap_lookup,
     )
 
     source_setting = get_popularity_source()
-    _cap_cache: dict = {}
+    cap_for = make_absent_cap_lookup()
 
     def _row_effective(row):
         ceiling = None
         if source_setting == SOURCE_APPLE:
-            key = (row["country"], row.get("inferred_genre", ""))
-            if key not in _cap_cache:
-                _cap_cache[key] = absent_cap(*key)
-            ceiling = _cap_cache[key]
+            ceiling = cap_for(row["country"], row.get("inferred_genre", ""))
         return effective_from_pair(
             row["popularity_score"], row["apple_popularity_score"],
             source_setting, absent_ceiling=ceiling,
@@ -427,6 +425,22 @@ def dashboard_view(request):
         last_refresh=last_refresh,
     )
 
+    # The keyword search in progress (or paused, or queued) and the newest
+    # finished one not yet dismissed: rendered on page load so switching back
+    # to the tab shows the live state at once. Results are fetched by the JS.
+    from .keyword_cleanup import cleanup_suggestion
+
+    panel = search_jobs.panel_job()
+    finished = search_jobs.finished_job()
+    search_job_bootstrap = {
+        "job": search_jobs.job_payload(panel) if panel else None,
+        "finished": search_jobs.job_payload(finished) if finished else None,
+        "others": [search_jobs.compact_payload(j) for j in search_jobs.other_paused_jobs(panel)],
+    }
+    cleanup = cleanup_suggestion(
+        SearchResult.objects.filter(id__in=latest_ids), app_id=int(app_id) if app_id else None,
+    )
+
     return render(
         request,
         "aso/dashboard.html",
@@ -460,6 +474,10 @@ def dashboard_view(request):
             "selected_diff_max": diff_max,
             "search_q": search_q,
             "has_filters": has_filters,
+            # Keyword search jobs (aso/search_jobs.py)
+            "search_job": search_job_bootstrap,
+            "keyword_limit_context": search_jobs.limit_context(),
+            "cleanup": cleanup,
         },
     )
 
@@ -500,186 +518,318 @@ def _attach_apple_trends(results) -> None:
 
 @require_POST
 def search_view(request):
-    """
-    Process keyword search request across one or more countries (max 5).
+    """Start a keyword search: create a job and answer at once.
 
-    Accepts comma-separated keywords (max 20) and comma-separated countries (max 5).
-    For each keyword × country combination:
-      1. Search iTunes for top competitors
-      2. Calculate difficulty score
-      3. Estimate popularity from competitor data
-      4. Save results to DB
-    Returns JSON with results grouped by country.
+    The search itself runs in the background through the run queue
+    (aso/search_jobs.py): one keyword and country pair at a time, resumable
+    after a restart. The limit per search depends on the edition (1,000
+    with Pro, 3 without) and is an error with a number, never a silent cut.
+    ``run_now=1`` puts the job first, pausing a running keyword search
+    (Top Search Terms tracks one keyword this way).
     """
     form = KeywordSearchForm(request.POST)
     if not form.is_valid():
         return JsonResponse({"error": "Invalid form data."}, status=400)
 
-    raw_keywords = form.cleaned_data["keywords"]
+    keywords = search_jobs.parse_keywords(form.cleaned_data["keywords"])
     app_id = form.cleaned_data.get("app_id")
     countries = form.cleaned_data.get("countries", ["us"])
-
-    # Parse comma-separated keywords, limit to 20
-    keywords = [kw.strip() for kw in raw_keywords.split(",") if kw.strip()][:20]
 
     if not keywords:
         return JsonResponse({"error": "No keywords provided."}, status=400)
 
-    # Get app if specified
-    app = None
-    if app_id:
-        try:
-            app = App.objects.get(id=app_id)
-        except App.DoesNotExist:
-            pass
+    context = search_jobs.limit_context()
+    limit = context["limit"]
+    if len(keywords) > limit:
+        return JsonResponse({
+            "error": search_jobs.limit_error(len(keywords), limit, context["is_pro"]),
+            "count": len(keywords), **context,
+        }, status=400)
 
-    # Set up services
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    download_est = DownloadEstimator()
+    if not context["is_pro"] and search_jobs.active_job() is not None:
+        return JsonResponse({"error": search_jobs.FREE_BUSY_MESSAGE, **context}, status=400)
 
-    # Results grouped by country
-    results_by_country = {}
-    skipped = []
-    call_count = 0
+    app = App.objects.filter(id=app_id).first() if app_id else None
 
-    for country in countries:
-        country_results = []
-        # One batched Apple fetch for the whole list, so each keyword's
-        # first score already carries its real Apple value.
-        prefetch_apple_values(keywords, country)
-        for kw_text in keywords:
-            # Get or create keyword
-            keyword_obj, created = Keyword.objects.get_or_create(
-                keyword=kw_text.lower(),
-                app=app,
-            )
+    running = run_queue.running_run()
+    queued_behind = None
+    eta_seconds = None
+    if running is not None:
+        run_feature, run_row = running
+        queued_behind = run_feature.label
+        if run_feature.key == search_jobs.FEATURE_KEY:
+            queued_behind = "the current search"
+            eta_seconds = search_jobs.job_payload(run_row)["eta_seconds"]
+    elif run_queue.busy_reason():
+        queued_behind = run_queue.busy_reason()
 
-            # Skip if this keyword already has results for the SAME country today
-            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-            if not created and keyword_obj.results.filter(
-                country=country, searched_at__gte=today_start
-            ).exists():
-                skipped.append(f"{kw_text} ({country.upper()})")
-                continue
+    run_now = request.POST.get("run_now") in ("1", "true", "on")
+    job = search_jobs.create_job(app, countries, keywords, run_now=run_now)
+    return JsonResponse({
+        "job": search_jobs.job_payload(job),
+        "queued_behind": queued_behind if job.status == "queued" else None,
+        "eta_seconds": eta_seconds if job.status == "queued" else None,
+    })
 
-            # Rate limit between external API calls only.
-            if call_count > 0:
-                time.sleep(2)
-            call_count += 1
 
-            # Search for competitors
-            try:
-                competitors = itunes_service.search_apps(kw_text, country=country, limit=25)
-            except SearchAPIUnavailableError as e:
-                return JsonResponse(
-                    {"error": str(e)},
-                    status=503,
-                )
+# ---------------------------------------------------------------------------
+# Keyword search jobs: what the dashboard panel and the global strip poll
+# and press. No Pro gate here - keyword search is a free feature with a
+# size limit, and the limit is checked at creation only.
+# ---------------------------------------------------------------------------
 
-            # Difficulty Score
-            difficulty_score, breakdown = difficulty_calc.calculate(
-                competitors, keyword=kw_text
-            )
+def _job_or_404(job_id):
+    return get_object_or_404(KeywordSearchJob, pk=job_id)
 
-            # Find user's app rank (if app has a track_id)
-            app_rank = None
-            if app and app.track_id:
-                try:
-                    app_rank = itunes_service.find_app_rank(
-                        kw_text, app.track_id, country=country
-                    )
-                except SearchAPIUnavailableError:
-                    pass  # Rank is optional — continue without it
 
-            # Popularity from both sources; `pop.effective` feeds all math.
-            pop = resolve_popularity(competitors, kw_text, country)
-            popularity = pop.effective
+def search_job_current_view(request):
+    """The active job (running, paused or queued), the newest finished job
+    not yet dismissed, and any other paused searches - without results."""
+    panel = search_jobs.panel_job()
+    finished = search_jobs.finished_job()
+    return JsonResponse({
+        "job": search_jobs.job_payload(panel) if panel else None,
+        "finished": search_jobs.job_payload(finished) if finished else None,
+        "others": [search_jobs.compact_payload(j) for j in search_jobs.other_paused_jobs(panel)],
+    })
 
-            # Download estimates
-            download_estimates = download_est.estimate(
-                popularity or 0,
-                country=country,
-            )
-            breakdown["download_estimates"] = download_estimates
 
-            # Save result (one entry per keyword+country per day)
-            search_result = SearchResult.upsert_today(
-                keyword=keyword_obj,
-                popularity_score=pop.internal,
-                inferred_genre=pop.genre_hint,
-                apple_popularity_score=pop.apple,
-                difficulty_score=difficulty_score,
-                difficulty_breakdown=breakdown,
-                competitors_data=competitors,
-                app_rank=app_rank,
-                country=country,
-            )
+def search_job_detail_view(request, job_id):
+    """One job with its results (cards for the first 50 pairs, the
+    opportunity ranking over all of them)."""
+    job = _job_or_404(job_id)
+    return JsonResponse({"job": search_jobs.job_payload(job, include_results=True)})
 
-            opportunity = calc_opportunity(popularity or 0, difficulty_score)
 
-            country_results.append(
-                {
-                    "keyword": kw_text,
-                    "country": country,
-                    "popularity_score": popularity,
-                    **popularity_fields(pop),
-                    "difficulty_score": difficulty_score,
-                    "opportunity_score": opportunity,
-                    "difficulty_label": search_result.difficulty_label,
-                    "difficulty_color": search_result.difficulty_color,
-                    "difficulty_breakdown": breakdown,
-                    "competitors": competitors,
-                    "result_id": search_result.id,
-                    "app_rank": app_rank,
-                    "app_name": app.name if app else None,
-                    "app_icon": app.icon_url if app else None,
-                    "classification": search_result.classification,
-                }
-            )
-        results_by_country[country] = country_results
+@require_POST
+def search_job_pause_view(request, job_id):
+    job = _job_or_404(job_id)
+    updated = KeywordSearchJob.objects.filter(pk=job.pk, status="running").update(
+        status="paused", auto_resume=False, throttle_state="normal",
+        yielded_for_feature="", yielded_for_id=None, yielded_for_label="",
+        progress_message="Paused", current_pair="",
+    )
+    if not updated:
+        return JsonResponse({"error": "This search is not running."}, status=400)
+    run_queue.kick()
+    job.refresh_from_db()
+    return JsonResponse({"job": search_jobs.job_payload(job)})
 
-    # Build opportunity ranking when multiple countries searched
-    opportunity_ranking = []
-    if len(countries) > 1:
-        # Group results by keyword across countries
-        kw_map = {}
-        for country, cresults in results_by_country.items():
-            for r in cresults:
-                kw = r["keyword"]
-                if kw not in kw_map:
-                    kw_map[kw] = {}
-                pop = r["popularity_score"] or 0
-                diff = r["difficulty_score"]
-                opp = calc_opportunity(pop, diff)
-                kw_map[kw][country] = {
-                    "popularity": pop,
-                    "difficulty": diff,
-                    "opportunity": opp,
-                }
-        for kw, country_data in kw_map.items():
-            best_country = max(country_data, key=lambda c: country_data[c]["opportunity"])
-            opportunity_ranking.append({
-                "keyword": kw,
-                "countries": country_data,
-                "best_country": best_country,
-                "best_score": country_data[best_country]["opportunity"],
-            })
-        opportunity_ranking.sort(key=lambda x: x["best_score"], reverse=True)
 
-    response_data = {
-        "results_by_country": results_by_country,
-        "countries": countries,
-        "opportunity_ranking": opportunity_ranking,
+@require_POST
+def search_job_resume_view(request, job_id):
+    """Resume a paused search. It re-queues at the back like any re-queued
+    run; with ``now=1`` it goes first and pauses whatever keyword search
+    runs (the "Resume now" button on a search that stepped aside)."""
+    job = _job_or_404(job_id)
+    updated = KeywordSearchJob.objects.filter(pk=job.pk, status__in=("paused", "failed")).update(
+        status="queued", auto_resume=False, queue_rank=None,
+        yielded_for_feature="", yielded_for_id=None, yielded_for_label="",
+        error_message="", progress_message="Resuming...",
+    )
+    if not updated:
+        return JsonResponse({"error": "This search is not paused."}, status=400)
+    if request.POST.get("now") in ("1", "true", "on"):
+        run_queue.run_now(search_jobs.FEATURE_KEY, job.pk)
+    else:
+        run_queue.kick()
+    job.refresh_from_db()
+    return JsonResponse({"job": search_jobs.job_payload(job)})
+
+
+@require_POST
+def search_job_discard_view(request, job_id):
+    """Discard the rest of a paused search (the researched keywords stay in
+    Search History). A queued search leaves the queue instead: deleted when
+    it never ran, paused when it already has progress."""
+    job = _job_or_404(job_id)
+    if job.status == "running":
+        return JsonResponse({"error": "Pause the search before discarding the rest."}, status=400)
+    if job.status == "queued":
+        removed = run_queue.remove_queued(search_jobs.FEATURE_KEY, job.pk)
+        if not removed:
+            return JsonResponse({"error": "This search already started."}, status=400)
+        run_queue.kick()
+        job = KeywordSearchJob.objects.filter(pk=job.pk).first()
+        return JsonResponse({"job": search_jobs.job_payload(job) if job else None})
+    updated = KeywordSearchJob.objects.filter(pk=job.pk, status__in=("paused", "failed")).update(
+        status="cancelled", auto_resume=False, finished_at=timezone.now(),
+        yielded_for_feature="", yielded_for_id=None, yielded_for_label="",
+        progress_message="Discarded the rest", current_pair="",
+    )
+    if not updated:
+        return JsonResponse({"error": "This search already finished."}, status=400)
+    run_queue.kick()
+    job.refresh_from_db()
+    return JsonResponse({"job": search_jobs.job_payload(job, include_results=True)})
+
+
+@require_POST
+def search_job_retry_failed_view(request, job_id):
+    """A new search with the keywords that could not be checked."""
+    job = _job_or_404(job_id)
+    if not job.is_terminal or not job.failed_items:
+        return JsonResponse({"error": "Nothing to search again."}, status=400)
+    context = search_jobs.limit_context()
+    if not context["is_pro"] and search_jobs.active_job() is not None:
+        return JsonResponse({"error": search_jobs.FREE_BUSY_MESSAGE, **context}, status=400)
+    KeywordSearchJob.objects.filter(pk=job.pk).update(acknowledged=True)
+    new_job = search_jobs.retry_failed_job(job)
+    return JsonResponse({"job": search_jobs.job_payload(new_job)})
+
+
+@require_POST
+def search_job_dismiss_view(request, job_id):
+    """"Done" on a finished search: it does not come back on reload."""
+    KeywordSearchJob.objects.filter(
+        pk=job_id, status__in=KeywordSearchJob.TERMINAL_STATUSES,
+    ).update(acknowledged=True)
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def keyword_cleanup_snooze_view(request):
+    """"Remind me in 30 days" on the keyword cleanup banner."""
+    from . import ui_state
+    from .keyword_cleanup import CLEANUP_SNOOZE_DAYS
+
+    ui_state.snooze(ui_state.KEYWORD_CLEANUP_BANNER, days=CLEANUP_SNOOZE_DAYS)
+    return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# The run queue (GitHub respectlytics/respectaso#18, #23)
+#
+# One run executes at a time across the Pro AI tabs and keyword searches, in
+# an order the user can change. These endpoints are what every tab polls and
+# what the queue panel's controls call. Pro only: the free tier runs one
+# keyword search at a time and has no queue to show.
+# ---------------------------------------------------------------------------
+
+def _queue_entry(feature, row, **extra):
+    """One queue-panel row: who owns the run, what it is, where it lives."""
+    described = feature.describe(row)
+    return {
+        "feature": feature.key,
+        "feature_label": feature.label,
+        "id": row.pk,
+        "label": described["label"],
+        "detail": described["detail"],
+        "country": described["country"],
+        "is_refinement": described["is_refinement"],
+        "quote_label": described.get("quote_label", True),
+        "url": feature.open_url,
+        **extra,
     }
-    if skipped:
-        response_data["skipped"] = skipped
-        response_data["warning"] = (
-            f"Skipped {len(skipped)} keyword(s) already in your list: "
-            + ", ".join(skipped)
-            + ". Use Refresh to update them."
-        )
-    return JsonResponse(response_data)
+
+
+def _queue_target(request):
+    """(feature, session_id) from a queue POST, or an error response."""
+    feature_key = (request.POST.get("feature") or "").strip()
+    feature = run_queue.get_feature(feature_key)
+    if feature is None:
+        return None, None, JsonResponse({"error": "Unknown feature."}, status=400)
+    try:
+        session_id = int(request.POST.get("session_id") or "")
+    except ValueError:
+        return None, None, JsonResponse({"error": "Unknown run."}, status=404)
+    return feature, session_id, None
+
+
+@pro_required_json
+def queue_status_view(request):
+    """Everything a tab needs to draw its progress panel and the queue."""
+    feature = run_queue.get_feature((request.GET.get("feature") or "").strip())
+    if feature is None:
+        return JsonResponse({"error": "Unknown feature."}, status=400)
+
+    running_here = running_elsewhere = None
+    executing_can_yield = False
+    running = run_queue.running_run()
+    if running is not None:
+        run_feature, run_row = running
+        executing_can_yield = run_feature.can_yield
+        if run_feature.key == feature.key:
+            progress = run_feature.progress(run_row) if run_feature.progress else {}
+            running_here = _queue_entry(run_feature, run_row, **progress)
+        else:
+            running_elsewhere = _queue_entry(
+                run_feature, run_row,
+                progress_percent=run_row.progress_percent,
+                progress_message=run_row.progress_message or "",
+                can_yield=run_feature.can_yield,
+            )
+
+    queued = [
+        _queue_entry(queued_feature, queued_row, position=position,
+                     can_run_now=executing_can_yield)
+        for position, (queued_feature, queued_row)
+        in enumerate(run_queue.queued_runs(), start=1)
+    ]
+    return JsonResponse({
+        "feature": feature.key,
+        "lane_state": run_queue.lane_state(),
+        "busy_with": run_queue.busy_reason() if running is None else None,
+        "running_here": running_here,
+        "running_elsewhere": running_elsewhere,
+        "queued": queued,
+    })
+
+
+@pro_required_json
+@require_POST
+def queue_remove_view(request):
+    """Take one waiting run out of the queue. A run that never started
+    leaves no history row; a keyword search with progress is paused."""
+    feature, session_id, error = _queue_target(request)
+    if error is not None:
+        return error
+    if run_queue.remove_queued(feature.key, session_id):
+        run_queue.kick()
+        return JsonResponse({"ok": True})
+    exists = feature.model.objects.filter(pk=session_id, **feature.filter_kwargs).exists()
+    if not exists:
+        return JsonResponse({"error": "Unknown run."}, status=404)
+    return JsonResponse(
+        {"error": "This run already started - cancel it from its tab instead."},
+        status=400,
+    )
+
+
+@pro_required_json
+@require_POST
+def queue_clear_view(request):
+    """Take every waiting run out of the queue. The executing run is never touched."""
+    removed = run_queue.clear_queued()
+    run_queue.kick()
+    return JsonResponse({"ok": True, "removed": removed})
+
+
+@pro_required_json
+@require_POST
+def queue_move_view(request):
+    """Move a waiting run up, down or to the front (``direction``)."""
+    feature, session_id, error = _queue_target(request)
+    if error is not None:
+        return error
+    position = run_queue.move(feature.key, session_id, (request.POST.get("direction") or "").strip())
+    if position is None:
+        return JsonResponse({"error": "This run is not waiting in the queue."}, status=400)
+    return JsonResponse({"position": position})
+
+
+@pro_required_json
+@require_POST
+def queue_run_now_view(request):
+    """Put a waiting run first and pause the executing run when it can
+    step aside (a keyword search can, an AI run cannot)."""
+    feature, session_id, error = _queue_target(request)
+    if error is not None:
+        return error
+    result = run_queue.run_now(feature.key, session_id)
+    if result is None:
+        return JsonResponse({"error": "This run is not waiting in the queue."}, status=400)
+    return JsonResponse(result)
 
 
 def opportunity_view(request):
@@ -1234,72 +1384,32 @@ def keyword_refresh_view(request, keyword_id):
     keyword_obj = get_object_or_404(Keyword, id=keyword_id)
     country = request.POST.get("country", "us")
 
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    download_est = DownloadEstimator()
-
-    # Search for competitors
     try:
-        competitors = itunes_service.search_apps(
-            keyword_obj.keyword, country=country, limit=25
+        search_result = score_keyword_pair(
+            keyword_obj, country,
+            itunes_service=ITunesSearchService(),
+            difficulty_calc=DifficultyCalculator(),
+            download_est=DownloadEstimator(),
         )
     except SearchAPIUnavailableError as e:
         return JsonResponse({"error": str(e)}, status=503)
 
-    # Calculate difficulty
-    difficulty_score, breakdown = difficulty_calc.calculate(
-        competitors, keyword=keyword_obj.keyword
-    )
-
-    # App rank
-    app_rank = None
     app = keyword_obj.app
-    if app and app.track_id:
-        try:
-            app_rank = itunes_service.find_app_rank(
-                keyword_obj.keyword, app.track_id, country=country
-            )
-        except SearchAPIUnavailableError:
-            pass  # Rank is optional
-
-    # Popularity from both sources; `pop.effective` feeds all math.
-    pop = resolve_popularity(competitors, keyword_obj.keyword, country)
-    popularity = pop.effective
-
-    # Download estimates
-    download_estimates = download_est.estimate(
-        popularity or 0,
-        country=country,
-    )
-    breakdown["download_estimates"] = download_estimates
-
-    # Save new result (one entry per keyword+country per day)
-    search_result = SearchResult.upsert_today(
-        keyword=keyword_obj,
-        popularity_score=pop.internal,
-        inferred_genre=pop.genre_hint,
-        apple_popularity_score=pop.apple,
-        difficulty_score=difficulty_score,
-        difficulty_breakdown=breakdown,
-        competitors_data=competitors,
-        app_rank=app_rank,
-        country=country,
-    )
-
+    pop = search_result.popularity_resolution()
     return JsonResponse({
         "success": True,
         "result": {
             "keyword": keyword_obj.keyword,
             "keyword_id": keyword_obj.pk,
             "result_id": search_result.pk,
-            "popularity_score": popularity,
+            "popularity_score": pop.effective,
             **popularity_fields(pop),
-            "difficulty_score": difficulty_score,
+            "difficulty_score": search_result.difficulty_score,
             "difficulty_label": search_result.difficulty_label,
             "difficulty_color": search_result.difficulty_color,
             "country": country,
             "searched_at": search_result.searched_at.strftime("%b %d, %H:%M"),
-            "app_rank": app_rank,
+            "app_rank": search_result.app_rank,
             "app_name": app.name if app else None,
         },
     })
@@ -1504,45 +1614,26 @@ def keywords_bulk_refresh_view(request):
     status = get_status()
     if status["running"]:
         return JsonResponse({"success": False, "error": "A refresh is already in progress."})
+    running = run_queue.running_run()
+    if running is not None:
+        return JsonResponse({
+            "success": False,
+            "error": f"{running[0].label} is running. Refresh when it finishes.",
+        }, status=400)
 
-    run_manual_refresh(pairs)
+    if not run_manual_refresh(pairs):
+        return JsonResponse({"success": False, "error": "A refresh is already in progress."})
     return JsonResponse({"success": True, "started": True, "total": len(pairs)})
 
 
 def version_check_view(request):
-    """Check GitHub for a newer release. Returns JSON with update info."""
-    current = settings.VERSION
-    is_native = getattr(settings, "IS_NATIVE_APP", False)
-    try:
-        url = "https://api.github.com/repos/respectlytics/respectaso/releases/latest"
-        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
-        latest = data.get("tag_name", "").lstrip("v")
-        if not latest:
-            return JsonResponse({"update_available": False, "current": current, "is_native": is_native})
-        # Simple semver comparison
-        current_parts = [int(x) for x in current.split(".")]
-        latest_parts = [int(x) for x in latest.split(".")]
-        update_available = latest_parts > current_parts
-        # Extract .dmg download URL from release assets
-        download_url = ""
-        for asset in data.get("assets", []):
-            if asset.get("name", "").endswith(".dmg"):
-                download_url = asset.get("browser_download_url", "")
-                break
-        return JsonResponse({
-            "update_available": update_available,
-            "current": current,
-            "latest": latest,
-            "release_url": data.get("html_url", ""),
-            "release_notes": data.get("body", ""),
-            "download_url": download_url,
-            "is_native": is_native,
-        })
-    except Exception as e:
-        logger.warning("Update check failed: %s: %s", type(e).__name__, e)
-        return JsonResponse({"update_available": False, "error": type(e).__name__, "current": current, "is_native": is_native})
+    """Report whether a newer release exists, for the update banner.
+
+    Every page load calls this. GitHub is asked at most once every ten
+    minutes (see aso/update_check.py); pages in between get the cached
+    answer, so an active session can never exhaust GitHub's rate limit.
+    """
+    return JsonResponse(update_check.check_for_update())
 
 
 def auto_refresh_status_view(request):
@@ -1551,32 +1642,17 @@ def auto_refresh_status_view(request):
     return JsonResponse(get_status())
 
 
-_dmg_url_cache = {"url": None, "expires": 0}
-
 GITHUB_RELEASES_URL = "https://github.com/respectlytics/respectaso/releases/latest"
-GITHUB_API_LATEST = "https://api.github.com/repos/respectlytics/respectaso/releases/latest"
 
 
 def download_dmg_view(request):
-    """Redirect to the latest .dmg download URL (direct file, no GitHub page)."""
-    now = time.time()
-    if _dmg_url_cache["url"] and now < _dmg_url_cache["expires"]:
-        return redirect(_dmg_url_cache["url"])
+    """Redirect to the latest .dmg as a direct file download.
 
-    try:
-        req = urllib.request.Request(GITHUB_API_LATEST, headers={"Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode())
-        for asset in data.get("assets", []):
-            if asset.get("name", "").endswith(".dmg"):
-                url = asset["browser_download_url"]
-                _dmg_url_cache["url"] = url
-                _dmg_url_cache["expires"] = now + 300
-                return redirect(url)
-    except Exception:
-        logger.warning("Failed to fetch latest DMG URL from GitHub API")
-
-    return redirect(_dmg_url_cache.get("url") or GITHUB_RELEASES_URL)
+    Reuses the update banner's cached GitHub answer (aso/update_check.py),
+    so a click never adds a GitHub request of its own. When the latest
+    release is not known, the GitHub releases page is the fallback.
+    """
+    return redirect(update_check.check_for_update().get("download_url") or GITHUB_RELEASES_URL)
 
 
 def keyword_trend_view(request, keyword_id):
