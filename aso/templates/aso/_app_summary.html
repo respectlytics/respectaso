@@ -297,35 +297,23 @@
         {# Bucket distribution — shape only, no normative copy #}
         <div>
             <div class="flex items-center justify-between mb-1.5">
-                <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1.5 cursor-help" data-tip="How your tracked keywords break down by popularity-vs-difficulty profile. NO category is inherently better than another — an app already ranking #1 for a 'High Competition' keyword can be in a much stronger position than one tracking only 'Sweet Spots'. Use this to see the shape of your keyword mix, not as a quality score.">
+                <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1.5 cursor-help" data-tip="How your tracked keywords break down by what each one is worth where you search it. NO category is inherently better than another: an app already ranking #1 for a keyword a new app would see as 'Worth Climbing' can be in a much stronger position than one tracking only 'Sweet Spots'. Use this to see the shape of your keyword mix, not as a quality score.">
                     Keyword mix
                     <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </h4>
             </div>
             <div class="flex h-2.5 rounded-full overflow-hidden bg-slate-900/60">
                 {% with bd=summary.bucket_dist tot=summary.total_keywords %}
-                {% with sw=bd|get_item:'Sweet Spot' gt=bd|get_item:'Good Target' hg=bd|get_item:'Hidden Gem' hc=bd|get_item:'High Competition' mod=bd|get_item:'Moderate' lv=bd|get_item:'Low Volume' av=bd|get_item:'Avoid' %}
-                {% if sw %}<div class="bg-green-500 cursor-help" style="width: {{ sw|pct_of:tot }}%" data-tip="Sweet Spot: {{ sw }} keyword{{ sw|pluralize }} — high search popularity AND low ranking difficulty. The most accessible growth opportunity if you're not already ranking."></div>{% endif %}
-                {% if gt %}<div class="bg-emerald-500 cursor-help" style="width: {{ gt|pct_of:tot }}%" data-tip="Good Target: {{ gt }} keyword{{ gt|pluralize }} — solid search volume with manageable competition."></div>{% endif %}
-                {% if hg %}<div class="bg-blue-500 cursor-help" style="width: {{ hg|pct_of:tot }}%" data-tip="Hidden Gem: {{ hg }} keyword{{ hg|pluralize }} — moderate popularity, minimal competition. Underrated picks."></div>{% endif %}
-                {% if hc %}<div class="bg-yellow-500 cursor-help" style="width: {{ hc|pct_of:tot }}%" data-tip="High Competition: {{ hc }} keyword{{ hc|pluralize }} — high popularity but tough field. Not bad — if you ALREADY rank well for these, you're in a strong position."></div>{% endif %}
-                {% if mod %}<div class="bg-slate-500 cursor-help" style="width: {{ mod|pct_of:tot }}%" data-tip="Moderate: {{ mod }} keyword{{ mod|pluralize }} — reasonable popularity / difficulty balance. Works as supporting keywords."></div>{% endif %}
-                {% if lv %}<div class="bg-slate-600 cursor-help" style="width: {{ lv|pct_of:tot }}%" data-tip="Low Volume: {{ lv }} keyword{{ lv|pluralize }} — very few searches. Only worth tracking if highly relevant."></div>{% endif %}
-                {% if av %}<div class="bg-red-500/70 cursor-help" style="width: {{ av|pct_of:tot }}%" data-tip="Avoid: {{ av }} keyword{{ av|pluralize }} — low search volume AND high difficulty. Effort better spent elsewhere."></div>{% endif %}
-                {% endwith %}
+                {% for item in classification_legend %}{% with n=bd|get_item:item.label %}
+                {% if n %}<div class="{{ item.bar }} cursor-help" style="width: {{ n|pct_of:tot }}%" data-tip="{{ item.label }}: {{ n }} keyword{{ n|pluralize }}. {{ item.description }}"></div>{% endif %}
+                {% endwith %}{% endfor %}
                 {% endwith %}
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] text-slate-500">
                 {% with bd=summary.bucket_dist %}
-                {% with sw=bd|get_item:'Sweet Spot' gt=bd|get_item:'Good Target' hg=bd|get_item:'Hidden Gem' hc=bd|get_item:'High Competition' mod=bd|get_item:'Moderate' lv=bd|get_item:'Low Volume' av=bd|get_item:'Avoid' %}
-                {% if sw %}<span class="cursor-help" data-tip="High popularity, low difficulty — easiest growth opportunities."><span class="inline-block w-2 h-2 rounded-sm bg-green-500 align-middle mr-1"></span>🎯 Sweet Spot: <span class="text-slate-300">{{ sw }}</span></span>{% endif %}
-                {% if gt %}<span class="cursor-help" data-tip="Solid volume with manageable competition."><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 align-middle mr-1"></span>✅ Good Target: <span class="text-slate-300">{{ gt }}</span></span>{% endif %}
-                {% if hg %}<span class="cursor-help" data-tip="Moderate volume, minimal competition — underrated picks."><span class="inline-block w-2 h-2 rounded-sm bg-blue-500 align-middle mr-1"></span>💎 Hidden Gem: <span class="text-slate-300">{{ hg }}</span></span>{% endif %}
-                {% if hc %}<span class="cursor-help" data-tip="High popularity, hard field — if you already rank here, you're winning."><span class="inline-block w-2 h-2 rounded-sm bg-yellow-500 align-middle mr-1"></span>⚔️ High Competition: <span class="text-slate-300">{{ hc }}</span></span>{% endif %}
-                {% if mod %}<span class="cursor-help" data-tip="Reasonable popularity/difficulty balance — supporting keywords."><span class="inline-block w-2 h-2 rounded-sm bg-slate-500 align-middle mr-1"></span>👍 Moderate: <span class="text-slate-300">{{ mod }}</span></span>{% endif %}
-                {% if lv %}<span class="cursor-help" data-tip="Very few searches — track only if directly relevant."><span class="inline-block w-2 h-2 rounded-sm bg-slate-600 align-middle mr-1"></span>🔍 Low Volume: <span class="text-slate-300">{{ lv }}</span></span>{% endif %}
-                {% if av %}<span class="cursor-help" data-tip="Low volume + high difficulty — effort better spent elsewhere."><span class="inline-block w-2 h-2 rounded-sm bg-red-500/70 align-middle mr-1"></span>🚫 Avoid: <span class="text-slate-300">{{ av }}</span></span>{% endif %}
-                {% endwith %}
+                {% for item in classification_legend %}{% with n=bd|get_item:item.label %}
+                {% if n %}<span class="cursor-help" data-tip="{{ item.description }}"><span class="inline-block w-2 h-2 rounded-sm {{ item.bar }} align-middle mr-1"></span>{{ item.icon }} {{ item.label }}: <span class="text-slate-300">{{ n }}</span></span>{% endif %}
+                {% endwith %}{% endfor %}
                 {% endwith %}
             </div>
         </div>
@@ -409,58 +397,3 @@
     </div> {# /data-summary-body — collapsible region #}
 
 </div>
-
-<script>
-// Click on a per-country row in the summary jumps to the History table filtered
-// to that country. Provides clear visual feedback so the user can SEE the change:
-// smooth-scrolls to the history section + briefly flashes the country filter.
-function filterHistoryToCountry(cc) {
-    const sel = document.getElementById('history-country-filter');
-    const historySection = document.getElementById('history-section');
-
-    // If we already have this country selected AND the history section is in view,
-    // do nothing — clicking the same row twice shouldn't reload the page.
-    const url = new URL(window.location.href);
-    const currentCountry = url.searchParams.get('country') || '';
-    if (currentCountry === cc) {
-        // Already filtered — just scroll to history and flash
-        if (historySection) {
-            historySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            historySection.style.transition = 'box-shadow 0.4s ease';
-            historySection.style.boxShadow = '0 0 0 2px rgba(168, 85, 247, 0.4)';
-            setTimeout(() => { historySection.style.boxShadow = ''; }, 800);
-        }
-        return;
-    }
-
-    // Persist scroll target so after reload we land at history
-    try { sessionStorage.setItem('aso_scroll_to', 'history-section'); } catch(e) {}
-
-    if (sel) {
-        sel.value = cc;
-        sel.dispatchEvent(new Event('change'));
-        return;
-    }
-    // Fallback: rebuild URL directly
-    url.searchParams.set('country', cc);
-    url.searchParams.delete('page');
-    window.location.href = url.toString();
-}
-
-// After the page reload, if we set a scroll target, jump to it and flash.
-(function() {
-    let target = null;
-    try { target = sessionStorage.getItem('aso_scroll_to'); } catch(e) {}
-    if (!target) return;
-    try { sessionStorage.removeItem('aso_scroll_to'); } catch(e) {}
-    const el = document.getElementById(target);
-    if (!el) return;
-    // Give the layout a beat to settle (the history table can be tall)
-    setTimeout(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.transition = 'box-shadow 0.4s ease';
-        el.style.boxShadow = '0 0 0 2px rgba(168, 85, 247, 0.5)';
-        setTimeout(() => { el.style.boxShadow = ''; }, 900);
-    }, 100);
-})();
-</script>

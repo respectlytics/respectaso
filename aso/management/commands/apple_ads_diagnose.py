@@ -21,13 +21,8 @@ import time
 
 from django.core.management.base import BaseCommand, CommandError
 
-from aso.apple_ads import api, keys, storage
-
-STOREFRONTS = [
-    "us", "gb", "ca", "au", "de", "fr", "jp", "kr", "cn", "br",
-    "in", "mx", "es", "it", "nl", "se", "no", "dk", "fi", "pt",
-    "ru", "tr", "sa", "ae", "sg", "th", "id", "ph", "vn", "tw",
-]
+from aso import countries
+from aso.apple_ads import api, coverage, keys, storage
 
 APPLE_UI_STEPS = """\
 Next steps (one time, about 5 minutes):
@@ -219,27 +214,17 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ #
 
     def _probe_storefronts(self, credentials, ad_account_id, week):
+        """Which storefronts Apple reports popularity for.
+
+        The implementation lives in aso.apple_ads.coverage so that this
+        command and `manage.py probe_storefronts --apple-ads` share one.
+        """
         self._banner("Storefront availability probe")
-        available, empty, errors = [], [], []
-        for country in STOREFRONTS:
-            try:
-                rows, total = api.query_search_term_popularity(
-                    credentials, ad_account_id,
-                    country=country, week_start=week, page_size=1,
-                )
-            except api.AppleAdsError as e:
-                errors.append((country, str(e)))
-                self.stdout.write(f"  {country}: ERROR {e}")
-                continue
-            if rows:
-                available.append(country)
-                self.stdout.write(f"  {country}: available "
-                                  f"(totalCount={total})")
-            else:
-                empty.append(country)
-                self.stdout.write(f"  {country}: NO DATA")
-            time.sleep(0.5)
-        self._ok(f"available={len(available)} empty={empty} "
+        available, empty, errors = coverage.probe(
+            sorted(countries.CODES), credentials=credentials,
+            ad_account_id=ad_account_id, week=week, log=self.stdout.write,
+        )
+        self._ok(f"available={len(available)} empty={len(empty)} "
                  f"errors={[c for c, _ in errors]}")
         self._rate_headers()
 

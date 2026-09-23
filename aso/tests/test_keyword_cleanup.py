@@ -51,7 +51,7 @@ class CleanupSuggestionTest(TestCase):
         self.assertEqual(data["candidates"], 50)
         self.assertEqual(data["refresh_text"], "about 1 h 7 min")
         self.assertIn("insight=Low+Volume", data["filter_url"])
-        self.assertIn("insight=Avoid", data["filter_url"])
+        self.assertNotIn("insight=Avoid", data["filter_url"])   # retired, round 4
         self.assertIn("app=3", data["filter_url"])
         self.assertTrue(data["filter_url"].endswith("#history-section"))
 
@@ -72,7 +72,7 @@ class CleanupSuggestionTest(TestCase):
         resp = self.client.get(reverse("aso:dashboard"))
         self.assertContains(resp, "Your daily refresh is getting long")
         self.assertContains(resp, "re-checks 800 keyword and country pairs")
-        self.assertContains(resp, "50 of them are Low Volume or Avoid")
+        self.assertContains(resp, "50 of them are Low Volume.")
 
     def test_duration_text(self):
         self.assertEqual(duration_text(20), "less than a minute")

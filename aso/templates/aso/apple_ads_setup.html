@@ -1,4 +1,5 @@
 {% extends "aso/base.html" %}
+{% load aso_tags %}
 
 {% block title %}Apple Ads Setup - RespectASO{% endblock %}
 
@@ -119,8 +120,7 @@
                 Hovering the badge explains the exact cap for that keyword.
             </span></li>
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
-                <span class="text-white font-medium">Coverage:</span> 29 of RespectASO's 30 storefronts have Apple data
-                (Apple Ads does not operate in Russia); uncovered storefronts use the estimate unchanged.
+                <span class="text-white font-medium">Coverage:</span> {% apple_coverage_sentence %}
             </span></li>
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Extras included:</span> the

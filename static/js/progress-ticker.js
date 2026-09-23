@@ -5,27 +5,11 @@
 (function() {
     'use strict';
 
-    // Classification → icon (matches dashboard classificationBadge)
-    var ICON_MAP = {
-        'Sweet Spot': '\uD83C\uDFAF',     // 🎯
-        'Hidden Gem': '\uD83D\uDC8E',      // 💎
-        'Good Target': '\u2705',            // ✅
-        'Moderate': '\uD83D\uDC4D',        // 👍
-        'Low Volume': '\uD83D\uDD0D',      // 🔍
-        'High Competition': '\u2694\uFE0F', // ⚔️
-        'Avoid': '\uD83D\uDEAB'            // 🚫
-    };
-
-    // Classification → badge CSS + ring stroke color (consistent with dashboard)
-    var STYLE_MAP = {
-        'Sweet Spot':       { badge: 'bg-green-900/20 border-green-500/20 text-green-300', ring: '#22c55e' },
-        'Good Target':      { badge: 'bg-green-900/20 border-green-500/20 text-green-300', ring: '#22c55e' },
-        'Hidden Gem':       { badge: 'bg-blue-900/20 border-blue-500/20 text-blue-300',    ring: '#3b82f6' },
-        'High Competition': { badge: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300', ring: '#eab308' },
-        'Moderate':         { badge: 'bg-slate-800 border-white/10 text-slate-300',        ring: '#64748b' },
-        'Low Volume':       { badge: 'bg-slate-800 border-white/10 text-slate-300',        ring: '#64748b' },
-        'Avoid':            { badge: 'bg-red-900/20 border-red-500/20 text-red-300',       ring: '#ef4444' }
-    };
+    // The classification icons and colours come from the shared table the
+    // server publishes (static/js/classification-badge.js). Two maps used to
+    // live here with a comment saying they matched the dashboard's, which is
+    // how three copies of seven labels ended up describing three different
+    // versions of the classifier.
 
     // SVG arc constants: circumference of r=23 circle
     var CIRCUMFERENCE = 2 * Math.PI * 23; // ≈ 144.51
@@ -168,8 +152,9 @@
 
         showState('keyword-ticker');
 
-        var style = STYLE_MAP[data.classification] || STYLE_MAP['Moderate'];
-        var icon = ICON_MAP[data.classification] || '\uD83D\uDC4D';
+        var style = window.ClassificationBadge.style(data.classification);
+        var icon = window.ClassificationBadge.icon(data.classification)
+            || window.ClassificationBadge.icon('Supporting');
         var opp = data.opportunity || 0;
 
         // Opportunity ring: animate arc fill

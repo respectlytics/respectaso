@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from . import run_queue, search_jobs, update_check
+from . import countries
 from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
 from .keyword_scoring import score_keyword_pair
 from .models import App, Keyword, KeywordSearchJob, SearchResult
@@ -24,7 +25,12 @@ from .popularity import (
     popularity_fields,
     resolve_popularity,
 )
-from .scoring import calc_opportunity, classify_keyword, CLASSIFICATION_LABELS
+from .scoring import (
+    calc_opportunity,
+    classify_keyword,
+    CLASSIFICATION_LABELS,
+    scoring_guide,
+)
 from .services import (
     DifficultyCalculator,
     DownloadEstimator,
@@ -44,8 +50,32 @@ HISTORY_PER_PAGE_DEFAULT = 25
 
 
 def methodology_view(request):
-    """Our Methodology page — explains how RespectASO works."""
-    return render(request, "aso/methodology.html")
+    """Our Methodology page — explains how RespectASO works.
+
+    Every section is hand written except Country coverage, which is generated
+    from aso/countries.py. A hand written storefront table would be wrong the
+    day a storefront changes, and this page is where a reader goes to find out
+    what a number means.
+    """
+    by_region = countries.by_region()
+    covered = countries.APPLE_ADS_STOREFRONTS & countries.CODES
+    no_language = countries.without_app_store_language()
+    return render(request, "aso/methodology.html", {
+        # The ranks per difficulty tier and the opportunity scale, from the
+        # scoring code, so this page cannot describe a model the app no
+        # longer runs.
+        "scoring_guide": scoring_guide(),
+        "coverage_regions": by_region,
+        "coverage_total": len(countries.CODES),
+        "coverage_apple_known": bool(covered),
+        "coverage_apple_count": len(covered),
+        "coverage_apple_codes": covered,
+        "coverage_language_count": len(countries.CODES) - len(no_language),
+        "coverage_no_language_count": len(no_language),
+        "coverage_measured_count": sum(
+            1 for c in countries.COUNTRIES.values() if c.market_source == "measured"
+        ),
+    })
 
 
 def whats_new_view(request):
@@ -470,6 +500,9 @@ def dashboard_view(request):
             "current_dir": sort_dir,
             # Filter state
             "selected_insights": valid_insights,
+            # Built from the scoring code, so the guide cannot grade a number
+            # the rows beneath it grade differently.
+            "scoring_guide": scoring_guide(),
             "selected_pop_min": pop_min,
             "selected_diff_max": diff_max,
             "search_q": search_q,
@@ -680,7 +713,8 @@ def search_job_retry_failed_view(request, job_id):
 
 @require_POST
 def search_job_dismiss_view(request, job_id):
-    """"Done" on a finished search: it does not come back on reload."""
+    """"Close" on a finished search: it does not come back on reload, and
+    no older search takes its place (search_jobs.finished_job)."""
     KeywordSearchJob.objects.filter(
         pk=job_id, status__in=KeywordSearchJob.TERMINAL_STATUSES,
     ).update(acknowledged=True)
@@ -830,253 +864,6 @@ def queue_run_now_view(request):
     if result is None:
         return JsonResponse({"error": "This run is not waiting in the queue."}, status=400)
     return JsonResponse(result)
-
-
-def opportunity_view(request):
-    """Country Opportunity Finder — search a keyword across all 30 countries."""
-    apps = App.objects.all()
-    form = OpportunitySearchForm()
-    return render(request, "aso/opportunity.html", {"apps": apps, "form": form})
-
-
-@require_POST
-def opportunity_search_country_view(request):
-    """AJAX endpoint: search a keyword in a single country.
-
-    Called once per country by the frontend (30 sequential calls).
-    """
-    keyword = request.POST.get("keyword", "").strip().lower()
-    country_code = request.POST.get("country", "").strip().lower()
-    app_id = request.POST.get("app_id", "")
-
-    valid_codes = {code for code, _ in COUNTRY_CHOICES}
-    if not keyword or country_code not in valid_codes:
-        return JsonResponse({"error": "Missing or invalid keyword/country."}, status=400)
-
-    app = None
-    if app_id:
-        try:
-            app = App.objects.get(id=app_id)
-        except App.DoesNotExist:
-            pass
-
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    download_est = DownloadEstimator()
-
-    try:
-        competitors = itunes_service.search_apps(keyword, country=country_code, limit=25)
-    except SearchAPIUnavailableError as e:
-        return JsonResponse({"error": str(e)}, status=503)
-
-    difficulty_score, breakdown = difficulty_calc.calculate(
-        competitors, keyword=keyword
-    )
-    pop = resolve_popularity(competitors, keyword, country_code)
-    popularity = pop.effective
-
-    download_estimates = download_est.estimate(popularity or 0, country=country_code)
-    breakdown["download_estimates"] = download_estimates
-
-    app_rank = None
-    if app and app.track_id:
-        try:
-            app_rank = itunes_service.find_app_rank(
-                keyword, app.track_id, country=country_code
-            )
-        except SearchAPIUnavailableError:
-            pass  # Rank is optional
-
-    if difficulty_score <= 15:
-        diff_label = "Very Easy"
-    elif difficulty_score <= 35:
-        diff_label = "Easy"
-    elif difficulty_score <= 55:
-        diff_label = "Moderate"
-    elif difficulty_score <= 75:
-        diff_label = "Hard"
-    elif difficulty_score <= 90:
-        diff_label = "Very Hard"
-    else:
-        diff_label = "Extreme"
-
-    opportunity = calc_opportunity(popularity, difficulty_score)
-    top_competitor = competitors[0]["trackName"] if competitors else "—"
-    top_ratings = competitors[0].get("userRatingCount", 0) if competitors else 0
-
-    return JsonResponse({
-        "country": country_code,
-        "popularity": popularity,
-        **popularity_fields(pop),
-        "difficulty": difficulty_score,
-        "difficulty_label": diff_label,
-        "difficulty_breakdown": breakdown,
-        "competitors_data": competitors,
-        "opportunity": opportunity,
-        "app_rank": app_rank,
-        "competitor_count": len(competitors),
-        "top_competitor": top_competitor,
-        "top_ratings": top_ratings,
-    })
-
-
-@require_POST
-def opportunity_search_view(request):
-    """
-    AJAX endpoint: search a single keyword across all 30 countries.
-
-    Returns ranked list of countries by opportunity score.
-    """
-    form = OpportunitySearchForm(request.POST)
-    if not form.is_valid():
-        return JsonResponse({"error": "Invalid form data."}, status=400)
-
-    kw_text = form.cleaned_data["keyword"].strip().lower()
-    app_id = form.cleaned_data.get("app_id")
-
-    if not kw_text:
-        return JsonResponse({"error": "No keyword provided."}, status=400)
-
-    app = None
-    if app_id:
-        try:
-            app = App.objects.get(id=app_id)
-        except App.DoesNotExist:
-            pass
-
-    itunes_service = ITunesSearchService()
-    difficulty_calc = DifficultyCalculator()
-    download_est = DownloadEstimator()
-
-    results = []
-    errors = []
-    for i, (country_code, country_name) in enumerate(COUNTRY_CHOICES):
-        if i > 0:
-            time.sleep(2)
-
-        try:
-            competitors = itunes_service.search_apps(kw_text, country=country_code, limit=25)
-        except SearchAPIUnavailableError as e:
-            errors.append({"country": country_code, "error": str(e)})
-            continue
-
-        difficulty_score, breakdown = difficulty_calc.calculate(
-            competitors, keyword=kw_text
-        )
-        pop = resolve_popularity(competitors, kw_text, country_code)
-        popularity = pop.effective
-
-        download_estimates = download_est.estimate(
-            popularity or 0,
-            country=country_code,
-        )
-        breakdown["download_estimates"] = download_estimates
-
-        app_rank = None
-        if app and app.track_id:
-            try:
-                app_rank = itunes_service.find_app_rank(
-                    kw_text, app.track_id, country=country_code
-                )
-            except SearchAPIUnavailableError:
-                pass  # Rank is optional
-
-        # Compute difficulty label from score (same logic as model property)
-        if difficulty_score <= 15:
-            diff_label = "Very Easy"
-        elif difficulty_score <= 35:
-            diff_label = "Easy"
-        elif difficulty_score <= 55:
-            diff_label = "Moderate"
-        elif difficulty_score <= 75:
-            diff_label = "Hard"
-        elif difficulty_score <= 90:
-            diff_label = "Very Hard"
-        else:
-            diff_label = "Extreme"
-
-        opportunity = calc_opportunity(popularity, difficulty_score)
-        top_competitor = competitors[0]["trackName"] if competitors else "—"
-        top_ratings = competitors[0].get("userRatingCount", 0) if competitors else 0
-
-        results.append({
-            "country": country_code,
-            "popularity": popularity,
-            **popularity_fields(pop),
-            "difficulty": difficulty_score,
-            "difficulty_label": diff_label,
-            "difficulty_breakdown": breakdown,
-            "competitors_data": competitors,
-            "opportunity": opportunity,
-            "app_rank": app_rank,
-            "competitor_count": len(competitors),
-            "top_competitor": top_competitor,
-            "top_ratings": top_ratings,
-            "classification": classify_keyword(popularity or 0, difficulty_score),
-        })
-
-    results.sort(key=lambda x: x["opportunity"], reverse=True)
-
-    response_data = {
-        "keyword": kw_text,
-        "app_id": app.id if app else None,
-        "results": results,
-        "total_countries": len(results),
-    }
-    if errors:
-        response_data["errors"] = errors
-        response_data["error_count"] = len(errors)
-    return JsonResponse(response_data)
-
-
-@require_POST
-def opportunity_save_view(request):
-    """
-    Save selected opportunity results to search history.
-
-    Accepts JSON body with keyword, app_id, and selected results
-    (each containing country, popularity, difficulty, breakdown, competitors, etc.).
-    """
-    try:
-        body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON."}, status=400)
-
-    kw_text = body.get("keyword", "").strip().lower()
-    app_id = body.get("app_id")
-    selected = body.get("results", [])
-
-    if not kw_text or not selected:
-        return JsonResponse({"error": "No keyword or results provided."}, status=400)
-
-    app = None
-    if app_id:
-        try:
-            app = App.objects.get(id=app_id)
-        except App.DoesNotExist:
-            pass
-
-    keyword_obj, _ = Keyword.objects.get_or_create(keyword=kw_text, app=app)
-    saved = 0
-
-    for item in selected:
-        country = item.get("country", "us")
-        # One entry per keyword+country per day (preserves historical trend data).
-        # popularity_score stores the internal estimate; older clients that only
-        # send "popularity" fall back to it (their value was internal-only).
-        SearchResult.upsert_today(
-            keyword=keyword_obj,
-            popularity_score=item.get("popularity_internal", item.get("popularity", 0)),
-            apple_popularity_score=item.get("popularity_apple"),
-            difficulty_score=item.get("difficulty", 0),
-            difficulty_breakdown=item.get("difficulty_breakdown", {}),
-            competitors_data=item.get("competitors_data", []),
-            app_rank=item.get("app_rank"),
-            country=country,
-        )
-        saved += 1
-
-    return JsonResponse({"success": True, "saved": saved})
 
 
 def app_lookup_view(request):
@@ -1500,8 +1287,10 @@ def export_history_csv_view(request):
         "Popularity (RespectASO)", "Popularity (Apple Ads)",
         "Popularity Source", "Popularity Fallback",
         "Apple Popularity Trend",
-        "Difficulty", "Difficulty Label", "Opportunity", "Insight", "Rank",
-        "Competitors", "Date",
+        "Difficulty", "Difficulty Label", "Opportunity",
+        "Scored For", "App Ratings Used", "Expected Rank",
+        "Downloads/Day at Expected Rank", "Downloads/Day at #1",
+        "Insight", "Rank", "Competitors", "Date",
     ]
     app_columns = [
         "Competitor Position", "Competitor App", "Competitor Seller",
@@ -1519,10 +1308,29 @@ def export_history_csv_view(request):
         effective = r.effective_popularity
         pop = effective if effective is not None else ""
         opportunity = (
-            calc_opportunity(effective, r.difficulty_score)
+            calc_opportunity(effective, r.difficulty_score, r.country,
+                             app=r.app_profile, app_rank=r.app_rank, keyword=r.keyword_text)
             if effective is not None
             else ""
         )
+        # The working behind the score, the same figures the table shows
+        # under it: the rank whose taps the app can expect, and what it pays.
+        if effective is not None:
+            reach = r.opportunity_reach
+            expected_rank = reach["position"]
+            at_expected = round(reach["downloads"], 6)
+            profile = r.app_profile
+            known = profile is not None and profile.known
+            ratings_used = profile.ratings if known else None
+            scored_for_cell = r.app.name if known else "new app"
+            first = (r.effective_download_estimates or {}).get("positions") or []
+            at_first = (
+                f"{first[0]['downloads_low']}-{first[0]['downloads_high']}"
+                if first else ""
+            )
+        else:
+            expected_rank = at_expected = at_first = ""
+            ratings_used, scored_for_cell = None, ""
         base_row = [
             r.keyword.keyword,
             r.keyword.app.name if r.keyword.app else "",
@@ -1536,6 +1344,11 @@ def export_history_csv_view(request):
             r.difficulty_score,
             r.difficulty_label,
             opportunity,
+            scored_for_cell,
+            "" if ratings_used is None else ratings_used,
+            expected_rank,
+            at_expected,
+            at_first,
             r.classification,
             r.app_rank if r.app_rank else "",
             len(r.competitors_data) if r.competitors_data else 0,

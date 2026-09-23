@@ -1,3 +1,18 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    /* The AI's written analysis on the AI tabs. The cards span the page,
+       like every other section, but a paragraph that runs 1,400 px wide is
+       tiring to read, so text wraps at a reading width; a table in the
+       analysis still uses the whole card. */
+    .ai-prose p,
+    .ai-prose li,
+    .ai-prose h1,
+    .ai-prose h2,
+    .ai-prose h3,
+    .ai-prose h4 {
+        max-width: 120ch;
+    }
+}

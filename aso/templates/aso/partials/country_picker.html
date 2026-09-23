@@ -1,0 +1,75 @@
+{% comment %}
+The country picker, used by the keyword search on the dashboard and by the
+Country Opportunity Finder. There is one of these, not one per page: two
+hand written copies inside dashboard.html and opportunity.html had already
+drifted apart before this replaced them.
+
+Parameters, all passed with {% include ... with %}:
+
+  picker_id      unique id on the page, e.g. "search-countries"
+  label          the field label above the button
+  max            maximum selectable, omitted or 0 means no limit
+  storage_key    localStorage key remembering the selection for this picker
+  preset         preset id selected the first time a browser opens it
+  cost_per_country  seconds one country costs, drives the cost line
+
+The hidden input is the contract with the surrounding form: a plain
+new FormData(form) picks up countries=us,de,fr with no glue code.
+
+The rows are built by static/js/country-picker.js from the catalog that
+base.html emits once, so this file carries no country data at all.
+{% endcomment %}
+<div class="cp-root relative" id="{{ picker_id }}"
+     data-max="{{ max|default:'' }}"
+     data-storage-key="{{ storage_key }}"
+     data-default-preset="{{ preset|default:'' }}"
+     data-cost-per-country="{{ cost_per_country|default:'' }}">
+    {% if label %}
+    <label class="block text-xs font-medium text-slate-300 mb-1.5" for="{{ picker_id }}-button">
+        {{ label }}{% if max %} <span class="text-slate-500">(max {{ max }})</span>{% endif %}
+    </label>
+    {% endif %}
+
+    <button type="button" id="{{ picker_id }}-button"
+            class="cp-button w-full flex items-center justify-between gap-2 bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            aria-haspopup="true" aria-expanded="false">
+        <span class="cp-button-text truncate">Loading storefronts</span>
+        <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+    </button>
+
+    <div class="cp-panel hidden absolute z-50 mt-1 w-full min-w-[22rem] bg-slate-800 border border-white/10 rounded-lg shadow-xl">
+        <div class="p-2 border-b border-white/5 space-y-2">
+            <input type="search" class="cp-search w-full bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                   placeholder="Search countries" autocomplete="off">
+            <div class="cp-presets flex flex-wrap gap-1"></div>
+        </div>
+
+        <div class="cp-bulk flex items-center justify-between px-3 py-1.5 border-b border-white/5 text-[11px]">
+            <span class="cp-count text-slate-400"></span>
+            <span class="flex gap-3">
+                <button type="button" class="cp-select-all text-purple-300 hover:text-purple-200">Select all</button>
+                <button type="button" class="cp-select-none text-slate-400 hover:text-slate-200">Clear</button>
+            </span>
+        </div>
+
+        <div class="cp-list max-h-80 overflow-y-auto py-1"></div>
+
+        <p class="cp-empty hidden px-3 py-4 text-xs text-slate-500 text-center">No country matches that.</p>
+
+        <div class="px-3 py-2 border-t border-white/5">
+            <p class="cp-cost text-[11px] text-slate-400"></p>
+            <p class="text-[11px] text-slate-500 mt-1">
+                Markers show what is different in a country.
+                <a href="{% url 'aso:methodology' %}#country-coverage" class="text-purple-300 hover:text-purple-200">How coverage works</a>
+            </p>
+        </div>
+    </div>
+
+    {% comment %}The form attribute is what lets the picker live outside the
+    <form> it belongs to, which is the case on the dashboard. Without it the
+    selection never reaches the server and the search quietly falls back to
+    the United States.{% endcomment %}
+    <input type="hidden" class="cp-value" name="{{ field_name|default:'countries' }}"{% if form_id %} form="{{ form_id }}"{% endif %}>
+</div>

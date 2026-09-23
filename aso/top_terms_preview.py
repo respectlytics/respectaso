@@ -22,7 +22,7 @@ from django.urls import reverse
 
 from aso.apple_ads.genres import genre_label
 
-PRICING_URL = "https://respectaso.com/pricing/"
+from .links import PRICING_URL  # noqa: E402 (the one address)
 RENEW_URL = "https://respectaso.com/license/renew/"
 
 # States the preview page can be in. Each maps to one CTA block.

@@ -357,6 +357,51 @@ class SearchResultEffectiveTest(TempDataDirMixin, TestCase):
         self.assertEqual(annotated.effective_pop, 62)
 
 
+class ClassificationUpgradeTest(TempDataDirMixin, TestCase):
+    """A rule change reaches the rows that were stored under the old rule."""
+
+    def _stored_row(self, keyword, country, popularity, difficulty, label):
+        app = App.objects.create(name="Upgrade App")
+        kw = Keyword.objects.create(keyword=keyword, app=app)
+        row = SearchResult.objects.create(
+            keyword=kw, popularity_score=popularity, difficulty_score=difficulty,
+            country=country,
+        )
+        # What an older version wrote. save() would relabel it, so bypass it.
+        SearchResult.objects.filter(pk=row.pk).update(classification=label)
+        return row
+
+    def test_the_argentina_row_is_relabelled_on_upgrade(self):
+        """"meditation" in Argentina: popularity 48, difficulty 38, 6.7
+        searches a day, and position 1 pays 0.1 to 0.4 downloads a day. v2
+        called it a Sweet Spot. After the upgrade it must read what the score
+        beside it says."""
+        from aso.popularity import (
+            CLASSIFICATION_VERSION,
+            maybe_upgrade_classification_version,
+        )
+
+        row = self._stored_row("meditation", "ar", 48, 38, "Sweet Spot")
+        storage.save_apple_settings(apple_ads={"classification_version": 2})
+
+        maybe_upgrade_classification_version()
+
+        row.refresh_from_db()
+        self.assertEqual(row.classification, classify_keyword(48, 38, "ar"))
+        self.assertNotEqual(row.classification, "Sweet Spot")
+        self.assertEqual(
+            storage.load_apple_settings()["apple_ads"]["classification_version"],
+            CLASSIFICATION_VERSION,
+        )
+
+    def test_the_version_is_ahead_of_every_rule_already_shipped(self):
+        """v2 shipped the storefront floor. The downloads ladder is a new
+        rule, so the stored labels need a new version to be rewritten."""
+        from aso.popularity import CLASSIFICATION_VERSION
+
+        self.assertGreaterEqual(CLASSIFICATION_VERSION, 3)
+
+
 class RefreshRowsEffectiveTest(TempDataDirMixin, TestCase):
     """Stored AI-session rows re-resolve under the current source setting
     when reused as refinement/re-simulate inputs (never mixing sources)."""

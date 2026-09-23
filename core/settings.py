@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "2.25.0"
+VERSION = "2.27.0"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -22,6 +22,11 @@ if "test" in sys.argv:
     import tempfile
 
     DATA_DIR = Path(tempfile.mkdtemp(prefix="respectaso-test-data-"))
+
+# And the test runner refuses every connection outside this machine, so a
+# test that forgot to mock Apple fails at once instead of hanging whenever
+# Apple throttles (core/test_runner.py).
+TEST_RUNNER = "core.test_runner.NoNetworkTestRunner"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -81,7 +86,11 @@ TEMPLATES = [
                 "aso.context_processors.popularity_source",
                 "aso.context_processors.whats_new",
                 "aso.context_processors.ui_state",
-                "aso.context_processors.search_job_strip",
+                "aso.context_processors.job_strip",
+                "aso.context_processors.country_catalog",
+                "aso.context_processors.classification_legend",
+                "aso.context_processors.difficulty_factors",
+                "aso.context_processors.pro_invite",
             ],
         },
     },

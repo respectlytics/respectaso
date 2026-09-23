@@ -269,6 +269,7 @@
                     id: previous.id,
                     status: data.status,
                     error: data.error,
+                    failure: data.failure,
                     label: previous.label
                 };
                 if (cfg.isIdle && cfg.isIdle()) {

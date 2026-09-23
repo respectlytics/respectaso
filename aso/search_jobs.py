@@ -30,8 +30,7 @@ from django.db.models import F
 from django.urls import reverse
 from django.utils import timezone
 
-from . import run_queue
-from .forms import COUNTRY_CHOICES
+from . import countries, run_queue
 from .keyword_scoring import result_payload, score_keyword_pair
 from .models import App, Keyword, KeywordSearchJob, SearchResult
 from .popularity import (
@@ -42,7 +41,7 @@ from .popularity import (
     prefetch_apple_values,
 )
 from .pro_access import has_pro_license
-from .scoring import calc_opportunity
+from .scoring import calc_opportunity, top_spot_opportunity
 from .services import (
     DifficultyCalculator,
     DownloadEstimator,
@@ -67,15 +66,12 @@ FAILED_ITEMS_CAP = 200      # failed keywords kept on the row (the retry uses th
 LIST_DISPLAY_CAP = 30       # names spelled out in a warning before "and N more"
 ETA_MIN_PAIRS = 3           # pairs done in this run before an ETA is shown
 
-PRICING_URL = "https://respectaso.com/pricing"
+from .links import PRICING_URL  # noqa: E402 (the one address)
 FREE_BUSY_MESSAGE = (
     "Your current search is still running. Wait for it to finish, or get Pro "
     "to queue searches and run up to 1,000 keywords at a time."
 )
 STATUS_NAME_FOR_THROTTLE = {"aborted": "cooldown"}
-
-# "🇺🇸 United States" -> "United States"
-COUNTRY_NAMES = {code: label.split(" ", 1)[1] for code, label in COUNTRY_CHOICES}
 
 
 def fmt(n) -> str:
@@ -169,10 +165,16 @@ def other_paused_jobs(panel):
 
 
 def finished_job():
-    """The newest finished job the user has not dismissed yet, or None."""
-    return (KeywordSearchJob.objects
-            .filter(status__in=KeywordSearchJob.TERMINAL_STATUSES, acknowledged=False)
-            .order_by("-finished_at", "-pk").first())
+    """The newest finished job, unless the user closed it, or None.
+
+    Only ever the newest. Closing it must not bring up an older search the
+    user never closed: each one looked like the last, so Close seemed to do
+    nothing. Older results live in Search History.
+    """
+    newest = (KeywordSearchJob.objects
+              .filter(status__in=KeywordSearchJob.TERMINAL_STATUSES)
+              .order_by("-finished_at", "-pk").first())
+    return newest if newest is not None and not newest.acknowledged else None
 
 
 def strip_job():
@@ -202,7 +204,7 @@ def create_job(app, countries, keywords, *, run_now=False) -> KeywordSearchJob:
 
 
 def country_names(codes) -> list[str]:
-    return [COUNTRY_NAMES.get(code, code.upper()) for code in codes]
+    return [countries.name(code) for code in codes]
 
 
 def countries_text(codes) -> str:
@@ -351,7 +353,8 @@ def _results(job) -> dict:
         .filter(country__in=job.countries, searched_at__gte=today_start, **scope)
         .select_related("keyword")
         .only("id", "country", "popularity_score", "apple_popularity_score",
-              "difficulty_score", "inferred_genre", "keyword__keyword", "keyword__app_id")
+              "difficulty_score", "inferred_genre", "app_rank", "keyword__keyword",
+              "keyword__app_id")
         .order_by("searched_at")
     )
     by_pair = {}
@@ -376,8 +379,12 @@ def _results(job) -> dict:
 
     ranking = []
     if n > 1:
+        from .app_profiles import cached_profile
+
         cap_for = make_absent_cap_lookup()
         source_setting = get_popularity_source()
+        # Every row here is the job's app, so one profile per storefront.
+        profiles = {code: cached_profile(job.app, code) for code in job.countries}
         kw_map = {}
         for keyword, row in ordered:
             ceiling = (cap_for(row.country, row.inferred_genre)
@@ -390,10 +397,18 @@ def _results(job) -> dict:
             kw_map.setdefault(keyword, {})[row.country] = {
                 "popularity": pop,
                 "difficulty": row.difficulty_score,
-                "opportunity": calc_opportunity(pop, row.difficulty_score),
+                "opportunity": calc_opportunity(
+                    pop, row.difficulty_score, row.country,
+                    app=profiles.get(row.country), app_rank=row.app_rank, keyword=keyword,
+                ),
+                "opportunity_at_first": top_spot_opportunity(pop, row.country),
             }
         for keyword, country_data in kw_map.items():
-            best_country = max(country_data, key=lambda c: country_data[c]["opportunity"])
+            # Best today; among storefronts equal today (often all 0 for a
+            # new app), the one worth most at #1.
+            best_country = max(country_data, key=lambda c: (
+                country_data[c]["opportunity"], country_data[c]["opportunity_at_first"],
+            ))
             ranking.append({
                 "keyword": keyword,
                 "countries": country_data,
@@ -409,17 +424,12 @@ def _results(job) -> dict:
 # Queue hooks
 # ---------------------------------------------------------------------------
 
-def _front_rank() -> int:
-    ranks = [row.queue_rank for _f, row in run_queue.queued_runs() if row.queue_rank is not None]
-    return (min(ranks) if ranks else 1) - 1
-
-
 def requeue_interrupted(queryset) -> None:
     """Searches left "running" by a quit, a crash or a container restart go
     back to the FRONT of the queue (they were executing, not waiting) and
     continue from the first keyword that was not finished."""
     queryset.update(
-        status="queued", queue_rank=_front_rank(), auto_resume=False,
+        status="queued", queue_rank=run_queue.front_rank(), auto_resume=False,
         yielded_for_feature="", yielded_for_id=None, yielded_for_label="",
         current_pair="", progress_message="Resuming...",
         restart_resumes=F("restart_resumes") + 1,

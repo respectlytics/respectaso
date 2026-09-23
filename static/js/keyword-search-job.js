@@ -16,14 +16,13 @@
  *                 queueMoveUrl, csrfToken, isPro, isNative, bootstrap,
  *                 renderResults, onProgress, onFinished})
  *             URL templates carry a 0 where the job id goes.
- * Other pages: SearchJob.initStrip({currentUrl, job})
+ * The global bottom strip lives in job-strip.js: it shows either job type.
  */
 (function () {
     'use strict';
 
     var POLL_MS = 3000;            // while a search runs or waits
     var PAUSED_POLL_MS = 15000;    // while it is paused (another window may resume it)
-    var STRIP_POLL_MS = 5000;
     var HISTORY_REFRESH_MS = 15000;
     var QUEUED_NOTE_MS = 8000;
 
@@ -596,75 +595,8 @@
         apply(cfg.bootstrap || {});
     }
 
-    // --- the strip (every page but the dashboard) ---------------------------
-
-    var stripCfg = null;
-    var stripTimer = null;
-
-    function stripActive(job) {
-        return job && (job.status === 'running' || job.status === 'queued' || job.auto_resume);
-    }
-
-    function renderStrip(job) {
-        var strip = byId('search-job-strip');
-        if (!strip) return;
-        if (!job) {
-            strip.classList.add('hidden');
-            return;
-        }
-        var text = '';
-        var link = 'Open';
-        var running = job.status === 'running';
-        switch (job.status) {
-            case 'running':
-                text = 'Keyword research running: ' + fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords';
-                break;
-            case 'queued':
-                text = 'Keyword research queued: ' + plural(job.total_keywords, 'keyword');
-                break;
-            case 'completed':
-                text = 'Keyword research finished: ' + plural(job.total_keywords, 'keyword');
-                link = 'See results';
-                break;
-            case 'cancelled':
-                text = 'Keyword research stopped at ' + fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords';
-                link = 'See results';
-                break;
-            default:
-                text = 'Keyword research paused at ' + fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords';
-                link = job.auto_resume ? 'Open' : 'Resume';
-        }
-        setText('sjs-text', text);
-        setText('sjs-link', link);
-        toggle('sjs-spinner', running || job.status === 'queued');
-        toggle('sjs-pause-icon', job.status === 'paused' || job.status === 'failed');
-        toggle('sjs-done-icon', job.status === 'completed' || job.status === 'cancelled');
-        toggle('sjs-bar', running);
-        if (running) byId('sjs-fill').style.width = (job.progress_percent || 0) + '%';
-        strip.classList.remove('hidden');
-    }
-
-    function stripRefresh() {
-        fetch(stripCfg.currentUrl)
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (data) {
-                if (!data) return;
-                var job = data.job || data.finished || null;
-                renderStrip(job);
-                if (stripActive(job)) stripTimer = setTimeout(stripRefresh, STRIP_POLL_MS);
-            })
-            .catch(function () { stripTimer = setTimeout(stripRefresh, STRIP_POLL_MS); });
-    }
-
-    function initStrip(options) {
-        stripCfg = options;
-        renderStrip(options.job);
-        if (stripActive(options.job)) stripTimer = setTimeout(stripRefresh, STRIP_POLL_MS);
-    }
-
     window.SearchJob = {
         init: init,
-        initStrip: initStrip,
         started: started,
         refresh: refresh,
         showError: showError,

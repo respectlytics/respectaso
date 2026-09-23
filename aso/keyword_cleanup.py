@@ -3,7 +3,7 @@
 Every tracked keyword and country pair is re-checked once a day while the
 app is open, at roughly five seconds per pair. Once that takes an hour or
 more, the dashboard says so and points at the pairs least worth keeping -
-by default the ones classified Low Volume or Avoid in their latest result -
+by default the ones classified Low Volume in their latest result -
 with a one-click filter to review and delete them. The classes are a
 default suggestion (``CLEANUP_CLASSIFICATIONS``); the user keeps full control
 through the History filters and can snooze the banner for 30 days.
@@ -20,7 +20,7 @@ from . import ui_state
 REFRESH_SECONDS_PER_PAIR = 5          # 3 s pacing plus a typical 2 s call
 CLEANUP_BANNER_MIN_SECONDS = 3600     # show once the daily refresh reaches an hour
 CLEANUP_MIN_CANDIDATES = 10           # and at least this many pairs are worth reviewing
-CLEANUP_CLASSIFICATIONS = ("Low Volume", "Avoid")
+CLEANUP_CLASSIFICATIONS = ("Low Volume",)
 CLEANUP_SNOOZE_DAYS = 30
 
 

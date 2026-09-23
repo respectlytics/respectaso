@@ -15,6 +15,7 @@ media/
 .env
 *.env.local
 .venv/
+.venv
 .python-version
 
 # Build artifacts

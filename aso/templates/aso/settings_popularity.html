@@ -1,4 +1,5 @@
 {% extends "aso/base.html" %}
+{% load aso_tags %}
 
 {% block title %}Popularity Source - RespectASO{% endblock %}
 
@@ -88,7 +89,7 @@
                             <span class="text-[9px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
                         </span>
                         <span class="block text-xs text-slate-400 mt-1">
-                            Built-in, works for every keyword in all 30 storefronts. Open methodology.
+                            Built-in, works for every keyword in all {% storefront_count %} storefronts. Open methodology.
                         </span>
                         {% if popularity_source == 'internal' %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-300">
@@ -213,7 +214,7 @@
                     RespectASO Estimate
                 </p>
                 <ul class="text-xs text-slate-400 space-y-1.5">
-                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Works instantly for every keyword, in all 30 storefronts</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Works instantly for every keyword, in all {% storefront_count %} storefronts</span></li>
                     <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Open methodology - see exactly how the score is built</span></li>
                     <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No account or setup needed</span></li>
                     <li class="flex gap-2"><span class="text-red-400">−</span><span>An estimate from observable App Store signals, not Apple's own measurement - on high-volume keywords it can disagree with Apple's data noticeably</span></li>

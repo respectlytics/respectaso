@@ -12,13 +12,13 @@
 
     <!-- Messages -->
     {% if message %}
-    <div class="{% if message_type == 'success' %}bg-green-900/30 border border-green-500/30 text-green-200{% else %}bg-red-900/30 border border-red-500/30 text-red-200{% endif %} rounded-xl p-3 text-sm">
+    <div id="apps-message" class="{% if message_type == 'success' %}bg-green-900/30 border border-green-500/30 text-green-200{% else %}bg-red-900/30 border border-red-500/30 text-red-200{% endif %} rounded-xl p-3 text-sm">
         {{ message }}
     </div>
     {% endif %}
 
     <!-- Add App -->
-    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
+    <div id="apps-add" class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
         <h2 class="text-base font-semibold text-white mb-3">Add App</h2>
 
         <!-- App Store Search -->
@@ -48,7 +48,7 @@
         </div>
 
         <!-- Manual Entry Form -->
-        <form method="post" action="{% url 'aso:apps' %}" class="space-y-3">
+        <form method="post" action="{% url 'aso:apps' %}" id="apps-manual-form" class="space-y-3">
             {% csrf_token %}
             <div class="flex flex-col sm:flex-row gap-3">
                 <div class="flex-1">
@@ -76,7 +76,8 @@
         </form>
     </div>
 
-    <!-- App List -->
+    <!-- App List (swapped in place after an add, a refresh or a delete) -->
+    <div id="apps-list">
     {% if apps %}
     <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
         <div class="px-4 py-3 border-b border-white/10">
@@ -84,7 +85,7 @@
         </div>
         <ul class="divide-y divide-white/5">
             {% for app in apps %}
-            <li class="px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
+            <li data-app-id="{{ app.id }}" class="px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
                 <div class="flex items-center gap-3">
                     {% if app.icon_url %}
                     <img src="{{ app.icon_url }}" alt="" class="w-10 h-10 rounded-xl flex-shrink-0">
@@ -115,7 +116,7 @@
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
                     {% if app.track_id %}
-                    <form method="post" action="{% url 'aso:app_refresh' app.id %}">
+                    <form method="post" action="{% url 'aso:app_refresh' app.id %}" class="app-refresh-form">
                         {% csrf_token %}
                         <button type="submit"
                                 class="text-slate-500 hover:text-purple-400 transition-colors p-2 rounded-lg hover:bg-purple-900/20"
@@ -151,6 +152,7 @@
         <p class="text-slate-400 text-xs mt-1.5">Search the App Store above to add your app and start tracking keyword rankings.</p>
     </div>
     {% endif %}
+    </div>
 </div>
 
 <script>
@@ -228,42 +230,70 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function selectApp(btn) {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '{% url "aso:apps" %}';
-
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-    const fields = {
-        csrfmiddlewaretoken: csrfToken,
-        track_id: btn.dataset.trackId,
-        name: btn.dataset.name,
-        bundle_id: btn.dataset.bundleId,
-        icon_url: btn.dataset.iconUrl,
-        seller_name: btn.dataset.sellerName,
-    };
-
-    for (const [key, value] of Object.entries(fields)) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-    }
-
-    document.body.appendChild(form);
-    form.submit();
+// Adding, refreshing and deleting an app update the page in place
+// (static/js/in-place.js): the message, the manual form and the list are
+// swapped from the page the server answers with. Each used to submit a form
+// and reload the page, which threw the reader back to the top.
+function postApps(url, body, appId) {
+    return InPlace.load(url, {
+        method: 'POST',
+        body: body,
+        history: 'none',
+        anchor: document.getElementById('apps-list'),
+        swap: function (doc) {
+            InPlace.swapSection(doc, 'apps-message', 'apps-add');
+            InPlace.swapSection(doc, 'apps-manual-form');
+            InPlace.swapSection(doc, 'apps-list');
+        },
+    }).then(function () { if (appId) echoMessageInRow(appId); });
 }
 
-// Custom confirm for app delete forms
-document.querySelectorAll('.app-delete-form').forEach(function(form) {
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const appName = form.dataset.appName;
-        showConfirm('Delete ' + appName + '? Keywords linked to this app will be unlinked, not deleted.', {type: 'danger', title: 'Delete App', confirmLabel: 'Delete', confirmStyle: 'danger'}).then(function(ok) {
-            if (ok) form.submit();
-        });
+// The answer's message sits at the top of the page. When that is off screen
+// (a refresh further down the list), the same words show for a moment in the
+// row that was clicked, where the reader is looking.
+function echoMessageInRow(appId) {
+    const message = document.getElementById('apps-message');
+    const row = document.querySelector('#apps-list li[data-app-id="' + appId + '"]');
+    if (!message || !row || message.getBoundingClientRect().bottom > 0) return;
+    const ok = !message.className.includes('text-red-200');
+    const note = document.createElement('p');
+    note.className = 'text-xs mt-0.5 transition-opacity duration-500 ' + (ok ? 'text-emerald-300' : 'text-red-300');
+    note.textContent = message.textContent.trim();
+    const text = row.querySelector('h3');
+    (text ? text.parentNode : row).appendChild(note);
+    setTimeout(function () { note.classList.add('opacity-0'); }, 3500);
+    setTimeout(function () { note.remove(); }, 4100);
+}
+
+function selectApp(btn) {
+    const body = new FormData();
+    body.set('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    body.set('track_id', btn.dataset.trackId);
+    body.set('name', btn.dataset.name);
+    body.set('bundle_id', btn.dataset.bundleId);
+    body.set('icon_url', btn.dataset.iconUrl);
+    body.set('seller_name', btn.dataset.sellerName);
+    postApps('{% url "aso:apps" %}', body).then(function () {
+        const input = document.getElementById('app-search-input');
+        const results = document.getElementById('app-search-results');
+        if (input) input.value = '';
+        if (results) { results.classList.add('hidden'); results.innerHTML = ''; }
     });
+}
+
+// Delegated, so the forms in a freshly swapped list work too.
+document.addEventListener('submit', function (e) {
+    const form = e.target;
+    if (form.id === 'apps-manual-form' || form.classList.contains('app-refresh-form')) {
+        e.preventDefault();
+        const row = form.closest('li[data-app-id]');
+        postApps(form.action, new FormData(form), row ? row.dataset.appId : null);
+    } else if (form.classList.contains('app-delete-form')) {
+        e.preventDefault();
+        showConfirm('Delete ' + form.dataset.appName + '? Keywords linked to this app will be unlinked, not deleted.',
+                    {type: 'danger', title: 'Delete App', confirmLabel: 'Delete', confirmStyle: 'danger'})
+            .then(function (ok) { if (ok) postApps(form.action, new FormData(form)); });
+    }
 });
 </script>
 {% endblock %}

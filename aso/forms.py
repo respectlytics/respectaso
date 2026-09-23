@@ -1,5 +1,7 @@
 from django import forms
 
+from aso import countries
+
 from .models import App
 
 
@@ -25,38 +27,10 @@ class AppForm(forms.ModelForm):
         }
 
 
-COUNTRY_CHOICES = [
-    ("us", "🇺🇸 United States"),
-    ("gb", "🇬🇧 United Kingdom"),
-    ("ca", "🇨🇦 Canada"),
-    ("au", "🇦🇺 Australia"),
-    ("de", "🇩🇪 Germany"),
-    ("fr", "🇫🇷 France"),
-    ("jp", "🇯🇵 Japan"),
-    ("kr", "🇰🇷 South Korea"),
-    ("cn", "🇨🇳 China"),
-    ("br", "🇧🇷 Brazil"),
-    ("in", "🇮🇳 India"),
-    ("mx", "🇲🇽 Mexico"),
-    ("es", "🇪🇸 Spain"),
-    ("it", "🇮🇹 Italy"),
-    ("nl", "🇳🇱 Netherlands"),
-    ("se", "🇸🇪 Sweden"),
-    ("no", "🇳🇴 Norway"),
-    ("dk", "🇩🇰 Denmark"),
-    ("fi", "🇫🇮 Finland"),
-    ("pt", "🇵🇹 Portugal"),
-    ("ru", "🇷🇺 Russia"),
-    ("tr", "🇹🇷 Turkey"),
-    ("sa", "🇸🇦 Saudi Arabia"),
-    ("ae", "🇦🇪 UAE"),
-    ("sg", "🇸🇬 Singapore"),
-    ("th", "🇹🇭 Thailand"),
-    ("id", "🇮🇩 Indonesia"),
-    ("ph", "🇵🇭 Philippines"),
-    ("vn", "🇻🇳 Vietnam"),
-    ("tw", "🇹🇼 Taiwan"),
-]
+# The storefront list lives in aso/countries.py, the one place allowed to
+# define one. This name is kept because a dozen modules and templates import
+# it, and it still answers (code, "flag Name") tuples.
+COUNTRY_CHOICES = countries.choices()
 
 
 class KeywordSearchForm(forms.Form):
@@ -94,22 +68,20 @@ class KeywordSearchForm(forms.Form):
         raw = self.cleaned_data.get("countries", "").strip()
         if not raw:
             return ["us"]
-        valid_codes = {code for code, _ in COUNTRY_CHOICES}
-        codes = [c.strip().lower() for c in raw.split(",") if c.strip()]
-        codes = [c for c in codes if c in valid_codes]
+        codes = countries.clean(raw.split(","))
         if not codes:
             return ["us"]
         return codes[:5]  # Max 5 countries
 
 
 class OpportunitySearchForm(forms.Form):
-    """Form for the Country Opportunity Finder — single keyword, all countries."""
+    """The Country Opportunity Finder: one keyword, the countries you pick."""
 
     keyword = forms.CharField(
         max_length=200,
         widget=forms.TextInput(
             attrs={
-                "class": "w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500",
+                "class": "w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500",
                 "placeholder": "fitness tracker",
                 "autofocus": True,
             }
@@ -119,3 +91,20 @@ class OpportunitySearchForm(forms.Form):
         required=False,
         widget=forms.HiddenInput(),
     )
+    countries = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        help_text="Comma-separated storefront codes. No cap: a scan may cover "
+                  "every storefront.",
+    )
+
+    def clean_countries(self):
+        """Parse and validate the picked storefronts.
+
+        Unlike the keyword search there is no maximum and nothing is silently
+        truncated: a scan may cover all 175 storefronts, and the page states
+        what that costs in time before you start it. An empty selection is an
+        error in the view, not a quiet fallback to the US.
+        """
+        raw = self.cleaned_data.get("countries", "").strip()
+        return countries.clean(raw.split(",")) if raw else []

@@ -9,6 +9,7 @@ Live-API contract notes baked into these tests (verified 2026-08-17):
 """
 
 import datetime as dt
+import functools
 from unittest import mock
 
 import jwt as pyjwt
@@ -32,8 +33,33 @@ CREDS = {
     "client_id": "SEARCHADS.client",
     "team_id": "SEARCHADS.team",
     "key_id": "kid-1",
-    "private_key_pem": None,  # filled in setUpClass
+    "private_key_pem": None,  # each test fills in _key_pair()'s key
 }
+
+
+@functools.cache
+def _key_pair():
+    """(private PEM, public PEM) of one EC key, made once per process.
+
+    Every test class asks for it here. They used to borrow it by calling
+    ClientSecretTest.setUpClass(), and one read the key before that call, so
+    it passed only when ClientSecretTest had already run in the same
+    process: always in a serial run, by chance under --parallel.
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    private_pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    public_pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode()
+    return private_pem, public_pem
 
 
 def _fresh_token_state():
@@ -44,19 +70,7 @@ class ClientSecretTest(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ec
-
-        key = ec.generate_private_key(ec.SECP256R1())
-        cls.private_pem = key.private_bytes(
-            serialization.Encoding.PEM,
-            serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption(),
-        ).decode()
-        cls.public_pem = key.public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode()
+        cls.private_pem, cls.public_pem = _key_pair()
 
     def test_claims_and_header(self):
         secret = api.build_client_secret(
@@ -78,9 +92,7 @@ class TokenLifecycleTest(SimpleTestCase):
     def setUp(self):
         _fresh_token_state()
         self.addCleanup(_fresh_token_state)
-        self.creds = dict(CREDS, private_key_pem=ClientSecretTest.private_pem)
-        ClientSecretTest.setUpClass()
-        self.creds["private_key_pem"] = ClientSecretTest.private_pem
+        self.creds = dict(CREDS, private_key_pem=_key_pair()[0])
 
     def test_token_fetch_success(self):
         with mock.patch.object(api.requests, "post", return_value=_response(
@@ -156,8 +168,7 @@ class RequestPlumbingTest(SimpleTestCase):
     def setUp(self):
         _fresh_token_state()
         self.addCleanup(_fresh_token_state)
-        ClientSecretTest.setUpClass()
-        self.creds = dict(CREDS, private_key_pem=ClientSecretTest.private_pem)
+        self.creds = dict(CREDS, private_key_pem=_key_pair()[0])
         self.token_patch = mock.patch.object(
             api, "_bearer", return_value="tok-x"
         )
@@ -243,8 +254,7 @@ class DiscoveryParsingTest(SimpleTestCase):
     def setUp(self):
         _fresh_token_state()
         self.addCleanup(_fresh_token_state)
-        ClientSecretTest.setUpClass()
-        self.creds = dict(CREDS, private_key_pem=ClientSecretTest.private_pem)
+        self.creds = dict(CREDS, private_key_pem=_key_pair()[0])
         patcher = mock.patch.object(api, "_bearer", return_value="tok-x")
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -284,8 +294,7 @@ class PopularityQueryTest(SimpleTestCase):
     def setUp(self):
         _fresh_token_state()
         self.addCleanup(_fresh_token_state)
-        ClientSecretTest.setUpClass()
-        self.creds = dict(CREDS, private_key_pem=ClientSecretTest.private_pem)
+        self.creds = dict(CREDS, private_key_pem=_key_pair()[0])
         patcher = mock.patch.object(api, "_bearer", return_value="tok-x")
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -361,8 +370,7 @@ class ImpressionShareQueryTest(SimpleTestCase):
     def setUp(self):
         _fresh_token_state()
         self.addCleanup(_fresh_token_state)
-        ClientSecretTest.setUpClass()
-        self.creds = dict(CREDS, private_key_pem=ClientSecretTest.private_pem)
+        self.creds = dict(CREDS, private_key_pem=_key_pair()[0])
         patcher = mock.patch.object(api, "_bearer", return_value="tok-x")
         patcher.start()
         self.addCleanup(patcher.stop)

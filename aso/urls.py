@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import settings_views, views
+from . import opportunity_views, settings_views, views
 
 app_name = "aso"
 
@@ -39,10 +39,32 @@ urlpatterns = [
     path("queue/clear/", views.queue_clear_view, name="queue_clear"),
     path("queue/move/", views.queue_move_view, name="queue_move"),
     path("queue/run-now/", views.queue_run_now_view, name="queue_run_now"),
-    path("opportunity/", views.opportunity_view, name="opportunity"),
-    path("opportunity/search/", views.opportunity_search_view, name="opportunity_search"),
-    path("opportunity/search-country/", views.opportunity_search_country_view, name="opportunity_search_country"),
-    path("opportunity/save/", views.opportunity_save_view, name="opportunity_save"),
+    # The Country Opportunity Finder. The scan is a queued background job
+    # (aso/opportunity_scans.py), so these mirror the keyword search endpoints
+    # one for one rather than scanning inside a request.
+    path("opportunity/", opportunity_views.opportunity_view, name="opportunity"),
+    path("opportunity/start/", opportunity_views.opportunity_start_view,
+         name="opportunity_start"),
+    path("opportunity/scans/current/", opportunity_views.opportunity_current_view,
+         name="opportunity_current"),
+    path("opportunity/scans/<int:scan_id>/", opportunity_views.opportunity_detail_view,
+         name="opportunity_detail"),
+    path("opportunity/scans/<int:scan_id>/country/<str:code>/",
+         opportunity_views.opportunity_country_view, name="opportunity_country"),
+    path("opportunity/scans/<int:scan_id>/pause/", opportunity_views.opportunity_pause_view,
+         name="opportunity_pause"),
+    path("opportunity/scans/<int:scan_id>/resume/", opportunity_views.opportunity_resume_view,
+         name="opportunity_resume"),
+    path("opportunity/scans/<int:scan_id>/discard/", opportunity_views.opportunity_discard_view,
+         name="opportunity_discard"),
+    path("opportunity/scans/<int:scan_id>/retry-failed/",
+         opportunity_views.opportunity_retry_failed_view, name="opportunity_retry_failed"),
+    path("opportunity/scans/<int:scan_id>/dismiss/", opportunity_views.opportunity_dismiss_view,
+         name="opportunity_dismiss"),
+    path("opportunity/save/", opportunity_views.opportunity_save_view, name="opportunity_save"),
+
+    # The global bottom strip, whichever job type is running.
+    path("jobs/strip/", opportunity_views.job_strip_state_view, name="job_strip_state"),
     path("export/history.csv", views.export_history_csv_view, name="export_history_csv"),
     path("apps/", views.apps_view, name="apps"),
     path("apps/lookup/", views.app_lookup_view, name="app_lookup"),

@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" class="text-[14px]">
+<html lang="en" class="text-[14px] [color-scheme:dark]">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -120,6 +120,8 @@
     </nav>
 
     <!-- Main Content -->
+    {% include "aso/partials/pro_invite.html" %}
+
     <main class="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-5">
         <!-- Update Banner (populated by JS, shown on all pages) -->
         <div id="update-banner" class="hidden animate-fade-in mb-5">
@@ -406,6 +408,18 @@
         };
     })();
     </script>
+
+    {% comment %}Every App Store storefront, once per page. The shared country
+    picker and anything else needing a country name read it from here instead
+    of carrying a list of their own. See aso/country_picker.py.{% endcomment %}
+    {{ country_catalog|json_script:"country-catalog-data" }}
+    {{ classification_legend|json_script:"classification-legend-data" }}
+    {{ difficulty_factors|json_script:"difficulty-factors-data" }}
+    <script src="{% static 'js/country-picker.js' %}"></script>
+    <script src="{% static 'js/tooltip.js' %}"></script>
+    <script src="{% static 'js/in-place.js' %}"></script>
+    <script src="{% static 'js/classification-badge.js' %}"></script>
+    <script src="{% static 'js/difficulty-factors.js' %}"></script>
 
     {% block scripts %}{% endblock %}
 

@@ -362,6 +362,34 @@
         return advisoryHtml(parasB);
     }
 
+
+    // ── Country coverage advisory ───────────────────────────────────────
+    // What a set of results across many storefronts does not say for itself.
+    // Sibling of formatSourceContextAdvisory above, same markup, same rule:
+    // observable facts only, counted from the rows on screen rather than from
+    // any static list, so the sentence cannot drift from what is shown.
+    function formatCoverageAdvisory(rows) {
+        if (!rows || rows.length < 2) { return ''; }
+        var noApple = 0;
+        var derivedMarket = 0;
+        rows.forEach(function (row) {
+            // A fallback row with no cap is the "Apple reports nothing for
+            // this storefront at all" case (aso/popularity.py absent_cap).
+            if (row.popularity_fallback && !row.popularity_cap) { noApple += 1; }
+            if (row.market_source === 'derived') { derivedMarket += 1; }
+        });
+        var paragraphs = [];
+        if (noApple) {
+            paragraphs.push('Apple reports no search popularity in ' + noApple + ' of these '
+                + 'storefronts, so their score is RespectASO\'s estimate.');
+        }
+        if (derivedMarket) {
+            paragraphs.push('Download estimates in ' + derivedMarket + ' of these markets use a '
+                + 'derived market size, so treat those ranges as indicative.');
+        }
+        return paragraphs.length ? advisoryHtml(paragraphs) : '';
+    }
+
     global.formatPopularityCell = formatPopularityCell;
     global.formatRunSourceNote = formatRunSourceNote;
     global.formatRunSourceBadge = formatRunSourceBadge;
@@ -369,4 +397,5 @@
     global.formatPopularityBadge = formatPopularityBadge;
     global.formatPopularityCompact = formatPopularityCompact;
     global.formatSourceContextAdvisory = formatSourceContextAdvisory;
+    global.formatCoverageAdvisory = formatCoverageAdvisory;
 })(window);

@@ -6,7 +6,14 @@ from django.db import models
 from django.db.models import Manager
 from django.utils import timezone
 
-from aso.scoring import calc_opportunity, classify_keyword, get_targeting_advice
+from aso.scoring import (
+    calc_opportunity,
+    classify_keyword,
+    difficulty_color,
+    difficulty_label,
+    get_targeting_advice,
+    opportunity_reach,
+)
 
 
 class App(models.Model):
@@ -40,6 +47,15 @@ class App(models.Model):
         blank=True,
         default="",
         help_text="App Store URL",
+    )
+    store_profiles = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "What the App Store shows for this app in each storefront, as "
+            "last read: {code: {count, average, released, checked_at}}. "
+            "Written only by aso/app_profiles.py; the opportunity score reads it."
+        ),
     )
     icon_url = models.URLField(
         blank=True,
@@ -155,7 +171,7 @@ class SearchResult(models.Model):
     )
     classification = models.CharField(
         max_length=20,
-        default="Moderate",
+        default="Low Volume",
         help_text="Keyword classification label from classify_keyword()",
     )
     searched_at = models.DateTimeField(auto_now_add=True)
@@ -185,11 +201,27 @@ class SearchResult(models.Model):
         return cls.objects.create(keyword=keyword, country=country, **fields)
 
     def save(self, *args, **kwargs):
-        """Auto-compute classification from the effective popularity on save."""
+        """Auto-compute classification from the effective popularity on save,
+        for the app this keyword is tracked for."""
         self.classification = classify_keyword(
-            self.effective_popularity or 0, self.difficulty_score
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
         )
         super().save(*args, **kwargs)
+
+    @property
+    def app(self):
+        """The app this row is scored for: its keyword's app, or None."""
+        return self.keyword.app if self.keyword_id else None
+
+    @property
+    def app_profile(self):
+        """The app's profile in this storefront, as last read (an AppProfile);
+        None for a keyword without an app. An app not yet read here scores
+        as a brand new app, and the screen says so."""
+        from .app_profiles import cached_profile
+
+        return cached_profile(self.app, self.country)
 
     def _resolve_popularity_pair(self):
         """(effective, source, is_fallback) per the user's source selection."""
@@ -219,33 +251,11 @@ class SearchResult(models.Model):
         the stored values, so ``popularity_fields()`` renders a stored row
         exactly like a fresh one (one lookup instead of one per property).
         """
-        from .popularity import (
-            SOURCE_APPLE,
-            PopularityResolution,
-            absent_cap,
-            effective_from_pair,
-            get_popularity_source,
-        )
+        from .popularity import resolution_from_stored
 
-        source_setting = get_popularity_source()
-        ceiling = (
-            absent_cap(self.country, self.inferred_genre)
-            if source_setting == SOURCE_APPLE else None
-        )
-        effective, source, is_fallback = effective_from_pair(
-            self.popularity_score,
-            self.apple_popularity_score,
-            source_setting,
-            absent_ceiling=ceiling,
-        )
-        return PopularityResolution(
-            effective=effective,
-            internal=self.popularity_score,
-            apple=self.apple_popularity_score,
-            source=source,
-            is_fallback=is_fallback,
-            genre_hint=self.inferred_genre or "",
-            absent_ceiling=ceiling,
+        return resolution_from_stored(
+            self.popularity_score, self.apple_popularity_score,
+            self.country, self.inferred_genre,
         )
 
     @property
@@ -264,46 +274,60 @@ class SearchResult(models.Model):
         return self._resolve_popularity_pair()[2]
 
     @property
+    def keyword_text(self) -> str:
+        """The keyword as text. OpportunityScanResult stores it as a column,
+        so one payload builder serves both row models, and the scores read it:
+        when the app's title already carries it, the real rank is final."""
+        return self.keyword.keyword if self.keyword_id else ""
+
+    @property
     def difficulty_label(self):
         """Human-readable difficulty interpretation."""
-        score = self.difficulty_score
-        if score <= 15:
-            return "Very Easy"
-        elif score <= 35:
-            return "Easy"
-        elif score <= 55:
-            return "Moderate"
-        elif score <= 75:
-            return "Hard"
-        elif score <= 90:
-            return "Very Hard"
-        return "Extreme"
+        return difficulty_label(self.difficulty_score)
 
     @property
     def difficulty_color(self):
         """Tailwind color class for the difficulty score."""
-        score = self.difficulty_score
-        if score <= 15:
-            return "text-green-400"
-        elif score <= 35:
-            return "text-green-300"
-        elif score <= 55:
-            return "text-yellow-400"
-        elif score <= 75:
-            return "text-orange-400"
-        elif score <= 90:
-            return "text-red-400"
-        return "text-red-600"
+        return difficulty_color(self.difficulty_score)
+
 
     @property
     def opportunity_score(self):
-        """Computed opportunity score from the effective popularity."""
-        return calc_opportunity(self.effective_popularity or 0, self.difficulty_score)
+        """Computed opportunity score from the effective popularity.
+
+        The storefront matters: a market with almost no searches cannot carry
+        an opportunity however weak its competitors look.
+        """
+        return calc_opportunity(
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+        )
+
+    @property
+    def opportunity_reach(self) -> dict:
+        """Where this row's app would rank, what that pays, and why.
+
+        The table prints the short line under the score and the explanation
+        behind it, so the score arrives with its working shown. Same inputs
+        as opportunity_score, so the two cannot disagree.
+        """
+        return opportunity_reach(
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+        )
 
     @property
     def targeting_advice(self):
-        """Return (icon, label, css_classes, description) for ASO targeting."""
-        return get_targeting_advice(self.effective_popularity, self.difficulty_score)
+        """Return (icon, label, css_classes, description) for ASO targeting.
+
+        The storefront goes in too: the advice describes search volume, and
+        volume is popularity times market size. Without it a row could show
+        "Under 1 search a day" and "high search volume" side by side.
+        """
+        return get_targeting_advice(
+            self.effective_popularity, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+        )
 
     @property
     def effective_download_estimates(self):
@@ -384,7 +408,7 @@ class KeywordSearchJob(models.Model):
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
     seconds_per_pair = models.FloatField(null=True, blank=True)   # running average, feeds the ETA
     elapsed_seconds = models.FloatField(default=0)                # active time across resumes
-    acknowledged = models.BooleanField(default=False)             # "Done" pressed on a finished job
+    acknowledged = models.BooleanField(default=False)             # "Close" pressed on a finished job
     restart_resumes = models.PositiveIntegerField(default=0)      # continued after the app was closed mid-run
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -747,4 +771,213 @@ class AppleImpressionShare(models.Model):
         return (
             f"{self.search_term} ({self.country}, {self.week}) - "
             f"{self.low_share:.0%}-{self.high_share:.0%}"
+        )
+
+
+class OpportunityScan(models.Model):
+    """One Country Opportunity Finder scan, as a persistent job.
+
+    A scan is one keyword across the storefronts the user picked, and it is a
+    row rather than a loop in the browser: the scan survives navigating away,
+    quitting the app and a crash, because everything it needs is here. The run
+    queue (``aso/run_queue.py``) executes it one country at a time and stops at
+    the next country boundary whenever the status is no longer "running", which
+    is how Pause, Discard and Run now all work.
+
+    It is a separate model from ``KeywordSearchJob`` on purpose. That job's
+    cursor is keyword-major over keywords times countries, it skips pairs
+    already scored today, and its whole premise is that results land in
+    ``SearchResult`` immediately. A scan has one keyword, never skips, and
+    deliberately keeps its results out of the search history until the user
+    saves them. Sharing the table would have meant retrofitting a discriminator
+    onto every query in aso/search_jobs.py and aso/views.py, where one missed
+    filter shows a country scan in the dashboard's keyword panel.
+
+    Results live in ``OpportunityScanResult``, one row per country. Old scans
+    are pruned to the ten most recent on every create.
+    """
+
+    STATUS_CHOICES = [
+        ("queued", "Queued"),
+        ("running", "Running"),
+        ("paused", "Paused"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    ]
+    ACTIVE_STATUSES = ("queued", "running", "paused", "failed")
+    TERMINAL_STATUSES = ("completed", "cancelled")
+    THROTTLE_CHOICES = [
+        ("normal", "Normal"),
+        ("slowed_down", "Slowed down"),
+        ("paused", "Paused by throttling"),
+        ("cooldown", "Cooling down"),
+    ]
+    ORIGIN_CHOICES = [("web", "Web"), ("mcp", "MCP")]
+
+    keyword = models.CharField(max_length=200)
+    app = models.ForeignKey(
+        App, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="opportunity_scans",
+    )
+    countries = models.JSONField(default=list)   # the work list, order kept, no cap
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default="queued")
+    queue_rank = models.IntegerField(null=True, blank=True)
+    # Paused so another run could go first; restored to the front of the queue
+    # by the dispatcher once that run is done.
+    auto_resume = models.BooleanField(default=False)
+    yielded_for_feature = models.CharField(max_length=32, blank=True, default="")
+    yielded_for_id = models.IntegerField(null=True, blank=True)
+    yielded_for_label = models.CharField(max_length=220, blank=True, default="")
+    next_index = models.PositiveIntegerField(default=0)   # index into countries
+    done_count = models.PositiveIntegerField(default=0)
+    failed_count = models.PositiveIntegerField(default=0)
+    failed_items = models.JSONField(default=list)   # [{"country", "error"}], capped
+    current_country = models.CharField(max_length=5, blank=True, default="")
+    progress_message = models.CharField(max_length=200, blank=True, default="")
+    error_message = models.TextField(blank=True, default="")
+    throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
+    seconds_per_country = models.FloatField(null=True, blank=True)   # feeds the ETA
+    elapsed_seconds = models.FloatField(default=0)
+    # Stamped on every country. A scan started from MCP runs in another
+    # process, so a dead process is recognised by a stale heartbeat instead of
+    # holding the single run lane for ever.
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    acknowledged = models.BooleanField(default=False)
+    restart_resumes = models.PositiveIntegerField(default=0)
+    saved_count = models.PositiveIntegerField(default=0)   # rows sent to Search History
+    origin = models.CharField(max_length=4, choices=ORIGIN_CHOICES, default="web")
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.keyword} across {self.total_countries} countries - {self.status}"
+
+    @property
+    def total_countries(self) -> int:
+        return len(self.countries or [])
+
+    @property
+    def remaining_count(self) -> int:
+        return max(0, self.total_countries - self.next_index)
+
+    @property
+    def progress_percent(self) -> int:
+        total = self.total_countries
+        if not total:
+            return 0
+        return min(100, round(self.next_index / total * 100))
+
+    @property
+    def is_active(self) -> bool:
+        return self.status in self.ACTIVE_STATUSES
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in self.TERMINAL_STATUSES
+
+    def country_at(self, index: int) -> str:
+        codes = self.countries or []
+        return codes[index] if 0 <= index < len(codes) else ""
+
+
+class OpportunityScanResult(models.Model):
+    """One country's result inside a scan.
+
+    Never a ``SearchResult``: the Country Opportunity Finder deliberately keeps
+    its results out of the search history until the user picks the rows worth
+    keeping, and Save copies them over with ``SearchResult.upsert_today``.
+
+    Both popularity values are stored raw and resolved at read time, exactly
+    like ``SearchResult``, so switching the popularity source re-reads an old
+    scan correctly. Nothing derived is stored: the effective popularity, the
+    opportunity, the classification and the difficulty label all come from
+    ``popularity.resolution_from_stored`` and ``aso/scoring.py`` on the way out.
+    """
+
+    scan = models.ForeignKey(
+        OpportunityScan, on_delete=models.CASCADE, related_name="results",
+    )
+    country = models.CharField(max_length=5)
+    order_index = models.PositiveIntegerField()   # position in scan.countries
+    keyword_text = models.CharField(max_length=200)
+    popularity_score = models.IntegerField(null=True, blank=True)        # RespectASO estimate
+    apple_popularity_score = models.IntegerField(null=True, blank=True)  # Apple's own value
+    inferred_genre = models.CharField(max_length=80, blank=True, default="")
+    difficulty_score = models.IntegerField(default=0)
+    app_rank = models.IntegerField(null=True, blank=True)
+    competitor_count = models.PositiveIntegerField(default=0)
+    top_competitor = models.CharField(max_length=255, blank=True, default="")
+    top_ratings = models.PositiveIntegerField(default=0)
+    # The two heavy columns, read only when a row is expanded.
+    difficulty_breakdown = models.JSONField(default=dict)
+    competitors_data = models.JSONField(default=list)
+    scanned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("scan", "country")
+        ordering = ["order_index"]
+        indexes = [models.Index(fields=["scan", "order_index"])]
+
+    def __str__(self):
+        return f"{self.keyword_text} ({self.country.upper()})"
+
+    def popularity_resolution(self):
+        """Both sources and their provenance, the same way SearchResult does."""
+        from .popularity import resolution_from_stored
+
+        return resolution_from_stored(
+            self.popularity_score, self.apple_popularity_score,
+            self.country, self.inferred_genre,
+        )
+
+    @property
+    def effective_popularity(self):
+        return self.popularity_resolution().effective
+
+    @property
+    def difficulty_label(self):
+        return difficulty_label(self.difficulty_score)
+
+    @property
+    def difficulty_color(self):
+        return difficulty_color(self.difficulty_score)
+
+    @property
+    def app(self):
+        """The app the scan is for, or None."""
+        return self.scan.app if self.scan_id else None
+
+    @property
+    def app_profile(self):
+        """The scan's app, its profile in this storefront."""
+        from .app_profiles import cached_profile
+
+        return cached_profile(self.app, self.country)
+
+    @property
+    def opportunity_score(self) -> int:
+        return calc_opportunity(
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+        )
+
+    @property
+    def classification(self) -> str:
+        return classify_keyword(
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+        )
+
+    @property
+    def opportunity_reach(self) -> dict:
+        """Where the scan's app (or a new app) lands here, what that pays and
+        why: the same inputs as opportunity_score, as SearchResult has it."""
+        return opportunity_reach(
+            self.effective_popularity or 0, self.difficulty_score, self.country,
+            app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
         )

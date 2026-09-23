@@ -1,0 +1,11 @@
+{% comment %}The button that invites a free user to Pro, right under the navbar.
+aso.context_processors.pro_invite decides whether it shows and what it says.{% endcomment %}
+{% if pro_invite %}
+<div class="max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 pt-3 flex justify-end">
+    <a href="{{ pro_invite.url }}" target="_blank" rel="noopener" data-pro-invite
+       class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-100 bg-emerald-600/25 hover:bg-emerald-600/40 border border-emerald-500/40 rounded-full px-3 py-1.5 transition-colors">
+        <svg class="w-3.5 h-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        {{ pro_invite.text }}
+    </a>
+</div>
+{% endif %}

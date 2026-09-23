@@ -178,7 +178,7 @@ def _bucket_distribution(results):
     """Count keywords per insight classification. No value judgments — diagnostic shape only."""
     dist = defaultdict(int)
     for r in results:
-        dist[r.classification or "Moderate"] += 1
+        dist[r.classification or "Low Volume"] += 1
     return dict(dist)
 
 
@@ -361,35 +361,16 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
 
 
 def _format_dl_number(value):
-    """Render a downloads number for the App Summary.
+    """A downloads number for the App Summary, as the History table prints it
+    (aso.scoring.fmt_downloads), so the same value never reads 27 in one
+    panel and 30 in the other. Nothing, or nothing yet, is "0"."""
+    from .scoring import fmt_downloads
 
-    Mirrors ``aso.templatetags.aso_tags._fmt_dl`` (the History table's number
-    formatter) so the same underlying value renders identically in both panels.
-    Without this alignment, a keyword's #1 download estimate showing as ``27``
-    in History would round to ``30`` in the Summary's biggest-opportunity cell
-    and create a confusing visible mismatch.
-
-    Rules (matching ``_fmt_dl``):
-      - >= 1000 → "1.2K" style (one decimal, trailing .0 stripped)
-      - < 1     → one decimal ("0.4")
-      - 1..10   → one decimal, trailing .0 stripped ("7.5", "8")
-      - >= 10   → nearest integer ("27", "109")
-    """
     try:
         n = float(value) if value is not None else 0.0
     except (TypeError, ValueError):
         return "0"
-    if n <= 0:
-        return "0"
-    if n >= 1000:
-        s = f"{n / 1000:.1f}"
-        return (s[:-2] if s.endswith(".0") else s) + "K"
-    if n < 1:
-        return f"{n:.1f}"
-    if n < 10:
-        s = f"{n:.1f}"
-        return s[:-2] if s.endswith(".0") else s
-    return str(round(n))
+    return "0" if n <= 0 else fmt_downloads(n)
 
 
 def format_interval(low, high):

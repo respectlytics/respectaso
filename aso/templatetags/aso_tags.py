@@ -2,9 +2,10 @@ import json
 import re
 
 from django import template
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 
+from aso import countries
 from aso.services import compound_form
 
 register = template.Library()
@@ -61,192 +62,6 @@ def trend_arrow(delta, metric="higher_better"):
         f'previous check">({arrow}{abs(delta)})</span>'
     )
 
-# ISO 3166-1 alpha-2 → country name (covers all App Store countries)
-COUNTRY_NAMES = {
-    "ad": "Andorra",
-    "ae": "UAE",
-    "af": "Afghanistan",
-    "ag": "Antigua & Barbuda",
-    "ai": "Anguilla",
-    "al": "Albania",
-    "am": "Armenia",
-    "ao": "Angola",
-    "ar": "Argentina",
-    "at": "Austria",
-    "au": "Australia",
-    "az": "Azerbaijan",
-    "bb": "Barbados",
-    "bd": "Bangladesh",
-    "be": "Belgium",
-    "bf": "Burkina Faso",
-    "bg": "Bulgaria",
-    "bh": "Bahrain",
-    "bj": "Benin",
-    "bm": "Bermuda",
-    "bn": "Brunei",
-    "bo": "Bolivia",
-    "br": "Brazil",
-    "bs": "Bahamas",
-    "bt": "Bhutan",
-    "bw": "Botswana",
-    "by": "Belarus",
-    "bz": "Belize",
-    "ca": "Canada",
-    "cg": "Congo",
-    "ch": "Switzerland",
-    "cl": "Chile",
-    "cn": "China",
-    "co": "Colombia",
-    "cr": "Costa Rica",
-    "cv": "Cape Verde",
-    "cy": "Cyprus",
-    "cz": "Czechia",
-    "de": "Germany",
-    "dk": "Denmark",
-    "dm": "Dominica",
-    "do": "Dominican Republic",
-    "dz": "Algeria",
-    "ec": "Ecuador",
-    "ee": "Estonia",
-    "eg": "Egypt",
-    "es": "Spain",
-    "fi": "Finland",
-    "fj": "Fiji",
-    "fm": "Micronesia",
-    "fr": "France",
-    "ga": "Gabon",
-    "gb": "United Kingdom",
-    "gd": "Grenada",
-    "ge": "Georgia",
-    "gh": "Ghana",
-    "gm": "Gambia",
-    "gr": "Greece",
-    "gt": "Guatemala",
-    "gw": "Guinea-Bissau",
-    "gy": "Guyana",
-    "hk": "Hong Kong",
-    "hn": "Honduras",
-    "hr": "Croatia",
-    "hu": "Hungary",
-    "id": "Indonesia",
-    "ie": "Ireland",
-    "il": "Israel",
-    "in": "India",
-    "iq": "Iraq",
-    "is": "Iceland",
-    "it": "Italy",
-    "jm": "Jamaica",
-    "jo": "Jordan",
-    "jp": "Japan",
-    "ke": "Kenya",
-    "kg": "Kyrgyzstan",
-    "kh": "Cambodia",
-    "kn": "St. Kitts & Nevis",
-    "kr": "South Korea",
-    "kw": "Kuwait",
-    "ky": "Cayman Islands",
-    "kz": "Kazakhstan",
-    "la": "Laos",
-    "lb": "Lebanon",
-    "lc": "St. Lucia",
-    "lk": "Sri Lanka",
-    "lr": "Liberia",
-    "lt": "Lithuania",
-    "lu": "Luxembourg",
-    "lv": "Latvia",
-    "md": "Moldova",
-    "mg": "Madagascar",
-    "mk": "North Macedonia",
-    "ml": "Mali",
-    "mm": "Myanmar",
-    "mn": "Mongolia",
-    "mo": "Macao",
-    "mr": "Mauritania",
-    "ms": "Montserrat",
-    "mt": "Malta",
-    "mu": "Mauritius",
-    "mv": "Maldives",
-    "mw": "Malawi",
-    "mx": "Mexico",
-    "my": "Malaysia",
-    "mz": "Mozambique",
-    "na": "Namibia",
-    "ne": "Niger",
-    "ng": "Nigeria",
-    "ni": "Nicaragua",
-    "nl": "Netherlands",
-    "no": "Norway",
-    "np": "Nepal",
-    "nz": "New Zealand",
-    "om": "Oman",
-    "pa": "Panama",
-    "pe": "Peru",
-    "pg": "Papua New Guinea",
-    "ph": "Philippines",
-    "pk": "Pakistan",
-    "pl": "Poland",
-    "pt": "Portugal",
-    "pw": "Palau",
-    "py": "Paraguay",
-    "qa": "Qatar",
-    "ro": "Romania",
-    "rs": "Serbia",
-    "ru": "Russia",
-    "rw": "Rwanda",
-    "sa": "Saudi Arabia",
-    "sb": "Solomon Islands",
-    "sc": "Seychelles",
-    "se": "Sweden",
-    "sg": "Singapore",
-    "si": "Slovenia",
-    "sk": "Slovakia",
-    "sl": "Sierra Leone",
-    "sn": "Senegal",
-    "sr": "Suriname",
-    "st": "São Tomé & Príncipe",
-    "sv": "El Salvador",
-    "sz": "Eswatini",
-    "tc": "Turks & Caicos",
-    "td": "Chad",
-    "th": "Thailand",
-    "tj": "Tajikistan",
-    "tm": "Turkmenistan",
-    "tn": "Tunisia",
-    "to": "Tonga",
-    "tr": "Türkiye",
-    "tt": "Trinidad & Tobago",
-    "tw": "Taiwan",
-    "tz": "Tanzania",
-    "ua": "Ukraine",
-    "ug": "Uganda",
-    "us": "United States",
-    "uy": "Uruguay",
-    "uz": "Uzbekistan",
-    "vc": "St. Vincent",
-    "ve": "Venezuela",
-    "vg": "British Virgin Islands",
-    "vn": "Vietnam",
-    "vu": "Vanuatu",
-    "ye": "Yemen",
-    "za": "South Africa",
-    "zw": "Zimbabwe",
-}
-
-
-def _country_flag(code: str) -> str:
-    """Convert 2-letter ISO country code to flag emoji."""
-    if not code or len(code) != 2:
-        return ""
-    return "".join(chr(0x1F1E6 + ord(c.upper()) - ord("A")) for c in code)
-
-
-def _country_name(code: str) -> str:
-    """Get country name from 2-letter code; falls back to uppercase code."""
-    if not code:
-        return ""
-    return COUNTRY_NAMES.get(code.lower(), code.upper())
-
-
 @register.filter
 def country_display(code):
     """
@@ -256,21 +71,21 @@ def country_display(code):
     """
     if not code:
         return mark_safe("—")
-    flag = _country_flag(code)
-    name = _country_name(code)
+    flag = countries.flag(code)
+    name = countries.name(code)
     return mark_safe(f'{flag} <span class="ml-0.5">{name}</span>')
 
 
 @register.filter
 def country_flag(code):
     """Return just the flag emoji for a 2-letter ISO code."""
-    return _country_flag(code) if code else ""
+    return countries.flag(code) if code else ""
 
 
 @register.filter
 def country_name(code):
     """Return just the country name for a 2-letter ISO code."""
-    return _country_name(code) if code else ""
+    return countries.name(code) if code else ""
 
 
 @register.filter
@@ -291,24 +106,42 @@ def format_number(value):
 
 
 def _fmt_dl(n):
-    """Mirror the canonical fmt() in static/js/ai-tabs-shared.js.
+    """The table's download figure (aso.scoring.fmt_downloads), the twin of
+    fmt() in static/js/ai-tabs-shared.js. See scoring-consistency.instructions.md."""
+    from aso.scoring import fmt_downloads
 
-    Preserves 1 decimal for values < 10 so we never display "<1" or rounded zeros.
-    See scoring-consistency.instructions.md.
-    """
-    try:
-        n = float(n)
-    except (TypeError, ValueError):
-        return "0"
-    if n >= 1000:
-        s = f"{n / 1000:.1f}"
-        return (s[:-2] if s.endswith(".0") else s) + "K"
-    if n < 1:
-        return f"{n:.1f}"
-    if n < 10:
-        s = f"{n:.1f}"
-        return s[:-2] if s.endswith(".0") else s
-    return str(round(n))
+    return fmt_downloads(n)
+
+
+INFO_ICON_CLASS = "w-3.5 h-3.5 text-slate-500 cursor-help inline-block align-[-2px] shrink-0"
+INFO_ICON_PATH = "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+
+
+@register.simple_tag
+def column_info(column, subject="new_app"):
+    """The (i) beside a column heading, with what the column means
+    (aso.column_tips). A click on it does not re-sort the table."""
+    from aso.column_tips import column_tip
+
+    return format_html(
+        '<svg class="{}" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="{}" '
+        'onclick="event.stopPropagation()"><path stroke-linecap="round" stroke-linejoin="round" '
+        'stroke-width="2" d="{}"/></svg>',
+        INFO_ICON_CLASS, column_tip(column, subject), INFO_ICON_PATH,
+    )
+
+
+OPPORTUNITY_SUBLINE_CLASS = "opp-subline block text-[9px] font-normal normal-case text-slate-500 whitespace-nowrap"
+
+
+@register.simple_tag
+def opportunity_subline(subject="new_app"):
+    """The words under the Opportunity heading, naming whose score it is:
+    "for a new app" (aso.column_tips.opportunity_subline). A page scored for
+    one app replaces the text with the app's name."""
+    from aso.column_tips import opportunity_subline as words
+
+    return format_html('<span class="{}">{}</span>', OPPORTUNITY_SUBLINE_CLASS, words(subject))
 
 
 @register.simple_tag
@@ -328,11 +161,13 @@ def download_cell(estimates, idx=0, total=0):
     positions = estimates.get("positions") or []
     if len(positions) < 10:
         return mark_safe('<span class="text-xs text-slate-500">—</span>')
+    show_below = total > 0 and idx < total / 2
+    if estimates.get("below_threshold"):
+        return _tiny_market_cell(show_below)
     p1, p5, p10 = positions[0], positions[4], positions[9]
     p1_lo, p1_hi = _fmt_dl(p1.get("downloads_low", 0)), _fmt_dl(p1.get("downloads_high", 0))
     p5_lo, p5_hi = _fmt_dl(p5.get("downloads_low", 0)), _fmt_dl(p5.get("downloads_high", 0))
     p10_lo, p10_hi = _fmt_dl(p10.get("downloads_low", 0)), _fmt_dl(p10.get("downloads_high", 0))
-    show_below = total > 0 and idx < total / 2
     pos_class = "top-full mt-2" if show_below else "bottom-full mb-2"
     return mark_safe(
         # Named group ("group/dl") scopes the hover to THIS cell only. A plain
@@ -347,7 +182,49 @@ def download_cell(estimates, idx=0, total=0):
         f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 font-mono">{p1_lo}–{p1_hi}</span></div>'
         f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 font-mono">{p5_lo}–{p5_hi}</span></div>'
         f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 font-mono">{p10_lo}–{p10_hi}</span></div>'
-        '</div></div></div>'
+        '</div>'
+        f'{_derived_market_note(estimates)}'
+        '</div></div>'
+    )
+
+
+DERIVED_MARKET_NOTE = (
+    "Market size for this storefront is derived from population and iOS share, not measured. Treat the range as indicative."
+)
+
+TINY_MARKET_TEXT = "Under 1 search a day"
+TINY_MARKET_NOTE = (
+    "This storefront sees under one search a day for this keyword, so there is no download range worth quoting."
+)
+
+
+def _derived_market_note(estimates) -> str:
+    """Twin of derivedMarketNote() in static/js/ai-tabs-shared.js."""
+    if estimates.get("market_source") != "derived":
+        return ""
+    return (
+        '<p class="text-[10px] text-slate-500 leading-snug mt-2 pt-2 '
+        'border-t border-white/5">' + DERIVED_MARKET_NOTE + '</p>'
+    )
+
+
+def _tiny_market_cell(show_below: bool) -> str:
+    """Twin of tinyMarketCell() in static/js/ai-tabs-shared.js.
+
+    A storefront this small sees under one search a day for the keyword, so a
+    range of zeros would read as a bug. Say the real thing instead.
+    """
+    pos_class = "top-full mt-2" if show_below else "bottom-full mb-2"
+    return mark_safe(
+        '<div class="group/dl relative inline-block">'
+        '<span class="text-xs text-slate-400 cursor-help border-b border-dotted '
+        'border-slate-600">' + TINY_MARKET_TEXT + '</span>'
+        f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} '
+        'left-1/2 -translate-x-1/2 w-52 bg-slate-800 border border-white/10 '
+        'rounded-lg p-3 shadow-xl text-left">'
+        '<p class="text-[11px] text-slate-300 leading-snug">'
+        + TINY_MARKET_NOTE + '</p>'
+        '</div></div>'
     )
 
 
@@ -697,3 +574,48 @@ def highlight_keyword(title, keyword, autoescape=True):
     )
     spans = [m.span() for m in word_re.finditer(title_str)]
     return _render_marks(title_str, spans, cls)
+
+
+@register.simple_tag
+def storefront_count():
+    """How many App Store storefronts RespectASO supports.
+
+    A tag rather than a number in the copy: the list is probed against Apple
+    (manage.py probe_storefronts) and the pages must follow it. The app used
+    to say "30" in nine places.
+    """
+    return len(countries.CODES)
+
+
+@register.simple_tag
+def apple_coverage_sentence():
+    """One sentence on where Apple reports search popularity.
+
+    Honest about not knowing: until the coverage probe has run on this
+    install, the app says Apple does not operate everywhere without putting a
+    number on it, because a number nobody measured is worse than none.
+    """
+    total = len(countries.CODES)
+    covered = len(countries.APPLE_ADS_STOREFRONTS & countries.CODES)
+    if not covered:
+        return (
+            "Apple Ads does not operate in every storefront. Where it does "
+            "not, RespectASO's estimate powers the score unchanged and the "
+            "value is marked EST."
+        )
+    return (
+        f"Apple Ads operates in {covered} of the {total} storefronts "
+        "RespectASO supports. The others use the estimate unchanged."
+    )
+
+
+@register.simple_tag
+def scored_for_note(reason=""):
+    """Whose opportunity a keyword table shows, for the surfaces that score
+    without an app of yours: "competitor" (the AI Competitor tab analyses
+    someone else's app) or anything else for "not tied to one of your apps".
+    Composed by aso.scoring.scored_for, like every other surface."""
+    from aso.scoring import scored_for
+
+    return scored_for(reason="competitor" if reason == "competitor" else None)
+

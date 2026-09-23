@@ -34,12 +34,15 @@ class AsoConfig(AppConfig):
         import threading
 
         if os.environ.get("RESPECTASO_DISABLE_SCHEDULER") != "1":
-            from .popularity import maybe_upgrade_estimator_version
+            from .popularity import upgrade_stored_history
 
+            # One thread, in dependency order: popularity, then difficulty,
+            # then the labels that read both. Each step has its own marker,
+            # so only what changed runs.
             threading.Thread(
-                target=maybe_upgrade_estimator_version,
+                target=upgrade_stored_history,
                 daemon=True,
-                name="estimator-upgrade",
+                name="history-upgrade",
             ).start()
 
         from .scheduler import start_scheduler

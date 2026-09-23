@@ -88,6 +88,7 @@ def _ensure_features():
         return
     _registrars_loaded = True
     from . import search_jobs  # noqa: F401  (keyword search, both editions)
+    from . import opportunity_scans  # noqa: F401  (country scans, both editions)
     if django_apps.is_installed("aso_pro"):
         from aso_pro import views  # noqa: F401  (the three AI features)
 
@@ -165,6 +166,16 @@ def lane_state():
     with _lock:
         winding = bool(_active)
     return "winding_down" if winding else "idle"
+
+
+def front_rank() -> int:
+    """A rank that puts a run ahead of everything already queued.
+
+    Used by the features whose interrupted rows go back to the FRONT: they
+    were executing when the app stopped, not waiting their turn.
+    """
+    ranks = [row.queue_rank for _f, row in queued_runs() if row.queue_rank is not None]
+    return (min(ranks) if ranks else 1) - 1
 
 
 def queue_position(row):

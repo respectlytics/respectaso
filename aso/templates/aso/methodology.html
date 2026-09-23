@@ -31,10 +31,9 @@
                 the same kind of competitive analysis that paid tools charge for — without sending your research data anywhere.
             </p>
             <p>
-                A note on complexity: Apple's ranking algorithms are proprietary and undocumented. No tool — regardless of
-                price or sophistication — knows exactly how they work. Past a certain point, adding more complexity to the
-                analysis doesn't improve accuracy; it just creates a false sense of precision. We'd rather give you
-                honest directional guidance than overfit to a black box.
+                Apple's ranking algorithm is private, and no tool knows exactly how it works. So RespectASO measures
+                instead of guessing: its popularity estimate is fitted to Apple's own popularity data, its ranks come
+                from where apps actually land in real App Store searches, and every score shows the working behind it.
             </p>
         </div>
     </section>
@@ -89,25 +88,15 @@
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <h3 class="text-white font-medium text-sm">Calibrated against Apple's official data</h3>
                 <p class="text-slate-400">
-                    Since estimate v2, the signal weights are not hand-tuned: they are fitted against
-                    hundreds of official Apple search-popularity values from the Apple Ads top-terms
-                    dataset, plus keywords provably outside Apple's top terms. The estimate therefore
-                    speaks Apple's 1–100 scale - keywords Apple reports land around 40 and up, and the
-                    fit separates genuinely popular brand keywords from unknown names using the same
-                    observable signals (a dominant exact-match app with millions of ratings reads very
-                    differently from an obscure one). Validation on held-out data: rank correlation
-                    0.61 with Apple's values, and 0.71 on brand-like keywords - the previous hand-tuned
-                    weights measured 0.37 and 0.09.
-                </p>
-                <p class="text-slate-400">
-                    Honest limits: below Apple's reporting bar there is no ground truth, so ordering
-                    among long-tail keywords remains heuristic; and no signal-based method can see raw
-                    search logs. The estimate stays an estimate - now a measured one.
+                    The signals are weighted by fitting them to thousands of Apple's official popularity values
+                    across several countries, and to search terms that fall below Apple's list. So the estimate speaks
+                    Apple's scale of 1 to 100: terms Apple reports land around 40 and up, terms almost nobody searches
+                    land well below, and a well-known brand search reads very differently from an unknown name.
                 </p>
             </div>
             <p>
-                Keep in mind that popularity is an estimate, not an exact measurement. A score of 60 doesn't mean "60 searches per day" — it
-                means the competitive signals suggest significantly above-average search volume.
+                A popularity of 60 is not 60 searches a day. It says how sought after a keyword is compared with
+                others, and the Opportunity score turns it into searches and downloads for each storefront.
             </p>
             <h3 class="text-white font-medium text-sm">Apple Ads popularity (official API)</h3>
             <p>
@@ -130,16 +119,16 @@
                 Storefronts where Apple Ads does not operate (for example Russia) use the estimate unchanged.
             </p>
             <p class="text-slate-400 text-xs">
-                One honest nuance: an install using the Apple source and an install using the estimate speak different
-                units - the same keyword can carry different numbers in each, by design. Within one install, everything
-                is always consistent, and both values stay a hover away on every keyword's source badge.
+                The two sources are separate measurements, so the same keyword can carry a different number in each.
+                Everything in the app uses the source you chose, and the other value is a hover away on every
+                keyword's source badge.
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Why we offer both - and never just pass Apple's number through</h3>
+                <h3 class="text-white font-medium text-sm">Why RespectASO offers both</h3>
                 <p class="text-slate-400">
-                    Apple's popularity is Apple's own measurement, now published through an official, documented API -
-                    but it covers only the top of the market (its top search terms per category), it is weekly rather
-                    than real-time, and Apple publishes no methodology for the value itself.
+                    Apple's popularity is Apple's own measurement, published through an official API. It covers only the
+                    top of the market (the most-searched terms in each category), it is updated once a week, and Apple
+                    publishes no method behind the value. That is true for every tool built on it.
                 </p>
                 <p class="text-slate-400">
                     That is why the RespectASO estimate stays first-class: it's fully inspectable, works in every
@@ -224,15 +213,17 @@
             <span class="text-purple-400">🏷️</span> Difficulty Tiers
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
-            <p>The final score maps to 6 color-coded tiers:</p>
+            <p>The final score maps to 6 color-coded tiers. The right-hand figure is where a brand new app with the keyword in its title typically lands in each tier, measured on real App Store searches; an app with ratings of its own does better.</p>
+            {% with d=scoring_guide.difficulty %}
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2 text-xs">
-                <div class="flex justify-between"><span class="text-green-400 font-medium">1–15: Very Easy</span><span class="text-slate-400">Almost no competition. Rank immediately with basic metadata.</span></div>
-                <div class="flex justify-between"><span class="text-green-300 font-medium">16–35: Easy</span><span class="text-slate-400">Light competition, achievable with good metadata.</span></div>
-                <div class="flex justify-between"><span class="text-yellow-400 font-medium">36–55: Moderate</span><span class="text-slate-400">Meaningful competition. Requires strategic keyword targeting.</span></div>
-                <div class="flex justify-between"><span class="text-orange-400 font-medium">56–75: Hard</span><span class="text-slate-400">Strong competition from established apps with significant ratings.</span></div>
-                <div class="flex justify-between"><span class="text-red-400 font-medium">76–90: Very Hard</span><span class="text-slate-400">Dominated by major apps. Breaking in requires exceptional execution.</span></div>
-                <div class="flex justify-between"><span class="text-red-600 font-medium">91–100: Extreme</span><span class="text-slate-400">Category-defining keywords held by the world's largest apps.</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-green-400 font-medium">1-15: Very Easy</span><span class="text-slate-400">Almost no competition. Rank quickly with basic metadata.</span><span class="text-slate-300 whitespace-nowrap">{{ d.0.where }}</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-green-300 font-medium">16-35: Easy</span><span class="text-slate-400">Light competition, achievable with good metadata.</span><span class="text-slate-300 whitespace-nowrap">{{ d.1.where }}</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-yellow-400 font-medium">36-55: Moderate</span><span class="text-slate-400">Meaningful competition. Requires strategic keyword targeting.</span><span class="text-slate-300 whitespace-nowrap">{{ d.2.where }}</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-orange-400 font-medium">56-75: Hard</span><span class="text-slate-400">Strong competition from established apps with significant ratings.</span><span class="text-slate-300 whitespace-nowrap">{{ d.3.where }}</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-red-400 font-medium">76-90: Very Hard</span><span class="text-slate-400">Dominated by major apps. Breaking in requires exceptional execution.</span><span class="text-slate-300 whitespace-nowrap">{{ d.4.where }}</span></div>
+                <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-red-600 font-medium">91-100: Extreme</span><span class="text-slate-400">Category-defining keywords held by the world's largest apps.</span><span class="text-slate-300 whitespace-nowrap">{{ d.5.where }}</span></div>
             </div>
+            {% endwith %}
         </div>
     </section>
 
@@ -279,16 +270,158 @@
                 <li><strong class="text-white">Market-size scaling</strong> — search volumes are calibrated for the US App Store. Estimates for other countries are scaled down based on relative App Store size</li>
             </ol>
             <p>
-                The result is a low–high range for each ranking position. These are directional estimates for <strong class="text-white">downloads
-                from this specific keyword only</strong> — your total downloads will include traffic from all keywords you rank for, plus
+                The result is a low to high range for each ranking position. These are directional estimates for <strong class="text-white">downloads
+                from this specific keyword only</strong>. Your total downloads will include traffic from all keywords you rank for, plus
                 browse traffic and other sources.
+            </p>
+            <p>
+                Two of these figures appear in the app, and they answer different questions.
+                <strong class="text-white">Downloads at #1</strong> is what the keyword pays whichever app holds the top spot:
+                the size of the prize. The <strong class="text-white">Opportunity score</strong> is built on the downloads averaged
+                over where apps like the one you track the keyword for land, using the conservative 5% end of the range. A keyword can pay
+                thousands a day at #1 and next to nothing where a new app typically lands, and the gap between the two is what the
+                Worth Climbing tag means.
             </p>
             <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-3 text-xs text-yellow-300">
                 <p class="text-yellow-400/80 italic">
-                    Apple doesn't publish search volumes or tap-through rates. No tool has exact numbers.
-                    Our estimates are calibrated against real download data but actual results will vary.
+                    Apple publishes no search volumes or tap-through rates, so no ASO tool has exact numbers.
+                    RespectASO's estimates are calibrated against real download data.
                 </p>
             </div>
+        </div>
+    </section>
+
+    <!-- Country coverage: generated from aso/countries.py, never hand written -->
+    <section id="country-coverage" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <span class="text-purple-400">🌍</span> Country coverage
+        </h2>
+        <div class="text-sm text-slate-300 leading-relaxed space-y-3">
+            <p>
+                RespectASO scans every App Store storefront Apple operates, {{ coverage_total }} of them.
+                Three things differ from one to the next, and the app marks each one where you choose a country
+                rather than leaving you to find out afterwards.
+            </p>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Where Apple reports popularity</h3>
+                {% if coverage_apple_known %}
+                <p class="text-slate-400">
+                    Apple Ads, the source of official search popularity, operates in
+                    <strong class="text-white">{{ coverage_apple_count }}</strong> of these {{ coverage_total }} storefronts.
+                    In the rest the popularity score is RespectASO's own estimate.
+                </p>
+                {% else %}
+                <p class="text-slate-400">
+                    Apple Ads, the source of official search popularity, does not operate everywhere.
+                    Where it does not, the popularity score is RespectASO's own estimate.
+                </p>
+                {% endif %}
+                <p class="text-slate-400">
+                    This is not a gap in the scan. It is a gap in what Apple publishes, and the badge on every
+                    score says which source produced it.
+                </p>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">What the badges mean</h3>
+                <div class="flex items-start gap-3">
+                    <span class="text-slate-500">•</span>
+                    <span><strong class="text-white">EST</strong> — RespectASO's estimate, the active source powering your scores.</span>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-slate-500">•</span>
+                    <span><strong class="text-white">ASA</strong> — Apple Ads popularity, Apple's own value for that keyword and week.</span>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="text-slate-500">•</span>
+                    <span><strong class="text-white">EST*</strong> — the estimate standing in where Apple reports nothing for that keyword,
+                    either because the keyword is not among its category's most-searched terms or because Apple publishes
+                    no data for that storefront at all. Hovering the badge gives the numbers behind that row.</span>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Listing languages</h3>
+                <p class="text-slate-400">
+                    Apple offers an App Store listing language for
+                    <strong class="text-white">{{ coverage_language_count }}</strong> of these storefronts.
+                    In the other <strong class="text-white">{{ coverage_no_language_count }}</strong> there is no App Store
+                    language at all, so your listing appears there in your app's fallback language.
+                </p>
+                <p class="text-slate-400">
+                    Keyword research still works in those markets, because people search in their own language.
+                    What you cannot do is ship a listing written in it.
+                </p>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Popularity is relative, not a number of searches</h3>
+                <p class="text-slate-400">
+                    A popularity of 43 means the same thing in every storefront: this keyword is sought after
+                    compared with other keywords. It does not mean 43 searches, and it does not mean the same
+                    number of searches everywhere. The searches behind it are popularity scaled by the size of
+                    the market, which is why the same 43 is about 110 searches a day in the United States and
+                    a fraction of one in Antigua &amp; Barbuda.
+                </p>
+                <p class="text-slate-400">
+                    That is also why a keyword under one search a day is classified
+                    <strong class="text-white">Low Volume</strong> there whatever its popularity score. It would
+                    be a contradiction for a row to say "under 1 search a day" and "high search volume" at once.
+                </p>
+            </div>
+
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
+                <h3 class="text-white font-medium text-sm">Market size</h3>
+                <p class="text-slate-400">
+                    Download estimates are scaled by how large a storefront is relative to the US.
+                    <strong class="text-white">{{ coverage_measured_count }}</strong> of these factors were measured against
+                    observed App Store data. The rest are derived from population and the region's typical iOS share,
+                    calibrated against the measured markets of a similar size, and every number they produce is marked
+                    as derived where it is shown.
+                </p>
+                <p class="text-slate-400">
+                    Where that puts a keyword under one search a day, the app says so instead of showing a range of zeros.
+                </p>
+            </div>
+
+            <details class="bg-slate-800/80 rounded-lg p-4">
+                <summary class="text-white font-medium text-sm cursor-pointer hover:text-purple-300 transition-colors">
+                    Show all {{ coverage_total }} storefronts
+                </summary>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-500">
+                                <th class="text-left py-1.5 pr-3 font-medium">Country</th>
+                                <th class="text-left py-1.5 pr-3 font-medium">Region</th>
+                                <th class="text-left py-1.5 pr-3 font-medium">Apple data</th>
+                                <th class="text-left py-1.5 pr-3 font-medium">Listing language</th>
+                                <th class="text-left py-1.5 font-medium">Market size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for region, entries in coverage_regions.items %}
+                                {% for c in entries %}
+                                <tr class="border-b border-white/5">
+                                    <td class="py-1.5 pr-3 text-slate-200 whitespace-nowrap">{{ c.flag }} {{ c.name }}</td>
+                                    <td class="py-1.5 pr-3 text-slate-500">{{ region }}</td>
+                                    <td class="py-1.5 pr-3 text-slate-400">
+                                        {% if not coverage_apple_known %}not checked yet
+                                        {% elif c.code in coverage_apple_codes %}Apple reports it
+                                        {% else %}estimate only{% endif %}
+                                    </td>
+                                    <td class="py-1.5 pr-3 text-slate-400">
+                                        {% if c.locales %}{{ c.primary_locale }}{% else %}none{% endif %}
+                                    </td>
+                                    <td class="py-1.5 text-slate-400">{{ c.market_source }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
         </div>
     </section>
 
@@ -299,64 +432,116 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                Keywords are automatically classified with insight tags based on their popularity and difficulty combination:
+                Every keyword gets one tag, and each tag is one range of one number on its row, so a tag can never
+                disagree with the numbers beside it. Demand comes first, and it is a fact about the keyword, not the app:
+                when even #1 brings under one download a day, at the low end of the Downloads at #1 column, the tag is
+                <strong class="text-white">Low Volume</strong>, for every app and at every difficulty. Otherwise the
+                Opportunity score decides, on round bars: <strong class="text-white">Sweet Spot</strong> from 10 downloads
+                a day, <strong class="text-white">Good Target</strong> from 1, <strong class="text-white">Supporting</strong>
+                from one every 10 days, and below that <strong class="text-white">Worth Climbing</strong>. Difficulty is not
+                judged a second time: it has its own column, and it already decides where the app lands, which is what the
+                score counts. Each tag belongs to one of three decisions. <strong class="text-white">Target now</strong>: the
+                keyword is worth something at the rank you can expect today, and the tag says how much.
+                <strong class="text-white">Target and climb</strong>: it pays well to whoever holds #1 but little at the rank
+                you can expect today. It is still worth targeting: putting a keyword in your title is how an app starts to
+                climb for it, and a title with it also ranks for longer searches that contain it. It pays more as the
+                app gains ratings. <strong class="text-white">Skip</strong>: even the top spot pays little in that
+                storefront. Hover any tag in a table for what it means for that row: for the app you track the keyword
+                for, by name, or for a brand new app when it is not tied to one.
             </p>
+            {% regroup classification_legend by decision as decisions %}
+            {% for group in decisions %}
+            <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide">{{ group.grouper }}</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div class="bg-green-900/20 border border-green-500/20 rounded-lg p-3">
-                    <p class="text-xs font-medium text-green-300">🎯 Sweet Spot</p>
-                    <p class="text-xs text-slate-400 mt-1">High search volume with low competition. Ideal targets.</p>
+                {% for item in group.list %}
+                <div class="{{ item.css }} border rounded-lg p-3">
+                    <p class="text-xs font-medium">{{ item.icon }} {{ item.label }}</p>
+                    <p class="text-xs text-slate-400 mt-1">{{ item.description }}</p>
                 </div>
-                <div class="bg-green-900/20 border border-green-500/20 rounded-lg p-3">
-                    <p class="text-xs font-medium text-green-300">✅ Good Target</p>
-                    <p class="text-xs text-slate-400 mt-1">Solid search volume with manageable competition.</p>
-                </div>
-                <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg p-3">
-                    <p class="text-xs font-medium text-blue-300">💎 Hidden Gem</p>
-                    <p class="text-xs text-slate-400 mt-1">Moderate search volume with minimal competition. Real download potential others have overlooked.</p>
-                </div>
-                <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-3">
-                    <p class="text-xs font-medium text-yellow-300">⚔️ High Competition</p>
-                    <p class="text-xs text-slate-400 mt-1">Dominated by established apps. Focus on long-tail variants.</p>
-                </div>
-                <div class="bg-slate-800 border border-white/10 rounded-lg p-3">
-                    <p class="text-xs font-medium text-slate-300">👍 Moderate</p>
-                    <p class="text-xs text-slate-400 mt-1">Reasonable opportunity as a supporting keyword.</p>
-                </div>
-                <div class="bg-slate-800 border border-white/10 rounded-lg p-3">
-                    <p class="text-xs font-medium text-slate-300">🔍 Low Volume</p>
-                    <p class="text-xs text-slate-400 mt-1">Very few searches. Only worth it if highly relevant.</p>
-                </div>
-                <div class="bg-red-900/20 border border-red-500/20 rounded-lg p-3">
-                    <p class="text-xs font-medium text-red-300">🚫 Avoid</p>
-                    <p class="text-xs text-slate-400 mt-1">Low opportunity. Effort better spent elsewhere.</p>
-                </div>
+                {% endfor %}
             </div>
+            {% endfor %}
+            <p class="text-xs text-slate-400">
+                When your app already has the keyword in its title and RespectASO knows where it ranks, that real rank is
+                what the score uses, better or worse than where apps like it typically land. Every explanation behind a low
+                score ends with what holding #1 would bring, so a keyword that is not worth much today still shows what it
+                could be worth.
+            </p>
         </div>
     </section>
 
     <!-- Opportunity Score -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
+    <section id="opportunity" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
         <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
             <span class="text-purple-400">🌍</span> Opportunity Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                The <strong class="text-white">Country Opportunity Finder</strong> scans a keyword across all 30 supported
-                countries simultaneously. For each country, it calculates an <strong class="text-white">Opportunity Score</strong>
-                (0–100) that answers: <em class="text-white">"How likely am I to rank for this keyword and get meaningful downloads?"</em>
+                The Opportunity score (0 to 100) is the number to act on. It answers one question:
+                <em class="text-white">"What is this keyword worth in this storefront, to the app I track it for?"</em>
+                It appears on every keyword in the app, and the <strong class="text-white">Country Opportunity Finder</strong>
+                ranks storefronts by it.
+            </p>
+            <ol class="list-decimal list-inside space-y-2 text-slate-400">
+                <li><strong class="text-white">Where apps like yours land.</strong> Difficulty measures how strong the apps
+                already ranking for the keyword are. Your app is measured on the same scale in that storefront: its ratings,
+                how fast it gains them, its average stars and its age. How far it falls short of the difficulty, or clears
+                it, says where apps like it land. That was measured, not guessed: RespectASO ran
+                {{ scoring_guide.rank_study.searches }} real App Store searches and recorded where each of the
+                {{ scoring_guide.rank_study.apps }} apps with the keyword in its title actually ranked. The searches
+                came from these storefronts: {{ scoring_guide.rank_study.storefronts }}. Apps land all over the results. A brand new app,
+                with no ratings yet, typically lands around #{{ scoring_guide.new_app.easy }} on a very easy keyword,
+                #{{ scoring_guide.new_app.middling }} on a middling one and #{{ scoring_guide.new_app.hard }} on a hard
+                one. On the very easy keyword {{ scoring_guide.new_app.easy_top_ten }} the top 10; on the hard one,
+                {{ scoring_guide.new_app.hard_top_ten }} it. An app with ratings of its own does better. When your app already ranks higher for the keyword, its
+                real rank is used, and when its title already carries the keyword, its real rank is used whether it is
+                better or worse. A harder keyword never means a better rank, and it changes a little at a time.</li>
+                <li><strong class="text-white">What that pays.</strong> The downloads where apps like yours land, averaged
+                over all of them: the searches the keyword gets in that storefront, times how many searchers tap each rank,
+                times the conservative 5% install rate. The few apps that reach the top get most of the taps, so the average
+                is well above what the middle app gets.
+                Past the first 20 results the share of people who scroll that far keeps shrinking; it never drops to zero
+                at a line.</li>
+                <li><strong class="text-white">The score.</strong> Those downloads on one scale: 50 is about one download a
+                day, and every tenfold change moves it 20 points.</li>
+            </ol>
+            {% with o=scoring_guide.opportunity %}
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-1.5 text-xs">
+                {% for row in o %}
+                <div class="grid grid-cols-[3.5rem_1fr] gap-3"><span class="text-cyan-300 font-mono">{{ row.range }}</span><span class="text-slate-300">{{ row.meaning }}</span></div>
+                {% endfor %}
+            </div>
+            {% endwith %}
+            <p>
+                Because every storefront goes through the same three steps, the score compares fairly across countries. The
+                same keyword with the same difficulty always scores at least as high in a larger market, and more reachable
+                downloads always means a higher score. Popularity cannot do this on its own: it is a relative index, so the
+                same 48 is about 220 searches a day in the United States and about 7 in Argentina.
             </p>
             <p>
-                The score combines search volume with competition:
+                Every table shows one Opportunity number per keyword, and says above the column whose it is: a brand new
+                app, the app being simulated, or on the Dashboard the app named under each keyword. Hover a score for the
+                reasoning: the app's ratings, stars and age in that storefront, where apps like it land, the rank it already
+                holds when that is known, and what that averages in downloads.
             </p>
-            <ul class="list-disc list-inside space-y-1.5 text-slate-400">
-                <li><strong class="text-white">Search volume</strong> — keywords with more searches have higher potential</li>
-                <li><strong class="text-white">Competition as a gate</strong> — low difficulty barely reduces your score, but high difficulty dramatically limits your realistic ranking potential — even for popular keywords</li>
-            </ul>
             <p>
-                A keyword with high popularity but extreme difficulty will score low because you're unlikely to crack the top
-                results through ASO alone. Conversely, a moderate-popularity keyword with low difficulty can score surprisingly
-                well — it represents a genuine opportunity to rank and capture downloads.
+                What the keyword would bring whoever holds #1 is the Downloads at #1 column beside it, so a low score never
+                hides a keyword worth climbing for, and the Worth Climbing tag marks exactly those: little today, a download
+                a day or more at #1.
             </p>
+            <div class="bg-slate-800/80 rounded-lg p-4 space-y-2 text-xs text-slate-400">
+                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide">The same keyword for two of your apps</h3>
+                <p>
+                    It can score differently for each, and should: the stronger app in that storefront ranks higher, so
+                    the keyword is worth more to it. Each row names its app, and the tooltip says what a brand new app
+                    would get for comparison. Each app's ratings, stars and release date are read from the App Store at
+                    most once a day per storefront, because they differ from country to country.
+                </p>
+                <p>
+                    Keywords not tied to one of your apps, the AI Researcher, and the AI Competitor tab (which analyses
+                    someone else's app) score for a brand new app, and say so above their tables.
+                </p>
+            </div>
         </div>
     </section>
 
@@ -367,13 +552,15 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                Every score in RespectASO is calculated using smooth mathematical curves — not arbitrary buckets.
-                This means small improvements in your metadata lead to small improvements in your score, and vice versa.
-                There are no hidden cliffs where a tiny change suddenly drops you from "Good" to "Poor."
+                Every score follows continuous curves rather than arbitrary buckets, so a small change in the inputs makes a
+                small change in the score. There are no cliffs: a harder keyword, a smaller market or fewer ratings lower
+                the score a little at a time, including past the first 20 search results, where the model keeps counting
+                the few people who scroll that far. Automated tests walk every input in small steps and fail on any jump.
             </p>
             <p>
-                The labels (Excellent, Good, etc.) are simply friendly names placed on top of the continuous score for
-                quick interpretation.
+                The tags (Sweet Spot, Low Volume and the rest) are names for ranges of the numbers on the row, never a
+                separate judgement: Low Volume is a range of Downloads at #1, every other tag a range of the Opportunity
+                score, so they move exactly when those numbers do.
             </p>
         </div>
     </section>
@@ -451,18 +638,18 @@
         </div>
     </section>
 
-    <!-- Limitations -->
+    <!-- Good to know -->
     <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
         <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">⚠️</span> Limitations
+            <span class="text-purple-400">📌</span> Good to Know
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <ul class="list-disc list-inside space-y-1.5 text-slate-400">
-                <li>The iTunes API returns up to 200 results per search — the true total may be higher</li>
-                <li>Popularity is estimated, not exact — Apple doesn't expose real search volumes</li>
-                <li>Rankings can change hourly; scores represent a snapshot in time</li>
-                <li>Different countries have different keyword landscapes — always check your target markets</li>
-                <li>Download estimates are rough approximations, not guarantees</li>
+                <li>Apple's search returns up to 200 apps per keyword, and RespectASO finds your app's rank anywhere among them</li>
+                <li>Apple publishes no exact search volumes, for any tool. RespectASO uses Apple's own popularity wherever Apple publishes it, and its calibrated estimate everywhere else</li>
+                <li>Rankings move during the day, so each score is a snapshot, and tracked keywords refresh automatically</li>
+                <li>Every country has its own keyword landscape, so check each market you target</li>
+                <li>Download figures are estimates, since Apple publishes no tap or install data</li>
             </ul>
         </div>
     </section>

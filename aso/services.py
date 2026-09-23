@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 
 import requests
 
+from aso import countries
+
 logger = logging.getLogger(__name__)
 
 
@@ -292,6 +294,48 @@ def _is_brand_keyword(
 # --------------------------------------------------------------------------- #
 
 
+# Leader strength, 0-30, from the strongest leading app's rating count: log
+# interpolation between the points, so no count is a step.
+_LEADER_BANDS = [
+    (10, 1),
+    (100, 5),
+    (1_000, 10),
+    (10_000, 17),
+    (100_000, 24),
+    (1_000_000, 30),
+]
+
+
+def _leader_band_score(max_reviews: float) -> float:
+    if max_reviews <= 0:
+        return 0
+    if max_reviews >= 1_000_000:
+        return 30
+    for i, (threshold, score) in enumerate(_LEADER_BANDS):
+        if max_reviews < threshold:
+            if i == 0:
+                return (max_reviews / threshold) * score
+            prev_t, prev_s = _LEADER_BANDS[i - 1]
+            ratio = math.log(max_reviews / prev_t) / math.log(threshold / prev_t)
+            return prev_s + ratio * (score - prev_s)
+    return 30
+
+
+# How many positions the leader gate takes to fade, around the middle of the
+# results. The top app always counts fully; at 25 results #13 counts half,
+# #16 a quarter and #25 almost nothing.
+LEADER_GATE_WIDTH = 3.0
+
+
+def _leader_gate(index: int, n: int) -> float:
+    """How much the app at 0-based ``index`` of ``n`` results counts as a
+    possible leader, 1 for the first app, fading smoothly past the middle."""
+    def logistic(i):
+        return 1.0 / (1.0 + math.exp((i + 0.5 - n / 2) / LEADER_GATE_WIDTH))
+
+    return logistic(index) / logistic(0)
+
+
 class PopularityEstimator:
     """
     Estimates keyword search popularity from iTunes Search competitor data.
@@ -389,33 +433,18 @@ class PopularityEstimator:
         # Smooth log interpolation avoids cliff effects between bands.
         top_half = competitors[: max(n // 2, 1)]
         max_reviews = max(c.get("userRatingCount", 0) for c in top_half)
-        leader_bands = [
-            (10, 1),
-            (100, 5),
-            (1_000, 10),
-            (10_000, 17),
-            (100_000, 24),
-            (1_000_000, 30),
-        ]
-        if max_reviews <= 0:
-            leader_score = 0
-        elif max_reviews >= 1_000_000:
-            leader_score = 30
-        else:
-            leader_score = 0
-            for i, (threshold, score) in enumerate(leader_bands):
-                if max_reviews < threshold:
-                    if i == 0:
-                        leader_score = (max_reviews / threshold) * score
-                    else:
-                        prev_t, prev_s = leader_bands[i - 1]
-                        ratio = math.log(max_reviews / prev_t) / math.log(
-                            threshold / prev_t
-                        )
-                        leader_score = prev_s + ratio * (score - prev_s)
-                    break
-            else:
-                leader_score = 30
+        leader_score = _leader_band_score(max_reviews)
+
+        # The same leader, found smoothly: each app counts by a gate that
+        # fades over a few positions around the middle of the results instead
+        # of cutting at it, so an app moving one place never takes the leader
+        # with it. Measured by apple_estimator_study (candidates C and D); a
+        # signal is only used when V2_WEIGHTS names it.
+        smooth_leader_mag = max(
+            _leader_gate(index, n) * math.log10(1 + c.get("userRatingCount", 0))
+            for index, c in enumerate(competitors)
+        )
+        smooth_leader_score = _leader_band_score(10 ** smooth_leader_mag - 1)
 
         # Signal 3: Title match density (0-20 points)
         # Strong title targeting (exact/all-word) is demand evidence.
@@ -443,6 +472,33 @@ class PopularityEstimator:
                 title_matches += 1
         match_ratio = title_matches / n if n > 0 else 0
         title_score = min(20, match_ratio * 40)
+
+        # How much of the top results' weight targets the keyword, 0 to 1.
+        # Each app weighs by its position (a smooth decay, so moving from #5
+        # to #6 changes little) and by the log of its ratings; its title
+        # counts by the graded evidence. One app changes the share only by
+        # its own part, never from nothing to everything.
+        share_num = share_den = 0.0
+        # The brand signal, built the same way: how big the apps carrying the
+        # keyword in their title are, weighted by position. Each app adds its
+        # own position weight's share of its magnitude, so one title gaining
+        # or losing the keyword moves it by that app's part and no more. It
+        # replaces x_top1_exact, the ratings of the single strongest exact
+        # match in the top five, which one title could switch from nothing to
+        # everything (STRENGTH_AND_RANK_CALIBRATION_PLAN.md, D7b).
+        mag_num = mag_den = 0.0
+        for index, c in enumerate(competitors):
+            position_weight = math.exp(-index / 3)
+            magnitude = math.log10(1 + c.get("userRatingCount", 0))
+            evidence = float(_keyword_title_evidence(
+                kw_lower, c.get("trackName", ""), c.get("primaryGenreName", ""),
+            )["evidence"])
+            share_num += position_weight * magnitude * evidence
+            share_den += position_weight * magnitude
+            mag_num += position_weight * magnitude * evidence
+            mag_den += position_weight
+        exact_share = share_num / share_den if share_den > 0 else 0.0
+        exact_mag = mag_num / mag_den if mag_den > 0 else 0.0
 
         # Signal 4: Market depth - median reviews (0-10 points)
         sorted_counts = sorted(
@@ -509,6 +565,7 @@ class PopularityEstimator:
         relevance = max(0.3, min(1.0, relevance_ratio * 2.6))
         result_score *= relevance
         leader_score *= relevance
+        smooth_leader_score *= relevance
         depth_score *= relevance
 
         return {
@@ -520,6 +577,15 @@ class PopularityEstimator:
             "f_exact": exact_bonus,
             "x_top1_exact": math.log10(1 + best_exact_reviews),
             "x_leader_mag": math.log10(1 + max_reviews),
+            # The smooth replacements for x_top1_exact, measured by
+            # apple_estimator_study (STRENGTH_AND_RANK_CALIBRATION_PLAN.md D7).
+            # A signal is only used when V2_WEIGHTS names it.
+            "x_exact_share": exact_share,
+            "x_exact_mag": exact_mag,
+            "x_exact_brand": exact_share * math.log10(1 + max_reviews),
+            "f_leader_smooth": smooth_leader_score,
+            "x_leader_mag_smooth": smooth_leader_mag,
+            "x_exact_brand_smooth": exact_share * smooth_leader_mag,
         }
 
 
@@ -1129,64 +1195,84 @@ class DownloadEstimator:
     _CVR_LOW = 0.05
     _CVR_HIGH = 0.20
 
-    # Market-size multiplier: scales search volumes relative to US.
-    # POP_TO_SEARCHES is calibrated for the US App Store (~180 M iPhones).
-    # Smaller markets have proportionally fewer searches for the same
-    # popularity score.  Factors derived from estimated active-iPhone
-    # installed base per country relative to the US.
-    _MARKET_SIZE = {
-        "us": 1.0,
-        # Tier 2 — large markets (30 M+ iPhones)
-        "cn": 0.45,
-        "jp": 0.35,
-        "gb": 0.30,
-        "de": 0.25,
-        "fr": 0.22,
-        "kr": 0.20,
-        "br": 0.18,
-        "in": 0.15,
-        "ca": 0.15,
-        "au": 0.12,
-        "ru": 0.12,
-        "it": 0.12,
-        "es": 0.10,
-        "mx": 0.10,
-        # Tier 3 — mid-size markets (5–30 M iPhones)
-        "tw": 0.08,
-        "nl": 0.07,
-        "se": 0.06,
-        "ch": 0.06,
-        "pl": 0.05,
-        "tr": 0.05,
-        "th": 0.05,
-        "id": 0.05,
-        "be": 0.04,
-        "at": 0.04,
-        "no": 0.04,
-        "dk": 0.04,
-        "sg": 0.04,
-        "il": 0.04,
-        "ae": 0.04,
-        "sa": 0.04,
-        "ph": 0.04,
-        "my": 0.04,
-        "za": 0.03,
-        "ie": 0.03,
-        "fi": 0.03,
-        "pt": 0.03,
-        "nz": 0.03,
-        "cl": 0.03,
-        "ar": 0.03,
-        "co": 0.03,
-        "ng": 0.03,
-        "eg": 0.03,
-        "pk": 0.02,
-        "ke": 0.02,
-        "gh": 0.02,
-        "tz": 0.02,
-        "ug": 0.02,
-    }
-    _MARKET_SIZE_DEFAULT = 0.03
+    # Market size scales search volumes relative to the US App Store, which
+    # is what POP_TO_SEARCHES is calibrated for. The factor per storefront
+    # lives in aso/countries.py, the one place that defines a country: 48 of
+    # them were measured against observed App Store data, the rest are derived
+    # from population and regional iOS share. A storefront that is genuinely
+    # tiny gets a tiny number rather than one shared default, which used to
+    # credit Andorra with roughly five million iPhones.
+
+    # Past #20 the tap-through rate keeps falling as a power law of the rank,
+    # with the exponent the table itself shows between #10 and #20
+    # (log(TTR10/TTR20) / log(2), about 4.2). #40 then gets about 5% of what
+    # #20 gets and #100 about 0.1%: little, but never a cliff to zero.
+    TAIL_EXPONENT = math.log(_TTR[10] / _TTR[20]) / math.log(20 / 10)
+
+    @classmethod
+    def ttr_at(cls, rank: float) -> float:
+        """Share of searchers who tap the result at ``rank``, for any real rank.
+
+        Whole ranks 1 to 20 return exactly the table. Between them the rate
+        is interpolated on a log scale, and past #20 it follows the power law
+        above, so the curve is continuous from #1 to any depth and every
+        figure built on it moves smoothly.
+        """
+        if rank <= 1:
+            return cls._TTR[1]
+        if rank <= 20:
+            low = int(math.floor(rank))
+            if low >= 20:
+                return cls._TTR[20]
+            fraction = rank - low
+            if fraction == 0:
+                return cls._TTR[low]
+            return math.exp(
+                math.log(cls._TTR[low]) * (1 - fraction)
+                + math.log(cls._TTR[low + 1]) * fraction
+            )
+        return cls._TTR[20] * (20 / rank) ** cls.TAIL_EXPONENT
+
+    def _downloads(self, searches: float, position: float, cvr: float) -> float:
+        """Downloads a day at one rank. The one place this is multiplied.
+
+        Searches x how many searchers tap that rank x how many of those
+        install. Everything that quotes a download figure, the chart, the
+        table and the opportunity score, comes through here.
+        """
+        return searches * self.ttr_at(position) * cvr
+
+    def downloads_at(
+        self, popularity: int, rank: float, country: str = "us",
+    ) -> float:
+        """The conservative daily downloads at one rank, UNROUNDED.
+
+        What the opportunity score is built on. ``rank`` is a real number
+        (the reachable rank is), and any depth is allowed: past #20 the
+        downloads keep shrinking along ttr_at() instead of dropping to zero.
+        estimate() rounds the same figures at whole ranks 1 to 20 for the
+        chart, which is right for a chart and wrong for a score.
+        """
+        from .scoring import daily_searches
+
+        if not popularity or popularity <= 0 or rank < 1:
+            return 0.0
+        return self._downloads(
+            daily_searches(popularity, country or "us"), rank, self._CVR_LOW,
+        )
+
+    def range_at(
+        self, popularity: int, rank: float, country: str = "us",
+    ) -> tuple[float, float]:
+        """Daily downloads at one rank, low and high, UNROUNDED: the range
+        estimate() rounds into its positions, for a sentence that quotes it."""
+        from .scoring import daily_searches
+
+        if not popularity or popularity <= 0 or rank < 1:
+            return 0.0, 0.0
+        searches = daily_searches(popularity, country or "us")
+        return (self._downloads(searches, rank, self._CVR_LOW),
+                self._downloads(searches, rank, self._CVR_HIGH))
 
     def estimate(
         self,
@@ -1204,19 +1290,19 @@ class DownloadEstimator:
             downloads_high for positions 1–20
           - tiers: summary for Top 5, Top 6-10, Top 11-20
         """
-        searches = self._daily_searches(popularity)
+        from .scoring import daily_searches
 
-        # Scale search volume by relative App Store market size.
-        market_mult = self._MARKET_SIZE.get(
-            (country or "us").lower(), self._MARKET_SIZE_DEFAULT
-        )
-        searches *= market_mult
+        entry = countries.get(country or "us")
+        market_source = entry.market_source if entry else "derived"
+        # One place does popularity times market size, so the number behind a
+        # download range and the number behind a classification are the same.
+        searches = daily_searches(popularity, country or "us")
 
         positions = []
         for pos in range(1, 21):
             ttr = self._TTR.get(pos, 0.001)
-            dl_low = searches * ttr * self._CVR_LOW
-            dl_high = searches * ttr * self._CVR_HIGH
+            dl_low = self._downloads(searches, pos, self._CVR_LOW)
+            dl_high = self._downloads(searches, pos, self._CVR_HIGH)
             positions.append({
                 "pos": pos,
                 "ttr": round(ttr * 100, 2),
@@ -1244,12 +1330,64 @@ class DownloadEstimator:
             "daily_searches": round(searches, 2),
             "positions": positions,
             "tiers": tiers,
+            # Two honesty flags the renderers read. `below_threshold` marks a
+            # market so small that the keyword sees under one search a day,
+            # where a download range of zeros would read as a bug rather than
+            # as a fact. `market_source` says whether the market size behind
+            # these numbers was measured or derived.
+            "below_threshold": searches < 1.0,
+            "market_source": market_source,
         }
 
 
 # --------------------------------------------------------------------------- #
 # Keyword Difficulty Calculator
 # --------------------------------------------------------------------------- #
+
+
+# The rating volume curve lives in aso/strength.py with every other factor
+# curve, shared by difficulty (the field) and the opportunity score (your
+# app). These names stay importable from here.
+from .strength import VOLUME_BANDS as RATING_VOLUME_BANDS  # noqa: E402
+from .strength import volume_score as rating_volume_score  # noqa: E402
+
+
+# The weak leader cap: a #1 app with few reviews means the keyword is easy,
+# whatever backfill sits below it. Full strength below LEADER_CAP_FULL
+# reviews, fading out on a log scale to nothing at LEADER_CAP_GONE, so a
+# leader crossing 1,000 reviews no longer lifts difficulty by up to 20
+# points in one step.
+LEADER_CAP_FULL = 1_000
+LEADER_CAP_GONE = 3_000
+
+
+def leader_cap(leader_reviews: float) -> float:
+    """The ceiling a weak #1 app puts on difficulty: 15 at 0 reviews, 50 at
+    about 1,000, rising slowly beyond."""
+    return 15 + 35 * math.log10(leader_reviews + 1) / math.log10(1001)
+
+
+def leader_cap_weight(leader_reviews: float) -> float:
+    """How much of the weak leader cap applies, 1 down to 0."""
+    if leader_reviews <= LEADER_CAP_FULL:
+        return 1.0
+    if leader_reviews >= LEADER_CAP_GONE:
+        return 0.0
+    return 1.0 - math.log10(leader_reviews / LEADER_CAP_FULL) / math.log10(
+        LEADER_CAP_GONE / LEADER_CAP_FULL
+    )
+
+
+def small_result_cap(result_count: int) -> int | None:
+    """The ceiling a tiny result set puts on difficulty.
+
+    Ten points per app Apple returns, up to nine apps; from ten apps on,
+    no ceiling. It used to be 10, 20, 31, 40 for one to four apps and then
+    nothing at five, a step of up to 60 points for one more app.
+    """
+    if 1 <= result_count <= 9:
+        return 10 * result_count
+    return None
 
 
 class DifficultyCalculator:
@@ -1451,14 +1589,16 @@ class DifficultyCalculator:
         market_age *= relevance
 
         # --- Weighted Total ---
+        from .strength import WEIGHTS
+
         raw_total = int(
-            rating_volume * 0.30
-            + review_velocity * 0.10
-            + dominant_players * 0.20
-            + rating_quality * 0.10
-            + market_age * 0.10
-            + publisher_diversity * 0.10
-            + title_relevance * 0.10
+            rating_volume * WEIGHTS["volume"]
+            + review_velocity * WEIGHTS["momentum"]
+            + dominant_players * WEIGHTS["dominance"]
+            + rating_quality * WEIGHTS["rating"]
+            + market_age * WEIGHTS["age"]
+            + publisher_diversity * WEIGHTS["publishers"]
+            + title_relevance * WEIGHTS["title"]
         )
         raw_total = max(1, min(100, raw_total))
 
@@ -1557,77 +1697,22 @@ class DifficultyCalculator:
 
         # Signal 0: Small Result Set Cap
         # If Apple returns very few results, there's objectively little
-        # competition for this keyword regardless of how strong those
-        # few apps are. Sub-scores like publisher diversity and title
-        # relevance become statistically meaningless with tiny samples.
-        #
-        # Smooth curve instead of step function:
-        # Explicit caps keep tiny samples from looking competitive
-        # while preserving moderate markets at n=5.
-        #   n=1→10, n=2→20, n=3→31, n=4→40
-        # Only applies when n ≤ 4 (n=5 keeps the raw score).
-        small_caps = {1: 10, 2: 20, 3: 31, 4: 40}
-        if n in small_caps:
-            small_cap = small_caps[n]
-            if total > small_cap:
-                total = small_cap
-                override_reason = "small_result_set"
+        # competition for this keyword regardless of how strong those few
+        # apps are. Ten points of ceiling per app returned, up to nine.
+        small_cap = small_result_cap(n)
+        if small_cap is not None and total > small_cap:
+            total = small_cap
+            override_reason = "small_result_set"
 
+        # Signals 1 and 2: the weak leader cap and the backfill discount,
+        # shared with every ranking tier.
         if kw_lower and n >= 2:
-            # Signal 1: Weak Leader Cap
-            # The #1 app's review count is the ultimate reality check.
-            # If #1 is easy to outrank, the keyword is objectively easy
-            # regardless of what backfill apps appear below.
-            #
-            # Smooth log interpolation instead of step thresholds:
-            #   cap = 15 + 35 * log10(reviews+1) / log10(1001)
-            #     0 reviews → 15,  10 → 27,  50 → 35,
-            #   100 → 39, 500 → 47, 999 → 50
-            # Only applies when leader < 1000; above that no cap.
-            leader_cap = None
-            if leader_reviews < 1_000 and not is_brand_keyword:
-                leader_cap = int(
-                    15 + 35 * math.log10(leader_reviews + 1) / math.log10(1001)
-                )
-
-            if leader_cap is not None and total > leader_cap:
-                # When many competitors target this keyword (high
-                # match_ratio), the weak leader just means no dominant
-                # player *yet* — the field is still competitive.
-                # Blend between raw and capped score so the cap bites
-                # less when title matches are high:
-                #   match_ratio=0   → full cap (pure backfill)
-                #   match_ratio=0.5 → midpoint between raw and cap
-                #   match_ratio=1.0 → raw score kept as-is
-                if match_ratio > 0.2:
-                    total = int(leader_cap + (total - leader_cap) * match_ratio)
-                else:
-                    total = leader_cap
-                override_reason = "weak_leader"
-
-            # Signal 2: Backfill Discount
-            # When few competitors have the keyword in their title AND
-            # the leader is genuinely weak (< 1000 reviews), most
-            # results are generic backfill from broader search terms.
-            #
-            # Smooth ramp instead of binary 0.6× cutoff:
-            #   discount = 0.6 + 2.0 * match_ratio  (clamped to [0.6, 1.0])
-            # So match_ratio=0 → 0.6×, 0.1 → 0.8×, 0.2 → 1.0× (no discount).
-            # Leader strength further modulates: stronger leaders
-            # mean less discount via log interpolation.
-            if match_ratio < 0.2 and leader_reviews < 1_000 and not is_brand_keyword:
-                # Base discount from match ratio (smooth ramp)
-                ratio_factor = min(1.0, 0.6 + 2.0 * match_ratio)
-                # Leader strength factor: stronger leaders = less discount
-                leader_factor = math.log10(leader_reviews + 1) / math.log10(1001)
-                # Blend: at leader_factor=0 use full ratio_factor,
-                # at leader_factor=1 use no discount
-                discount = ratio_factor + (1.0 - ratio_factor) * leader_factor
-                discount = max(0.6, min(1.0, discount))
-                discounted = max(1, int(total * discount))
-                if discounted < total:
-                    total = discounted
-                    override_reason = "backfill"
+            total, leader_reason = self._leader_corrections(
+                total, leader_reviews=leader_reviews, match_ratio=match_ratio,
+                is_brand=is_brand_keyword,
+            )
+            if leader_reason:
+                override_reason = leader_reason
 
         total = max(1, min(100, total))
 
@@ -1783,6 +1868,54 @@ class DifficultyCalculator:
 
         return total, breakdown
 
+    def _leader_corrections(
+        self, total: int, *, leader_reviews: float, match_ratio: float,
+        is_brand: bool,
+    ) -> tuple[int, str | None]:
+        """The weak leader cap and the backfill discount, in one place.
+
+        Used by the overall score and by every ranking tier, which used to
+        carry their own copies.
+
+        Weak leader cap: a #1 app with few reviews caps difficulty. When many
+        competitors target the keyword the weak leader just means no dominant
+        player yet, so the cap bites in proportion to the backfill:
+        ``cap + (total - cap) * match_ratio``. It applies in full below
+        LEADER_CAP_FULL reviews and fades out by LEADER_CAP_GONE. It used to
+        switch off at exactly 1,000 reviews and to apply in full below a 20%
+        match ratio, both of which made difficulty jump.
+
+        Backfill discount: when few competitors have the keyword in their
+        title and the leader is weak, most results are backfill from broader
+        terms. Unchanged: it was already continuous at both edges.
+
+        Brand keywords get neither: Apple ranked those apps on purpose.
+        """
+        reason = None
+        if is_brand:
+            return total, reason
+
+        weight = leader_cap_weight(leader_reviews)
+        if weight > 0:
+            cap = leader_cap(leader_reviews)
+            if total > cap:
+                capped = cap + (total - cap) * match_ratio
+                adjusted = int(total - weight * (total - capped))
+                if adjusted < total:
+                    total = adjusted
+                    reason = "weak_leader"
+
+        if match_ratio < 0.2 and leader_reviews < LEADER_CAP_FULL:
+            ratio_factor = min(1.0, 0.6 + 2.0 * match_ratio)
+            leader_factor = math.log10(leader_reviews + 1) / math.log10(1001)
+            discount = ratio_factor + (1.0 - ratio_factor) * leader_factor
+            discount = max(0.6, min(1.0, discount))
+            discounted = max(1, int(total * discount))
+            if discounted < total:
+                total = discounted
+                reason = "backfill"
+        return total, reason
+
     def _compute_ranking_tiers(
         self,
         competitors: list[dict],
@@ -1851,28 +1984,10 @@ class DifficultyCalculator:
             # This prevents e.g. "lan signer" tiers showing Hard
             # while overall shows Very Easy.
             if kw_lower and full_n >= 2:
-                # Weak leader cap (based on overall leader)
-                tier_cap = None
-                if overall_leader_reviews < 1_000 and not is_brand_keyword:
-                    tier_cap = int(
-                        15 + 35 * math.log10(overall_leader_reviews + 1) / math.log10(1001)
-                    )
-                if tier_cap is not None and tier_score > tier_cap:
-                    if overall_match_ratio > 0.2:
-                        tier_score = int(
-                            tier_cap
-                            + (tier_score - tier_cap) * overall_match_ratio
-                        )
-                    else:
-                        tier_score = tier_cap
-
-                # Backfill discount (based on overall match ratio)
-                if overall_match_ratio < 0.2 and overall_leader_reviews < 1_000 and not is_brand_keyword:
-                    ratio_factor = min(1.0, 0.6 + 2.0 * overall_match_ratio)
-                    leader_factor = math.log10(overall_leader_reviews + 1) / math.log10(1001)
-                    discount = ratio_factor + (1.0 - ratio_factor) * leader_factor
-                    discount = max(0.6, min(1.0, discount))
-                    tier_score = max(1, int(tier_score * discount))
+                tier_score, _ = self._leader_corrections(
+                    tier_score, leader_reviews=overall_leader_reviews,
+                    match_ratio=overall_match_ratio, is_brand=is_brand_keyword,
+                )
 
             tier_score = max(1, min(100, tier_score))
 
@@ -2311,82 +2426,21 @@ class DifficultyCalculator:
         return signals
 
     def _rating_volume_score(self, median_ratings: float) -> float:
-        """
-        Map median rating count to a 0-100 score using log scale.
-
-        Uses median instead of mean to prevent outliers from skewing.
-        Calibrated for realistic App Store competition:
-          <50 median  → ~5   (ghost town)
-          <200 median → ~15  (very low competition)
-          <500 median → ~30  (indie-friendly)
-          <2,000      → ~50  (moderate, needs effort)
-          <5,000      → ~65  (competitive)
-          <10,000     → ~78  (hard)
-          <25,000     → ~88  (very hard)
-          <100,000    → ~95  (dominated)
-          ≥100,000    → 100  (impossible for indie)
-        """
-        if median_ratings <= 0:
-            return 0
-        if median_ratings >= 100_000:
-            return 100
-
-        # Logarithmic interpolation between calibration points
-        bands = [
-            (50, 5),
-            (200, 15),
-            (500, 30),
-            (2_000, 50),
-            (5_000, 65),
-            (10_000, 78),
-            (25_000, 88),
-            (100_000, 95),
-        ]
-
-        for i, (threshold, score) in enumerate(bands):
-            if median_ratings < threshold:
-                if i == 0:
-                    # Linear interpolation from 0 to first band
-                    return (median_ratings / threshold) * score
-                prev_threshold, prev_score = bands[i - 1]
-                ratio = math.log(median_ratings / prev_threshold) / math.log(
-                    threshold / prev_threshold
-                )
-                return prev_score + ratio * (score - prev_score)
-
-        return 100
+        """The rating volume sub-score. See rating_volume_score()."""
+        return rating_volume_score(median_ratings)
 
     def _review_velocity_score(self, competitors: list[dict]) -> float:
-        """
-        Calculate difficulty component from review velocity (reviews/year).
+        """The field's momentum: median ratings per year across competitors,
+        on the shared momentum curve (aso.strength.momentum_score)."""
+        from .strength import _utcnow, momentum_score, ratings_per_year, years_since
 
-        Uses median velocity across competitors, log-scaled.
-        Distinguishes active, growing markets from stagnant ones.
-
-        Calibration:
-          <10/yr   → ~5   (dead apps)
-          <50/yr   → ~15  (minimal traction)
-          <200/yr  → ~30  (slow growth)
-          <1000/yr → ~50  (moderate, indie-level)
-          <5000/yr → ~70  (solid growth)
-          <20000/yr→ ~85  (strong growth)
-          <50000/yr→ ~95  (top-charts velocity)
-          ≥50000/yr→ 100  (viral / premium)
-        """
-        now = datetime.now(timezone.utc)
+        now = _utcnow()
         velocities = []
         for c in competitors:
             reviews = c.get("userRatingCount", 0)
-            release_date = c.get("releaseDate", "")
-            if release_date and reviews > 0:
-                try:
-                    released = datetime.fromisoformat(
-                        release_date.replace("Z", "+00:00")
-                    )
-                    age_years = max(0.5, (now - released).days / 365.25)
-                    velocities.append(reviews / age_years)
-                except (ValueError, TypeError):
-                    pass
+            years = years_since(c.get("releaseDate", ""), now)
+            if years is not None and reviews > 0:
+                velocities.append(ratings_per_year(reviews, years))
 
         if not velocities:
             return 50  # default mid-range
@@ -2398,129 +2452,25 @@ class DifficultyCalculator:
             median_vel = velocities[vn // 2]
         else:
             median_vel = (velocities[vn // 2 - 1] + velocities[vn // 2]) / 2
-
-        if median_vel <= 0:
-            return 0
-        if median_vel >= 50_000:
-            return 100
-
-        bands = [
-            (10, 5),
-            (50, 15),
-            (200, 30),
-            (1_000, 50),
-            (5_000, 70),
-            (20_000, 85),
-            (50_000, 95),
-        ]
-
-        for i, (threshold, score) in enumerate(bands):
-            if median_vel < threshold:
-                if i == 0:
-                    return (median_vel / threshold) * score
-                prev_threshold, prev_score = bands[i - 1]
-                ratio = math.log(median_vel / prev_threshold) / math.log(
-                    threshold / prev_threshold
-                )
-                return prev_score + ratio * (score - prev_score)
-
-        return 100
+        return momentum_score(median_vel)
 
     def _rating_quality_score(self, avg_quality: float) -> float:
-        """
-        Map average rating quality to a 0-100 normalized score.
+        """The field's rating, on the shared curve (aso.strength.rating_score)."""
+        from .strength import rating_score
 
-        Higher avg ratings = harder to compete = higher score.
-        Uses smooth linear interpolation between calibration points
-        instead of discrete steps.
-
-        Calibration:
-          0.0 → 0
-          3.0 → 20
-          3.5 → 35
-          4.0 → 50
-          4.3 → 70
-          4.5 → 85
-          5.0 → 100
-        """
-        if avg_quality <= 0:
-            return 0
-        if avg_quality >= 5.0:
-            return 100
-
-        bands = [
-            (0.0, 0),
-            (3.0, 20),
-            (3.5, 35),
-            (4.0, 50),
-            (4.3, 70),
-            (4.5, 85),
-            (5.0, 100),
-        ]
-
-        for i in range(1, len(bands)):
-            threshold, score = bands[i]
-            if avg_quality < threshold:
-                prev_threshold, prev_score = bands[i - 1]
-                ratio = (avg_quality - prev_threshold) / (
-                    threshold - prev_threshold
-                )
-                return prev_score + ratio * (score - prev_score)
-
-        return 100
+        return rating_score(avg_quality)
 
     def _market_age_score(self, competitors: list[dict]) -> float:
-        """
-        Map average market age to a 0-100 normalized score.
+        """The field's age: mean years on the store, on the shared curve
+        (aso.strength.age_score). Older fields are more entrenched."""
+        from .strength import _utcnow, age_score, years_since
 
-        Older markets = more entrenched = harder to enter.
-          <1 year → 20
-          1-2 years → 35
-          2-3 years → 50
-          3-5 years → 70
-          5-8 years → 85
-          >8 years → 100
-        """
-        now = datetime.now(timezone.utc)
-        ages = []
-        for c in competitors:
-            release_date = c.get("releaseDate", "")
-            if release_date:
-                try:
-                    released = datetime.fromisoformat(
-                        release_date.replace("Z", "+00:00")
-                    )
-                    age_years = (now - released).days / 365.25
-                    ages.append(age_years)
-                except (ValueError, TypeError):
-                    pass
-
+        now = _utcnow()
+        ages = [
+            years for years in (years_since(c.get("releaseDate", ""), now) for c in competitors)
+            if years is not None
+        ]
         if not ages:
             return 50  # default mid-range
+        return age_score(sum(ages) / len(ages))
 
-        avg_age = sum(ages) / len(ages)
-
-        # Smooth linear interpolation between calibration points
-        # (consistent with _rating_volume_score, _review_velocity_score).
-        if avg_age <= 0:
-            return 0
-        if avg_age >= 10:
-            return 100
-
-        age_bands = [
-            (0.5, 10),
-            (1.0, 20),
-            (2.0, 35),
-            (3.0, 50),
-            (5.0, 70),
-            (8.0, 85),
-            (10.0, 100),
-        ]
-        for i, (threshold, score) in enumerate(age_bands):
-            if avg_age < threshold:
-                if i == 0:
-                    return (avg_age / threshold) * score
-                prev_t, prev_s = age_bands[i - 1]
-                ratio = (avg_age - prev_t) / (threshold - prev_t)
-                return prev_s + ratio * (score - prev_s)
-        return 100

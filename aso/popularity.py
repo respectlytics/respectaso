@@ -179,6 +179,32 @@ POPULARITY_PROVENANCE_KEYS = (
 )
 
 
+
+def resolution_from_stored(internal, apple, country, genre="") -> PopularityResolution:
+    """Rebuild a resolution from values already on a row.
+
+    The same PopularityResolution live scoring produces, so a stored row
+    renders exactly like a fresh one. SearchResult and OpportunityScanResult
+    both call this instead of each keeping a copy of the six lines.
+    """
+    source_setting = get_popularity_source()
+    ceiling = (
+        absent_cap(country, genre or "")
+        if source_setting == SOURCE_APPLE else None
+    )
+    effective, source, is_fallback = effective_from_pair(
+        internal, apple, source_setting, absent_ceiling=ceiling,
+    )
+    return PopularityResolution(
+        effective=effective,
+        internal=internal,
+        apple=apple,
+        source=source,
+        is_fallback=is_fallback,
+        genre_hint=genre or "",
+        absent_ceiling=ceiling,
+    )
+
 def popularity_fields(resolution: PopularityResolution) -> dict:
     """Standard dual-source fields for result dicts (AI tabs, MCP, views).
 
@@ -293,7 +319,7 @@ def apple_rank_context(rows, country) -> str:
         return ""
 
 
-def refresh_rows_effective(rows, country):
+def refresh_rows_effective(rows, country, app=None):
     """Re-resolve stored result-row dicts under the CURRENT source setting.
 
     AI sessions freeze their scores at run time (correct for reports - the
@@ -308,6 +334,10 @@ def refresh_rows_effective(rows, country):
     table is fresher, and it covers keywords whose parent run predates the
     Apple connection. Terms Apple is still missing are queued for the next
     enrichment sync when the Apple source is active.
+
+    ``app`` is the profile of the app the new run scores for (an
+    AppProfile), and each row's own ``app_rank`` is that app's real rank, so
+    a reused row is scored for the same app as a freshly scored one.
 
     Only keys a row already has are recomputed (row shapes vary per tab).
     The "source" key is keyword provenance (title/ai_generated/...), NOT the
@@ -357,9 +387,15 @@ def refresh_rows_effective(rows, country):
         new_row["popularity_genre"] = ""
         difficulty = new_row.get("difficulty") or 0
         if "opportunity" in new_row:
-            new_row["opportunity"] = calc_opportunity(effective_int, difficulty)
+            new_row["opportunity"] = calc_opportunity(
+                effective_int, difficulty, country,
+                app=app, app_rank=new_row.get("app_rank"), keyword=term,
+            )
         if "classification" in new_row:
-            new_row["classification"] = classify_keyword(effective_int, difficulty)
+            new_row["classification"] = classify_keyword(
+                effective_int, difficulty, country,
+                app=app, app_rank=new_row.get("app_rank"), keyword=term,
+            )
         if "downloads" in new_row:
             from .services import DownloadEstimator
 
@@ -545,7 +581,7 @@ def recompute_all_classifications():
     updated = 0
     batch = []
     ceilings: dict[tuple, int | None] = {}
-    qs = SearchResult.objects.all().only(
+    qs = SearchResult.objects.select_related("keyword__app").only(
         "id",
         "popularity_score",
         "apple_popularity_score",
@@ -553,6 +589,13 @@ def recompute_all_classifications():
         "classification",
         "country",
         "inferred_genre",
+        "app_rank",
+        "keyword__id",
+        "keyword__keyword",
+        "keyword__app__id",
+        "keyword__app__name",
+        "keyword__app__track_id",
+        "keyword__app__store_profiles",
     )
     for result in qs.iterator(chunk_size=500):
         if source_setting == SOURCE_APPLE:
@@ -568,7 +611,10 @@ def recompute_all_classifications():
             result.popularity_score, result.apple_popularity_score,
             source_setting, absent_ceiling=ceiling,
         )
-        new_label = classify_keyword(effective or 0, result.difficulty_score)
+        new_label = classify_keyword(
+            effective or 0, result.difficulty_score, result.country,
+            app=result.app_profile, app_rank=result.app_rank, keyword=result.keyword_text,
+        )
         if new_label != result.classification:
             result.classification = new_label
             batch.append(result)
@@ -590,6 +636,133 @@ def recompute_all_classifications():
 # requires re-scoring stored history. Version 2 = the 2026-08 calibration
 # against Apple's official dataset (see PopularityEstimator.V2_WEIGHTS).
 ESTIMATOR_VERSION = 2
+
+# Bumped when the classification RULE changes, which is separate from the
+# estimator's weights: same popularity, different label. v2 taught
+# classify_keyword the storefront, so a keyword with almost no searches in a
+# small market is Low Volume there instead of a Sweet Spot. v3 rebuilt the
+# ladder on expected downloads, which v2 only patched at the very bottom:
+# "meditation" in Argentina, 6.7 searches a day, cleared the v2 floor and
+# stayed a Sweet Spot while position 1 paid 0.1 to 0.4 downloads a day.
+# Stored rows carry the old label until this re-runs, and the dashboard
+# reads the stored label, so skipping a bump leaves the old answer on screen.
+# v4: the rank is a continuous curve with downloads past #20, and a keyword
+# tracked for an app is labelled for that app's ratings in the storefront.
+# v5: the app is measured on the competitors' yardstick (ratings, stars,
+# momentum, age: aso/strength.py), its real rank counts when it is better,
+# and the rank curve is the measured one.
+# v7: three decisions (High Competition became Later Target, and a keyword
+# worth something today is a target today), and the real rank is final when
+# the app's title already carries the keyword (KEYWORD_DECISIONS_PLAN.md).
+# v8: Later Target became Worth Climbing (target it, it pays as the app
+# climbs), with the same rule (KEYWORD_DECISIONS_PLAN.md, round 2).
+# v9: five tags, each one range of one number on screen, demand first: Low
+# Volume whenever #1 brings under a download a day, at every difficulty;
+# bars at 10, 1 and 0.1 downloads a day; Hidden Gem, Avoid and Moderate
+# retired, Supporting added (KEYWORD_DECISIONS_PLAN.md, round 4).
+CLASSIFICATION_VERSION = 9
+
+
+# Bumped when DifficultyCalculator changes in a way that should reach stored
+# history. v2 removed the jumps: the weak leader cap that vanished at 1,000
+# reviews, the 20% match ratio switch, the 95-to-100 steps at the top of the
+# rating and velocity curves, and the small result set cap that ended at 4.
+DIFFICULTY_VERSION = 2
+
+
+def recalculate_stored_difficulty() -> dict:
+    """Re-score every stored difficulty from its own frozen competitors.
+
+    Same idea as recalculate_stored_popularity(): the competitors observed at
+    the time stay what they were, only the calculation changes. Covers
+    Search History rows and Country Opportunity Finder rows. The download
+    estimates inside each breakdown are carried over untouched, since they do
+    not depend on difficulty.
+
+    Returns {"search_results", "scan_results", "rewritten", "skipped"}.
+    """
+    from .models import OpportunityScanResult, SearchResult
+    from .services import DifficultyCalculator
+
+    calc = DifficultyCalculator()
+    stats = {"search_results": 0, "scan_results": 0, "rewritten": 0, "skipped": 0}
+
+    def rescore(row, keyword, field):
+        competitors = row.competitors_data or []
+        if not competitors:
+            stats["skipped"] += 1
+            return False
+        score, breakdown = calc.calculate(competitors, keyword=keyword)
+        old_breakdown = row.difficulty_breakdown or {}
+        if "download_estimates" in old_breakdown:
+            breakdown["download_estimates"] = old_breakdown["download_estimates"]
+        if score == getattr(row, field) and breakdown == old_breakdown:
+            return False
+        setattr(row, field, score)
+        row.difficulty_breakdown = breakdown
+        stats["rewritten"] += 1
+        return True
+
+    batch = []
+    for row in SearchResult.objects.select_related("keyword").iterator(chunk_size=200):
+        stats["search_results"] += 1
+        if rescore(row, row.keyword.keyword, "difficulty_score"):
+            batch.append(row)
+        if len(batch) >= 200:
+            SearchResult.objects.bulk_update(
+                batch, ["difficulty_score", "difficulty_breakdown"])
+            batch = []
+    if batch:
+        SearchResult.objects.bulk_update(
+            batch, ["difficulty_score", "difficulty_breakdown"])
+
+    batch = []
+    for row in OpportunityScanResult.objects.iterator(chunk_size=200):
+        stats["scan_results"] += 1
+        if rescore(row, row.keyword_text, "difficulty_score"):
+            batch.append(row)
+        if len(batch) >= 200:
+            OpportunityScanResult.objects.bulk_update(
+                batch, ["difficulty_score", "difficulty_breakdown"])
+            batch = []
+    if batch:
+        OpportunityScanResult.objects.bulk_update(
+            batch, ["difficulty_score", "difficulty_breakdown"])
+    return stats
+
+
+def maybe_upgrade_difficulty_version() -> None:
+    """Re-score stored difficulty once when DIFFICULTY_VERSION bumps.
+
+    Idempotent through its own marker. Never blocks startup: a failure
+    leaves the marker so the next start retries.
+    """
+    from .apple_ads import storage as apple_storage
+
+    block = apple_storage.load_apple_settings()["apple_ads"]
+    if int(block.get("difficulty_version") or 1) >= DIFFICULTY_VERSION:
+        return
+    try:
+        stats = recalculate_stored_difficulty()
+        logger.info("Difficulty upgraded to v%d: %s", DIFFICULTY_VERSION, stats)
+    except Exception as e:  # Never block app start; retried next boot.
+        logger.error("Difficulty v%d recompute failed: %s", DIFFICULTY_VERSION, e)
+        return
+    apple_storage.save_apple_settings(
+        apple_ads={"difficulty_version": DIFFICULTY_VERSION}
+    )
+
+
+def upgrade_stored_history() -> None:
+    """Every one-time history upgrade, in the order they depend on each other.
+
+    Popularity first (it feeds everything), then difficulty, then the
+    labels, which read both. They used to run in two threads at once, which
+    could label a row from a difficulty that was about to change.
+    """
+    maybe_upgrade_estimator_version()
+    maybe_upgrade_difficulty_version()
+    maybe_upgrade_classification_version()
 
 
 def recalculate_stored_popularity() -> dict:
@@ -648,6 +821,41 @@ def recalculate_stored_popularity() -> dict:
         "skipped_no_competitors": skipped,
         "reclassified": reclassified,
     }
+
+
+def maybe_upgrade_classification_version() -> None:
+    """Re-classify stored history once when the classification rule changes.
+
+    Called from AsoConfig.ready() in a background thread, like its estimator
+    sibling. Idempotent: a stored marker records the applied version, and a
+    failure simply leaves the marker so the next start retries.
+    """
+    from .apple_ads import storage as apple_storage
+
+    block = apple_storage.load_apple_settings()["apple_ads"]
+    if int(block.get("classification_version") or 1) >= CLASSIFICATION_VERSION:
+        return
+    try:
+        # Labels read each app's profile per storefront (ratings, stars,
+        # age). Seed it from what the stored searches already observed before
+        # labelling, so an app that appears in its own results is labelled
+        # for itself at once.
+        from .app_profiles import backfill_from_history
+
+        backfill_from_history()
+        updated = recompute_all_classifications()
+        logger.info(
+            "Classification rule v%d applied: %s rows relabelled",
+            CLASSIFICATION_VERSION, updated,
+        )
+    except Exception as e:  # Never block app start; retried next boot.
+        logger.error(
+            "Classification v%d recompute failed: %s", CLASSIFICATION_VERSION, e,
+        )
+        return
+    apple_storage.save_apple_settings(
+        apple_ads={"classification_version": CLASSIFICATION_VERSION}
+    )
 
 
 def maybe_upgrade_estimator_version() -> None:

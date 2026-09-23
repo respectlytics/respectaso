@@ -38,7 +38,115 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.25.0',
+RELEASES = [{'version': '2.27.0',
+  'date': '2026-09-23',
+  'title': 'Every App Store country, an Opportunity score you can act on, and 3-month licenses',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'Every App Store country',
+       'intro': ['RespectASO now covers all 175 App Store storefronts, up from 30. Israel, '
+                 'the Balkans, the Baltics, most of Latin America and Africa, and the rest '
+                 'of Asia can be picked in keyword search, the Opportunity Finder and the '
+                 'AI tabs.'],
+       'items': [
+           'Type a country\'s name to find it, or pick a whole region or a preset such as '
+           'the Top 10 markets.',
+           'The country list marks where Apple publishes no search popularity, so you know '
+           'the score there is RespectASO\'s estimate, and where Apple offers no App Store '
+           'language for your listing. The AI tabs tell you too.',
+           'Download estimates use each country\'s own market size. When a keyword gets '
+           'under one search a day in a small market, RespectASO says so instead of showing '
+           'zeros.',
+           'The Methodology page lists every storefront and what data exists there.',
+           'Your saved keywords and their history are untouched.',
+       ]},
+      {'heading': 'The Opportunity Finder runs in the background',
+       'intro': ['Pick the countries you want to compare, and the button tells you how long '
+                 'the scan will take before you start it.'],
+       'items': [
+           'Leave the page, or quit RespectASO, while it runs: the scan picks up where it '
+           'left off. Pause it, resume it or stop it, and the countries already scanned are '
+           'kept.',
+           'Results appear as each country finishes, and a strip at the bottom of every page '
+           'shows how far along it is.',
+           'A country that fails can be scanned again on its own.',
+           'Fixed: the advice on an expanded row read the same whatever the data said, and '
+           'rows saved to Search History from this tab lost their category.',
+       ]},
+      {'heading': 'Opportunity: one number you can act on',
+       'intro': ['Opportunity now tells you what a keyword is worth in downloads, in that '
+                 'country, at the rank an app like yours can realistically reach. 50 means '
+                 'about one download a day, and higher is better.'],
+       'items': [
+           'The score is for a real app: yours when the keyword is tracked for one of your '
+           'apps, judged by its ratings, stars and age in that country, or a brand new app '
+           'when it is not. Every table says above the column whose score it shows, and '
+           'where your app already ranks for a keyword, its real rank is used.',
+           'Hover a score to see why: how strong the apps already ranking are, and what that '
+           'means in downloads.',
+           'The Downloads at #1 column shows what the top spot is worth, so a keyword that '
+           'brings little today but a lot at #1 is easy to spot.',
+           'Scores change smoothly as a keyword gets harder or a market gets smaller, with no '
+           'sudden drops, and the same keyword never scores lower in a bigger market.',
+           'Expect lower scores for a brand new app than before. New apps usually land further '
+           'down the results, and the score is now honest about that. Easy keywords that people '
+           'really search for are where a new app wins.',
+           'Your saved keywords are scored again automatically the first time you open this '
+           'version.',
+       ]},
+      {'heading': 'Five clear tags',
+       'intro': ['Every keyword gets one of five tags, and a tag never contradicts the numbers '
+                 'beside it. Hover a tag to see what it means for that row.'],
+       'items': [
+           '<strong>Sweet Spot</strong>, <strong>Good Target</strong> and '
+           '<strong>Supporting</strong> say what a keyword brings the app today: about ten '
+           'downloads a day or more, about one a day or more, and less than that.',
+           '<strong>Worth Climbing</strong>: little today, but a download a day or more if you '
+           'reach #1.',
+           '<strong>Low Volume</strong>: even #1 would bring less than one download a day.',
+           'Hidden Gem, Avoid and Moderate are gone, and your saved keywords are tagged again '
+           'under the new rules.',
+       ]},
+      {'heading': 'AI tabs you can read at a glance, and AI runs you can trust',
+       'items': [
+           'The AI Researcher, AI Competitor and ASO Simulator tables use the same Opportunity '
+           'score and tags as the Dashboard, explain every column on hover, and use the full '
+           'width of the window. Past runs are shown under the current scoring.',
+           'The AI sees what a keyword is worth today and at #1, so its advice for a new app '
+           'is more useful.',
+           'When an AI run fails, its card says what went wrong, whose side the problem is on '
+           'and what to do next, with a Copy button for a report that leaves out your keys.',
+           'Runs on OpenAI models through OpenRouter no longer fail at the last step, and a '
+           'wrong key or model ID stops a run in seconds instead of minutes.',
+           'Test model in Settings now checks a model the way a real run uses it, so a model '
+           'that passes the test works in practice.',
+           'Validate works again for Gemini keys, and says why a key was refused.',
+       ]},
+      {'heading': 'Licenses for 3 months or 12 months',
+       'items': [
+           'A Pro license is now sold for 3 months or 12 months, one payment either way, and '
+           'nothing renews by itself.',
+           'Buying again with the same email adds the new period after your current one ends, '
+           'so buying early never costs you days.',
+           'The expiry reminder comes 30 days before a 12-month license ends, and 10 days '
+           'before a 3-month one.',
+           'The invite programme has ended. Months already added to a license stay on it.',
+       ]},
+      {'heading': 'Smaller improvements',
+       'items': [
+           'Filtering, sorting and paging on the Dashboard, Top Search Terms and Apps update the '
+           'list where you are, instead of reloading the page and jumping back to the top. The '
+           'search box filters as you type.',
+           'Close on finished search results now clears them for good. It used to bring back '
+           'the previous search, one press per past search.',
+           'A tooltip always describes the row under your mouse, even in a filtered list, and '
+           'names its keyword.',
+           'Source badges are spelled out: Title + Keyword Field instead of Title + KF.',
+           'The Methodology page explains what the numbers mean in plain words.',
+           'Without a Pro license, a Go Pro button under the navigation shows what Pro adds.',
+       ]},
+  ]},
+ {'version': '2.25.0',
   'date': '2026-09-05',
   'title': 'Research up to 1,000 keywords in one search',
   'kind': 'feature',

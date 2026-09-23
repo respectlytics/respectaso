@@ -1,69 +1,89 @@
-"""Country → App Store metadata locale mapping.
+"""Country to App Store metadata locale mapping.
 
 Used by the AI tabs (Simulator, Researcher, Competitor) to let the user pick
-which language the LLM should write the suggested metadata in. The country
-list mirrors COUNTRY_CHOICES in aso/forms.py.
+which language the LLM should write the suggested metadata in.
+
+The country list is NOT kept here any more: it lives in aso/countries.py, and
+every locale below comes from that registry. Apple offers App Store listing
+languages for roughly 40 languages, not for 175 storefronts, so a storefront
+with an empty ``locales`` tuple genuinely has none. Those countries fall back
+to English here, and the UI says so out loud instead of implying a Bulgarian
+or Serbian listing is possible.
 """
 
 from __future__ import annotations
 
-# Apple App Store metadata locales available per storefront, primary first.
-# Display labels are shown in the language dropdown.
-COUNTRY_LOCALES: dict[str, list[tuple[str, str]]] = {
-    "us": [("en-US", "English (US)")],
-    "gb": [("en-GB", "English (UK)")],
-    "ca": [("en-CA", "English (Canada)"), ("fr-CA", "French (Canada)")],
-    "au": [("en-AU", "English (Australia)")],
-    "de": [("de-DE", "German")],
-    "fr": [("fr-FR", "French")],
-    "jp": [("ja", "Japanese")],
-    "kr": [("ko", "Korean")],
-    "cn": [("zh-Hans", "Chinese (Simplified)")],
-    "br": [("pt-BR", "Portuguese (Brazil)")],
-    "in": [("en-IN", "English (India)"), ("hi", "Hindi")],
-    "mx": [("es-MX", "Spanish (Mexico)")],
-    "es": [("es-ES", "Spanish (Spain)")],
-    "it": [("it", "Italian")],
-    "nl": [("nl-NL", "Dutch")],
-    "se": [("sv", "Swedish")],
-    "no": [("no", "Norwegian")],
-    "dk": [("da", "Danish")],
-    "fi": [("fi", "Finnish")],
-    "pt": [("pt-PT", "Portuguese (Portugal)")],
-    "ru": [("ru", "Russian")],
-    "tr": [("tr", "Turkish")],
-    "sa": [("ar-SA", "Arabic")],
-    "ae": [("ar-SA", "Arabic")],
-    "sg": [("en-SG", "English (Singapore)"), ("zh-Hans", "Chinese (Simplified)")],
-    "th": [("th", "Thai")],
-    "id": [("id", "Indonesian")],
-    "ph": [("en-PH", "English (Philippines)")],
-    "vn": [("vi", "Vietnamese")],
-    "tw": [("zh-Hant", "Chinese (Traditional)")],
+from aso import countries
+
+# Every App Store metadata locale the registry is allowed to reference, and
+# the label the language dropdown shows. A test asserts that no storefront
+# names a locale that is missing from this table, which is what stops an
+# invented locale reaching a user.
+LOCALE_LABELS: dict[str, str] = {
+    "ar-SA": "Arabic",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "da": "Danish",
+    "de-DE": "German",
+    "el": "Greek",
+    "en-AU": "English (Australia)",
+    "en-CA": "English (Canada)",
+    "en-GB": "English (UK)",
+    "en-IN": "English (India)",
+    "en-PH": "English (Philippines)",
+    "en-SG": "English (Singapore)",
+    "en-US": "English (US)",
+    "es-ES": "Spanish (Spain)",
+    "es-MX": "Spanish (Mexico)",
+    "fi": "Finnish",
+    "fr-CA": "French (Canada)",
+    "fr-FR": "French",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hr": "Croatian",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "ms": "Malay",
+    "nl-NL": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt-BR": "Portuguese (Brazil)",
+    "pt-PT": "Portuguese (Portugal)",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sk": "Slovak",
+    "sv": "Swedish",
+    "th": "Thai",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "vi": "Vietnamese",
+    "zh-Hans": "Chinese (Simplified)",
+    "zh-Hant": "Chinese (Traditional)",
 }
 
 ENGLISH_FALLBACK: tuple[str, str] = ("en-US", "English (US)")
 
-# Pretty country names for prompts (e.g. "Mexico" instead of "mx").
-COUNTRY_DISPLAY_NAMES: dict[str, str] = {
-    "us": "United States", "gb": "United Kingdom", "ca": "Canada",
-    "au": "Australia", "de": "Germany", "fr": "France", "jp": "Japan",
-    "kr": "South Korea", "cn": "China", "br": "Brazil", "in": "India",
-    "mx": "Mexico", "es": "Spain", "it": "Italy", "nl": "Netherlands",
-    "se": "Sweden", "no": "Norway", "dk": "Denmark", "fi": "Finland",
-    "pt": "Portugal", "ru": "Russia", "tr": "Turkey", "sa": "Saudi Arabia",
-    "ae": "UAE", "sg": "Singapore", "th": "Thailand", "id": "Indonesia",
-    "ph": "Philippines", "vn": "Vietnam", "tw": "Taiwan",
+# Derived from the registry, primary locale first. Kept as a module-level name
+# because several call sites and tests read it directly.
+COUNTRY_LOCALES: dict[str, list[tuple[str, str]]] = {
+    country.code: [(code, LOCALE_LABELS[code]) for code in country.locales]
+    for country in countries.COUNTRIES.values()
 }
 
 
 def locales_for(country: str) -> list[tuple[str, str]]:
     """Return the list of (locale_code, display_label) options for a country.
+
     Always appends English (US) as a fallback if no English variant is already
-    listed — covers users targeting a foreign market with an English-only app.
+    listed. That covers two cases: a user targeting a foreign market with an
+    English-only app, and a storefront where Apple offers no App Store
+    listing language at all, where English is the only honest answer.
     """
     code = (country or "us").lower()
-    locales = list(COUNTRY_LOCALES.get(code, [ENGLISH_FALLBACK]))
+    locales = list(COUNTRY_LOCALES.get(code, []))
     if not any(loc[0].startswith("en") for loc in locales):
         locales.append(ENGLISH_FALLBACK)
     return locales
@@ -75,24 +95,32 @@ def primary_locale(country: str) -> str:
 
 
 def label_for(locale_code: str) -> str:
-    """Return the human-readable label for a locale, e.g. 'fr-CA' → 'French (Canada)'.
-    Falls back to the locale code itself if not found in any country's list.
-    """
-    for entries in COUNTRY_LOCALES.values():
-        for code, label in entries:
-            if code == locale_code:
-                return label
-    if locale_code == ENGLISH_FALLBACK[0]:
-        return ENGLISH_FALLBACK[1]
-    return locale_code
+    """Return the human-readable label for a locale, e.g. 'fr-CA' to
+    'French (Canada)'. Falls back to the locale code itself."""
+    return LOCALE_LABELS.get(locale_code, locale_code)
 
 
 def country_name(country: str) -> str:
-    """Return the display name for a country code, e.g. 'mx' → 'Mexico'."""
-    return COUNTRY_DISPLAY_NAMES.get((country or "us").lower(), country.upper())
+    """Return the display name for a country code, e.g. 'mx' to 'Mexico'."""
+    return countries.name(country or "us")
 
 
-# ISO 639-1 → friendly label, used to humanise lingua's detection output
+def has_app_store_language(country: str) -> bool:
+    """False when Apple offers no App Store listing language for a storefront.
+
+    A listing there appears in the app's fallback language, so the AI tabs say
+    so rather than offering a language Apple will never show.
+    """
+    entry = countries.get(country)
+    return bool(entry and entry.locales)
+
+
+def countries_without_app_store_language() -> list[str]:
+    """Storefront codes where Apple offers no App Store listing language."""
+    return countries.without_app_store_language()
+
+
+# ISO 639-1 to friendly label, used to humanise lingua's detection output
 # (e.g., when warning the user that their source appears to be in 'en' / 'fr').
 ISO_LANGUAGE_NAMES: dict[str, str] = {
     "en": "English", "fr": "French", "de": "German", "es": "Spanish",
@@ -100,7 +128,9 @@ ISO_LANGUAGE_NAMES: dict[str, str] = {
     "no": "Norwegian", "da": "Danish", "fi": "Finnish", "ru": "Russian",
     "tr": "Turkish", "ar": "Arabic", "ja": "Japanese", "ko": "Korean",
     "zh": "Chinese", "hi": "Hindi", "th": "Thai", "id": "Indonesian",
-    "vi": "Vietnamese",
+    "vi": "Vietnamese", "ca": "Catalan", "cs": "Czech", "el": "Greek",
+    "he": "Hebrew", "hr": "Croatian", "hu": "Hungarian", "ms": "Malay",
+    "pl": "Polish", "ro": "Romanian", "sk": "Slovak", "uk": "Ukrainian",
 }
 
 
@@ -123,11 +153,8 @@ def locale_country_locales_for_template() -> dict[str, list[list[str]]]:
     of [code, label] pairs.
     """
     out: dict[str, list[list[str]]] = {}
-    for country, entries in COUNTRY_LOCALES.items():
-        merged = list(entries)
-        if not any(loc[0].startswith("en") for loc in merged):
-            merged.append(ENGLISH_FALLBACK)
-        out[country] = [[code, label] for code, label in merged]
+    for country in COUNTRY_LOCALES:
+        out[country] = [[code, label] for code, label in locales_for(country)]
     return out
 
 

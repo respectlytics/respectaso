@@ -117,7 +117,6 @@ shared_hiddenimports = [
         "licensing.apps",
         "licensing.decorators",
         "licensing.middleware",
-        "licensing.referral",
         "licensing.refresh",
         "licensing.storage",
         "licensing.validator",

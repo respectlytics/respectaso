@@ -1,7 +1,7 @@
 {% comment %}
 The keyword cleanup suggestion (aso/keyword_cleanup.py), shown above Search
 History once the daily refresh of every tracked keyword and country pair
-takes an hour or more and at least ten of them are Low Volume or Avoid.
+takes an hour or more and at least ten of them are Low Volume.
 "Show them" filters the History table to those rows, where the existing
 multi-select delete does the rest; "Remind me in 30 days" snoozes it
 server-side (aso.ui_state), because the desktop edition has no
@@ -15,11 +15,11 @@ localStorage.
             <h3 class="text-sm font-semibold text-amber-100">Your daily refresh is getting long</h3>
             <p class="text-sm text-amber-200/80 mt-1">
                 RespectASO re-checks {{ cleanup.pairs_text }} keyword and country pairs every day, which takes {{ cleanup.refresh_text }}{% if IS_NATIVE_APP %} while the app is open{% endif %}.
-                {{ cleanup.candidates_text }} of them are Low Volume or Avoid.
+                {{ cleanup.candidates_text }} of them are Low Volume.
                 Review those and remove the ones you don't need, and tomorrow's refresh gets shorter.
             </p>
             <div class="flex flex-wrap items-center gap-3 mt-3">
-                <a href="{{ cleanup.filter_url }}"
+                <a data-in-place href="{{ cleanup.filter_url }}"
                    class="bg-amber-600/40 hover:bg-amber-600/60 border border-amber-500/30 text-amber-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
                     Show them
                 </a>

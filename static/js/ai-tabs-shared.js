@@ -33,13 +33,15 @@
         'combination': 'Combination',
         'title_combo': 'Title Phrase',
         'subtitle_combo': 'Subtitle Phrase',
-        'keyword_field_combo': 'Keyword Field Combo',
+        // Spelled out: "KF" and "Combo" read as internal shorthand (a
+        // reviewer, 2026-09-23). "Phrase" as for the title and subtitle.
+        'keyword_field_combo': 'Keyword Field Phrase',
         'title_subtitle': 'Title + Subtitle',
         'subtitle_title': 'Subtitle + Title',
-        'title_keyword_field': 'Title + KF',
-        'keyword_field_title': 'KF + Title',
-        'subtitle_keyword_field': 'Subtitle + KF',
-        'keyword_field_subtitle': 'KF + Subtitle',
+        'title_keyword_field': 'Title + Keyword Field',
+        'keyword_field_title': 'Keyword Field + Title',
+        'subtitle_keyword_field': 'Subtitle + Keyword Field',
+        'keyword_field_subtitle': 'Keyword Field + Subtitle',
         // Researcher-specific
         'seed': 'Seed Keyword',
         'ai_generated': 'AI Generated',
@@ -111,18 +113,19 @@
         'ai_generated': 'AI-discovered keyword based on analyzing top-ranking apps for your seed keyword',
         'ai_generated_component': 'A component word from a multi-word AI-generated phrase, scored separately so you can evaluate its long-tail value.',
         // Competitor-specific
-        'implied': "Keywords from the app's description — features, use cases, and themes users search for",
+        'implied': "Keywords from the app's description: features, use cases, and themes users search for",
         'implied_component': "A component word from a multi-word implied phrase, scored separately so you can evaluate its long-tail value.",
         'inferred': "Broader market keywords — what users looking for this type of app would search",
         'inferred_component': "A component word from a multi-word inferred phrase, scored separately so you can evaluate its long-tail value.",
-        'ai_discovered': "AI-discovered keywords relevant to this app's niche — beyond what's in their visible metadata",
+        'ai_discovered': "AI-discovered keywords relevant to this app's niche, beyond what is in its visible metadata",
         'ai_discovered_component': "A component word from a multi-word AI-discovered phrase, scored separately so you can evaluate its long-tail value.",
     };
 
+    // Safe in text and in an attribute value (data-tip, title).
     function escapeHtml(str) {
         var d = document.createElement('div');
         d.textContent = (str === null || str === undefined) ? '' : String(str);
-        return d.innerHTML;
+        return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function formatSourceLabel(source) {
@@ -164,9 +167,10 @@
         if (!dl || !dl.positions || dl.positions.length < 10) {
             return '<span class="text-xs text-slate-500">—</span>';
         }
-        var p1 = dl.positions[0], p5 = dl.positions[4], p10 = dl.positions[9];
         var showBelow = idx < total / 2;
         var posClass = showBelow ? 'top-full mt-2' : 'bottom-full mb-2';
+        if (dl.below_threshold) { return tinyMarketCell(posClass); }
+        var p1 = dl.positions[0], p5 = dl.positions[4], p10 = dl.positions[9];
         // Named group ("group/dl") so the tooltip only shows on cell hover, not
         // when hovering anywhere on a parent row that also carries a "group" class.
         return '<div class="group/dl relative inline-block">' +
@@ -179,6 +183,30 @@
             '<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 font-mono">' + fmt(p5.downloads_low) + '–' + fmt(p5.downloads_high) + '</span></div>' +
             '<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 font-mono">' + fmt(p10.downloads_low) + '–' + fmt(p10.downloads_high) + '</span></div>' +
             '</div>' +
+            derivedMarketNote(dl) +
+            '</div></div>';
+    }
+
+    // Twins of _derived_market_note() and _tiny_market_cell() in
+    // aso/templatetags/aso_tags.py. scoring-consistency.instructions.md: the
+    // two renderers must stay visually identical, and a test asserts the copy.
+    var DERIVED_MARKET_NOTE = 'Market size for this storefront is derived from population and iOS share, not measured. Treat the range as indicative.';
+    var TINY_MARKET_TEXT = 'Under 1 search a day';
+    var TINY_MARKET_NOTE = 'This storefront sees under one search a day for this keyword, so there is no download range worth quoting.';
+
+    function derivedMarketNote(dl) {
+        if (!dl || dl.market_source !== 'derived') { return ''; }
+        return '<p class="text-[10px] text-slate-500 leading-snug mt-2 pt-2 border-t border-white/5">' +
+            DERIVED_MARKET_NOTE + '</p>';
+    }
+
+    function tinyMarketCell(posClass) {
+        return '<div class="group/dl relative inline-block">' +
+            '<span class="text-xs text-slate-400 cursor-help border-b border-dotted border-slate-600">' +
+            TINY_MARKET_TEXT + '</span>' +
+            '<div class="hidden group-hover/dl:block absolute z-20 ' + posClass +
+            ' left-1/2 -translate-x-1/2 w-52 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">' +
+            '<p class="text-[11px] text-slate-300 leading-snug">' + TINY_MARKET_NOTE + '</p>' +
             '</div></div>';
     }
 
@@ -187,13 +215,13 @@
         var labelText = formatSourceLabel(source);
         var color = getSourceColor(source);
         if (!tooltip) {
-            return '<span class="text-xs px-1.5 py-0.5 rounded ' + color + '">' + escapeHtml(labelText) + '</span>';
+            return '<span class="text-xs px-1.5 py-0.5 rounded whitespace-nowrap ' + color + '">' + escapeHtml(labelText) + '</span>';
         }
         var showBelow = idx < total / 2;
         var posClass = showBelow ? 'top-full mt-1' : 'bottom-full mb-1';
         // Named group ("group/src") to avoid triggering on a parent row's "group".
         return '<div class="group/src relative inline-block">' +
-            '<span class="text-xs px-1.5 py-0.5 rounded cursor-help ' + color + '">' + escapeHtml(labelText) + '</span>' +
+            '<span class="text-xs px-1.5 py-0.5 rounded cursor-help whitespace-nowrap ' + color + '">' + escapeHtml(labelText) + '</span>' +
             '<div class="hidden group-hover/src:block absolute z-20 ' + posClass + ' left-0 w-52 bg-slate-800 border border-white/10 rounded-lg p-2 shadow-xl text-left">' +
             '<p class="text-[11px] text-slate-300 leading-snug">' + tooltip + '</p>' +
             '</div></div>';
@@ -223,6 +251,111 @@
             badge.color + '">' + escapeHtml(badge.label) + '</span>';
     }
 
+    /*
+     * Why a run failed: the one panel every AI tab shows, on a failed card in
+     * the Recent list and when a run fails on screen. Built from the server's
+     * failure record (aso_pro/run_failures.py): what went wrong, whose side
+     * it is on, what to do, the step, the model, the version. The Copy button
+     * hands over the same facts as plain text, with nothing secret in them,
+     * so a screenshot or a pasted report is enough to act on.
+     */
+    function formatFailureWhen(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return isNaN(d) ? iso : d.toLocaleString();
+    }
+
+    function formatRunFailure(failure) {
+        if (!failure) return '';
+        var facts = [
+            ['Step', failure.step],
+            ['AI service', failure.service],
+            ['Model', failure.model],
+            ['When', formatFailureWhen(failure.at)],
+            ['RespectASO', failure.version],
+            ['Run', failure.run]
+        ].filter(function (f) { return f[1]; });
+        var grid = facts.length
+            ? '<dl class="mt-3 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 text-xs">' +
+                facts.map(function (f) {
+                    return '<dt class="text-slate-500">' + escapeHtml(f[0]) + '</dt>' +
+                           '<dd class="text-slate-300 break-words">' + escapeHtml(f[1]) + '</dd>';
+                }).join('') + '</dl>'
+            : '';
+        return '<div class="run-failure bg-red-950/40 border border-red-500/30 rounded-lg p-4 text-left cursor-auto">' +
+            '<p class="text-sm font-semibold text-red-200">' + escapeHtml(failure.headline) + '</p>' +
+            '<p class="text-xs text-red-300/80 mt-0.5">Whose side: ' + escapeHtml(failure.whose) + '</p>' +
+            (failure.reason
+                ? '<p class="mt-3 text-xs text-slate-300 break-words"><span class="text-slate-500">Details: </span>' +
+                  escapeHtml(failure.reason) + '</p>'
+                : '') +
+            '<p class="mt-2 text-xs text-slate-100"><span class="text-slate-500">What to do: </span>' +
+                escapeHtml(failure.next) + '</p>' +
+            grid +
+            (failure.where
+                ? '<p class="mt-2 text-[10px] font-mono text-slate-500 break-all">Code location: ' +
+                  escapeHtml(failure.where) + '</p>'
+                : '') +
+            '<button type="button" class="run-failure-copy mt-3 text-xs font-medium text-slate-200 bg-slate-700/70 ' +
+                'hover:bg-slate-600 border border-white/10 rounded-lg px-3 py-1.5 transition-colors" ' +
+                'title="Copies what went wrong, the step, the model and the version. No keys or private data." ' +
+                'data-report="' + escapeHtml(failure.report || '') + '">Copy error report</button>' +
+        '</div>';
+    }
+
+    /*
+     * A failed card in a Recent list: says what went wrong on the card itself,
+     * and opens the full panel on a click. Returns the element to append in
+     * place of the row (the row itself when the run did not fail).
+     */
+    function wrapFailedRun(row, session) {
+        if (session.status !== 'failed' || !session.failure) return row;
+        var box = document.createElement('div');
+        var note = document.createElement('p');
+        note.className = 'text-xs text-red-300 mt-1';
+        var label = row.querySelector('.min-w-0') || row;
+        label.appendChild(note);
+        var panel = document.createElement('div');
+        panel.className = 'hidden mt-2';
+        panel.innerHTML = formatRunFailure(session.failure);
+        function sync(open) {
+            note.textContent = session.failure.headline + (open ? '' : ' Click to see why and what to do.');
+            row.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        row.classList.add('cursor-pointer', 'hover:border-red-500/30', 'hover:bg-slate-800/60', 'transition-colors');
+        row.addEventListener('click', function () {
+            sync(!panel.classList.toggle('hidden'));
+        });
+        sync(false);
+        box.appendChild(row);
+        box.appendChild(panel);
+        return box;
+    }
+
+    /*
+     * A run that failed while its tab was open: the same panel, in the tab's
+     * error section (#error-failure), in place of the raw text. `showError`
+     * is the tab's own, which resets the section.
+     */
+    function presentRunFailure(run, showError) {
+        showError(run.failure ? '' : (run.error || 'The run failed.'));
+        var slot = document.getElementById('error-failure');
+        var text = document.getElementById('error-message');
+        if (!slot) return;
+        slot.innerHTML = run.failure ? formatRunFailure(run.failure) : '';
+        slot.classList.toggle('hidden', !run.failure);
+        if (text) text.classList.toggle('hidden', !!run.failure);
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.run-failure-copy');
+        if (!btn) return;
+        e.stopPropagation();
+        copyTextToClipboard(btn.getAttribute('data-report') || '')
+            .then(function () { showCopyToast(btn, 'Copied', true); })
+            .catch(function () { showCopyToast(btn, 'Copy failed', false); });
+    });
+
     // Expose under a namespace AND as bare globals so existing inline template
     // code that calls e.g. formatSourceBadge() / fmt() / escapeHtml() keeps working
     // without any rename.
@@ -238,6 +371,9 @@
         formatDownloadCell: formatDownloadCell,
         formatSourceBadge: formatSourceBadge,
         formatRunStatusBadge: formatRunStatusBadge,
+        formatRunFailure: formatRunFailure,
+        wrapFailedRun: wrapFailedRun,
+        presentRunFailure: presentRunFailure,
     };
     window.escapeHtml = escapeHtml;
     window.formatSourceLabel = formatSourceLabel;
@@ -247,4 +383,7 @@
     window.formatDownloadCell = formatDownloadCell;
     window.formatSourceBadge = formatSourceBadge;
     window.formatRunStatusBadge = formatRunStatusBadge;
+    window.formatRunFailure = formatRunFailure;
+    window.wrapFailedRun = wrapFailedRun;
+    window.presentRunFailure = presentRunFailure;
 })();

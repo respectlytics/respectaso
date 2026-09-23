@@ -185,18 +185,24 @@ class SharedHighlighterWiringTest(SimpleTestCase):
     """One JS highlighter, loaded where titles are rendered client-side;
     no inline copies that could drift from the server filter."""
 
+    # (template that loads the script, file that calls it). They are the same
+    # file on the dashboard; the Opportunity Finder's client moved into its
+    # own script when the scan became a background job.
     TEMPLATES = (
-        "aso/templates/aso/dashboard.html",
-        "aso/templates/aso/opportunity.html",
+        ("aso/templates/aso/dashboard.html", "aso/templates/aso/dashboard.html"),
+        ("aso/templates/aso/opportunity.html", "static/js/opportunity-scan.js"),
     )
 
     def test_templates_load_the_shared_script_and_define_no_copy(self):
-        for rel in self.TEMPLATES:
-            with open(os.path.join(BASE_DIR, rel)) as f:
+        for template, caller in self.TEMPLATES:
+            with open(os.path.join(BASE_DIR, template)) as f:
                 html = f.read()
-            self.assertIn("js/keyword-highlight.js", html, rel)
-            self.assertIn("highlightKeyword(", html, rel)
-            self.assertNotIn("function highlightKeyword", html, rel)
+            self.assertIn("js/keyword-highlight.js", html, template)
+            self.assertNotIn("function highlightKeyword", html, template)
+            with open(os.path.join(BASE_DIR, caller)) as f:
+                code = f.read()
+            self.assertIn("highlightKeyword(", code, caller)
+            self.assertNotIn("function highlightKeyword", code, caller)
 
     def test_js_and_python_share_the_tier_classes(self):
         with open(JS_PATH) as f:

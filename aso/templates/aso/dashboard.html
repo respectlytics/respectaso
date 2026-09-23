@@ -34,19 +34,7 @@
                 </div>
             </div>
             <div class="flex-1">
-                <label class="block text-xs font-medium text-slate-300 mb-1.5">Countries <span class="text-slate-500">(max 5)</span></label>
-                <div id="country-dropdown" class="relative">
-                    <button type="button" id="country-btn"
-                            class="w-full bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white text-left focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center justify-between">
-                        <span id="country-btn-text" class="truncate">🇺🇸 United States</span>
-                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                    <div id="country-panel" class="hidden absolute z-50 mt-1 w-full bg-slate-800 border border-white/10 rounded-lg shadow-xl max-h-72 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
+                {% include "aso/partials/country_picker.html" with picker_id="search-countries" label="Countries" max=5 storage_key="aso_countries" form_id="search-form" %}
             </div>
         </div>
         <form id="search-form" method="post" action="{% url 'aso:search' %}" class="mt-4 pt-4 border-t border-white/5">
@@ -106,12 +94,13 @@
     {% include "aso/partials/keyword_cleanup_banner.html" %}
 
     <!-- Search History -->
-    <div id="history-section" class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+    <div id="history-section" class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden scroll-mt-20"
+         data-sort="{{ current_sort }}" data-dir="{{ current_dir }}" data-app="{{ selected_app|default_if_none:'' }}">
         <div class="p-4 {% if total_unfiltered_count or history_results %}border-b border-white/5{% endif %}">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
                 <h2 class="text-base font-semibold text-white">
-                    Search History{% if selected_app_name %} — {{ selected_app_name }}{% else %} — All Apps{% endif %}
+                    Search History{% if selected_app_name %}: {{ selected_app_name }}{% else %}: All Apps{% endif %}
                 </h2>
                 {% if total_count %}
                 <p class="text-slate-500 text-xs mt-0.5" id="history-subtitle">
@@ -123,7 +112,7 @@
                 badge, so the timestamp is repeated here only when that panel is hidden.{% endcomment %}
                 <p id="refresh-hint" class="text-slate-500 text-[11px] mt-1 inline-flex items-center gap-1"{% if last_refresh %} title="{{ last_refresh|date:'Y-m-d H:i:s' }}"{% endif %}>
                     <svg class="w-3 h-3 text-emerald-400/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span>{% if IS_NATIVE_APP %}Keep RespectASO open and your Mac awake: rankings refresh once a day in the background{% else %}Rankings refresh once a day while the container runs{% endif %}{% if last_refresh and not app_summary %} - last refreshed {{ last_refresh|timesince }} ago{% endif %}.</span>
+                    <span>{% if IS_NATIVE_APP %}Keep RespectASO open and your Mac awake: rankings refresh once a day in the background{% else %}Rankings refresh once a day while the container runs{% endif %}{% if last_refresh and not app_summary %}. Last refreshed {{ last_refresh|timesince }} ago{% endif %}.</span>
                 </p>
             </div>
             <div class="flex items-center gap-2">
@@ -142,7 +131,7 @@
                     {% endif %}
                 </select>
                 {% endif %}
-                <button onclick="location.reload()" title="Reload history table"
+                <button onclick="refreshHistorySection()" title="Reload history table"
                         class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -198,43 +187,51 @@
             <details class="group bg-slate-900/40 hover:bg-slate-900/60 open:bg-slate-900/60 border border-white/5 open:border-purple-500/20 rounded-lg transition-colors">
                 <summary class="flex items-center gap-2 px-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                     <svg class="w-3.5 h-3.5 text-purple-400/80 group-open:text-purple-400 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Scoring guide — what to aim for</span>
+                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Scoring guide: what the numbers mean</span>
                     <svg class="w-3 h-3 text-slate-500 group-open:text-purple-400 transition-all group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </summary>
                 <div class="px-4 pb-4 pt-3 border-t border-white/5">
+                    {% with g=scoring_guide %}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
                         <div>
-                            <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Popularity (1–100)</h4>
+                            <h4 class="text-[11px] font-semibold text-cyan-300 uppercase tracking-wider mb-1">Opportunity (0-100)</h4>
+                            <p class="text-[11px] text-slate-500 mb-2.5">What a keyword is worth to the app you track it for, at the rank that app can realistically reach, or to a brand new app when it is not tied to one. The app is named under each keyword. Hover a score for how it is worked out.</p>
                             <div class="space-y-1 text-xs">
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">50+</span><span class="text-slate-300">High demand</span><span class="text-green-400 font-medium">Excellent</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">30–49</span><span class="text-slate-300">Good search volume</span><span class="text-emerald-400 font-medium">Good</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">15–29</span><span class="text-slate-300">Moderate volume</span><span class="text-yellow-400 font-medium">Fair</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">5–14</span><span class="text-slate-300">Low volume</span><span class="text-orange-400 font-medium">Low</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">&lt;5</span><span class="text-slate-300">Very few searches</span><span class="text-red-400 font-medium">Minimal</span></div>
+                                {% for row in g.opportunity %}
+                                <div class="grid grid-cols-[3.5rem_1fr] items-baseline gap-3 py-0.5"><span class="text-cyan-300 font-mono text-[11px]">{{ row.range }}</span><span class="text-slate-300">{{ row.meaning }}{% if row.tag %}<span class="text-slate-500"> · {{ row.tag }} from here</span>{% endif %}</span></div>
+                                {% endfor %}
                             </div>
                         </div>
                         <div>
-                            <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Difficulty (1–100)</h4>
+                            <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-1">Difficulty (1-100)</h4>
+                            <p class="text-[11px] text-slate-500 mb-2.5">How strong the apps already ranking are, and where a brand new app with the keyword in its title typically lands, measured on real App Store searches. One of your apps does better the stronger it is in that storefront.</p>
                             <div class="space-y-1 text-xs">
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">0–15</span><span class="text-slate-300">Very Easy</span><span class="text-green-400 font-medium">Go for it</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">16–35</span><span class="text-slate-300">Easy</span><span class="text-green-300 font-medium">Good chance</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">36–55</span><span class="text-slate-300">Moderate</span><span class="text-yellow-400 font-medium">Achievable</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">56–75</span><span class="text-slate-300">Hard</span><span class="text-orange-400 font-medium">Tough</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">76–90</span><span class="text-slate-300">Very Hard</span><span class="text-red-400 font-medium">Risky</span></div>
-                                <div class="grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">91–100</span><span class="text-slate-300">Extreme</span><span class="text-red-600 font-medium">Avoid</span></div>
+                                {% for row in g.difficulty %}
+                                <div class="grid grid-cols-[3.5rem_5rem_1fr] items-baseline gap-3 py-0.5"><span class="text-slate-500 font-mono text-[11px]">{{ row.range }}</span><span class="{{ row.css }} font-medium">{{ row.label }}</span><span class="text-slate-300">{{ row.where }}</span></div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
+                    <div class="mt-4 pt-3 border-t border-white/5">
+                        <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-1">Popularity (1-100)</h4>
+                        <p class="text-xs text-slate-400 leading-relaxed">How sought after a keyword is compared with other keywords, not a count of searches. The same number means far fewer searches in a small storefront: popularity {{ g.popularity_example.popularity }} is about {{ g.popularity_example.us }} searches a day in the United States and about {{ g.popularity_example.there }} in {{ g.popularity_example.there_name }}. Opportunity already accounts for this, so compare countries by Opportunity, not by Popularity.</p>
+                    </div>
+                    {% endwith %}
                     <div class="mt-5 pt-4 border-t border-white/5">
-                        <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-2.5">Targeting Advice</h4>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
-                            <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-3 py-2 text-green-300 leading-tight">🎯 Sweet Spot<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">High pop + low diff</span></div>
-                            <div class="bg-green-900/20 border border-green-500/20 rounded-lg px-3 py-2 text-green-300 leading-tight">✅ Good Target<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">High pop, ok diff</span></div>
-                            <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg px-3 py-2 text-blue-300 leading-tight">💎 Hidden Gem<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Moderate pop + very low diff</span></div>
-                            <div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg px-3 py-2 text-yellow-300 leading-tight">⚔️ High Competition<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Tough to rank via ASO</span></div>
-                            <div class="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-slate-300 leading-tight">👍 Moderate<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Reasonable opportunity</span></div>
-                            <div class="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-slate-300 leading-tight">🔍 Low Volume<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Few searches</span></div>
-                            <div class="bg-red-900/20 border border-red-500/20 rounded-lg px-3 py-2 text-red-300 leading-tight">🚫 Avoid<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">Low opportunity</span></div>
+                        <h4 class="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-1">What to do with a keyword</h4>
+                        <p class="text-[11px] text-slate-500 mb-2.5">Each tag is one range: Low Volume reads the Downloads at #1 column, every other tag reads the Opportunity score. Together they say which of three things to do. Hover a tag in the table for what it means for that row.</p>
+                        {% regroup classification_legend by decision as decisions %}
+                        <div class="space-y-2.5">
+                            {% for group in decisions %}
+                            <div>
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{{ group.grouper }}</p>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+                                    {% for item in group.list %}
+                                    <div class="{{ item.css }} border rounded-lg px-3 py-2 leading-tight">{{ item.icon }} {{ item.label }}<span class="block text-[10px] text-slate-500 mt-0.5 font-normal">{{ item.summary }}</span></div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -242,7 +239,7 @@
             <details class="group bg-slate-900/40 hover:bg-slate-900/60 open:bg-slate-900/60 border border-white/5 open:border-purple-500/20 rounded-lg transition-colors">
                 <summary class="flex items-center gap-2 px-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                     <svg class="w-3.5 h-3.5 text-purple-400/80 group-open:text-purple-400 flex-shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Two <span class="text-purple-300 font-medium">Popularity</span> sources - RespectASO estimate and Apple Ads - and why you choose</span>
+                    <span class="text-xs text-slate-300 group-open:text-white transition-colors flex-1 min-w-0 truncate">Two <span class="text-purple-300 font-medium">Popularity</span> sources (RespectASO estimate and Apple Ads) and why you choose</span>
                     <svg class="w-3 h-3 text-slate-500 group-open:text-purple-400 transition-all group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </summary>
                 <div class="px-4 pb-4 pt-3 border-t border-white/5 text-xs text-slate-400 leading-relaxed space-y-3">
@@ -299,7 +296,7 @@
                 <button onclick="clearAllFilters()" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">Clear all</button>
                 {% endif %}
             </div>
-            <div id="filter-panel" class="{% if not has_filters %}hidden{% endif %} mt-3 pt-3 border-t border-white/5 animate-fade-in">
+            <div id="filter-panel" data-keep-open class="{% if not has_filters %}hidden{% endif %} mt-3 pt-3 border-t border-white/5">
                 <div class="flex items-end gap-3">
                     <!-- Insight multi-select dropdown -->
                     <div class="relative" id="insight-dropdown-wrap">
@@ -308,28 +305,12 @@
                             <span id="insight-dropdown-text" class="truncate">{% if selected_insights %}{{ selected_insights|length }} selected{% else %}Any{% endif %}</span>
                             <svg class="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        <div id="insight-dropdown-panel" class="hidden absolute top-full left-0 mt-1 bg-slate-800 border border-white/10 rounded-lg py-1 z-50 shadow-xl min-w-[200px] max-h-64 overflow-y-auto">
+                        <div id="insight-dropdown-panel" data-keep-open class="hidden absolute top-full left-0 mt-1 bg-slate-800 border border-white/10 rounded-lg py-1 z-50 shadow-xl min-w-[200px] max-h-64 overflow-y-auto">
+                            {% for item in classification_legend %}
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Sweet Spot" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Sweet Spot' in selected_insights %}checked{% endif %}> 🎯 Sweet Spot
+                                <input type="checkbox" value="{{ item.label }}" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if item.label in selected_insights %}checked{% endif %}> {{ item.icon }} {{ item.label }}
                             </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Good Target" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Good Target' in selected_insights %}checked{% endif %}> ✅ Good Target
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Hidden Gem" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Hidden Gem' in selected_insights %}checked{% endif %}> 💎 Hidden Gem
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="High Competition" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'High Competition' in selected_insights %}checked{% endif %}> ⚔️ High Competition
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Moderate" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Moderate' in selected_insights %}checked{% endif %}> 👍 Moderate
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Low Volume" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Low Volume' in selected_insights %}checked{% endif %}> 🔍 Low Volume
-                            </label>
-                            <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="Avoid" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if 'Avoid' in selected_insights %}checked{% endif %}> 🚫 Avoid
-                            </label>
+                            {% endfor %}
                         </div>
                     </div>
                     <!-- Popularity dropdown -->
@@ -396,22 +377,23 @@
                             </th>
                             <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('keyword')">Keyword <span class="sort-indicator text-slate-500">{% if current_sort == 'keyword' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('rank')">Rank <span class="sort-indicator text-slate-500">{% if current_sort == 'rank' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>{% endif %}
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')">Popularity <span class="sort-indicator text-slate-500">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span><span class="block text-[9px] font-normal normal-case text-slate-500 whitespace-nowrap">via {% if popularity_source == 'apple' %}Apple Ads{% else %}RespectASO{% endif %}</span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')"><span class="inline-flex items-center gap-1">Popularity {% column_info "popularity" %}</span> <span class="sort-indicator text-slate-500">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span><span class="block text-[9px] font-normal normal-case text-slate-500 whitespace-nowrap">via {% if popularity_source == 'apple' %}Apple Ads{% else %}RespectASO{% endif %}</span></th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('difficulty')">
                                 <span class="inline-flex items-center gap-1">Overall Difficulty
-                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Weighted score (0–100) based on 7 competition signals across all search results: rating volume, growth speed, brand strength, title relevance, rating quality, market maturity, and publisher diversity."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    {% column_info "difficulty" %}
                                 </span>
                                 <span class="sort-indicator text-slate-500">{% if current_sort == 'difficulty' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
                             </th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('opportunity')">
+                            <th class="text-center text-xs font-semibold text-cyan-300 px-3 py-2 cursor-pointer hover:text-cyan-200 select-none bg-cyan-500/5" onclick="sortHistory('opportunity')">
                                 <span class="inline-flex items-center gap-1">Opportunity
-                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Combined score reflecting how likely you are to rank AND get downloads. High popularity + low difficulty = high opportunity."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    {% column_info "opportunity" "tracked" %}
                                 </span>
                                 <span class="sort-indicator text-slate-500">{% if current_sort == 'opportunity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
+                                {% opportunity_subline "tracked" %}
                             </th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('est_downloads')">
-                                <span class="inline-flex items-center gap-1">Est. Downloads
-                                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="Estimated daily downloads if you rank #1 (hover each cell for the breakdown across rank #1, #5, and #10)."><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span class="inline-flex items-center gap-1">Downloads at #1
+                                    {% column_info "downloads" %}
                                 </span>
                                 <span class="sort-indicator text-slate-500">{% if current_sort == 'est_downloads' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
                             </th>
@@ -438,6 +420,8 @@
                                 <span class="text-white text-sm font-medium">{{ result.keyword.keyword }}</span><button class="kw-copy-btn ml-1.5 text-slate-600 hover:text-slate-300 transition-colors inline-flex items-center align-middle" data-kw="{{ result.keyword.keyword }}" title="Copy keyword" aria-label="Copy keyword"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
                                 {% if result.keyword.app %}
                                 <span class="text-slate-500 text-[10px] block">{{ result.keyword.app.name }}</span>
+                                {% else %}
+                                <span class="text-slate-600 text-[10px] block">No app: scored for a new app</span>
                                 {% endif %}
                             </td>
                             {% if show_rank %}
@@ -465,8 +449,8 @@
                                 <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword - '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's ratings.">🏷️ Brand</span>
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 text-center text-sm font-semibold" data-sort-value="{{ result.opportunity_score }}">
-                                <span class="text-cyan-400">{{ result.opportunity_score }}</span>
+                            <td class="px-3 py-2 text-center text-base font-bold bg-cyan-500/5" data-sort-value="{{ result.opportunity_score }}">
+                                <span class="text-cyan-300 cursor-help" data-tip="{{ result.opportunity_reach.explanation }}">{{ result.opportunity_score }}</span>
                             </td>
                             <td class="px-3 py-2 text-center" data-sort-value="{{ result.effective_download_estimates|download_sort_value }}">
                                 {% download_cell result.effective_download_estimates forloop.counter0 history_results|length %}
@@ -535,7 +519,7 @@
                                         </svg>
                                     </button>
                                     {% endif %}
-                                    <button onclick="refreshKeyword({{ result.keyword.id }}, this)" title="Refresh difficulty"
+                                    <button onclick="refreshKeyword({{ result.keyword.id }}, '{{ result.country }}', this)" title="Refresh difficulty"
                                             class="text-slate-500 hover:text-purple-400 transition-colors p-1 rounded hover:bg-white/5">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -723,7 +707,7 @@
             </div>
             <div class="flex items-center gap-2">
                 {% if has_prev %}
-                <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}{% for i in selected_insights %}insight={{ i|urlencode }}&{% endfor %}{% if selected_pop_min %}pop_min={{ selected_pop_min }}&{% endif %}{% if selected_diff_max %}diff_max={{ selected_diff_max }}&{% endif %}{% if search_q %}q={{ search_q|urlencode }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"-1" }}"
+                <a data-in-place="page" href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}{% for i in selected_insights %}insight={{ i|urlencode }}&{% endfor %}{% if selected_pop_min %}pop_min={{ selected_pop_min }}&{% endif %}{% if selected_diff_max %}diff_max={{ selected_diff_max }}&{% endif %}{% if search_q %}q={{ search_q|urlencode }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"-1" }}"
                    class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
                     ← Prev
                 </a>
@@ -732,7 +716,7 @@
                 <span class="text-xs text-slate-500">Page {{ page }} of {{ total_pages }}</span>
                 {% endif %}
                 {% if has_next %}
-                <a href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}{% for i in selected_insights %}insight={{ i|urlencode }}&{% endfor %}{% if selected_pop_min %}pop_min={{ selected_pop_min }}&{% endif %}{% if selected_diff_max %}diff_max={{ selected_diff_max }}&{% endif %}{% if search_q %}q={{ search_q|urlencode }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"1" }}"
+                <a data-in-place="page" href="?{% if selected_app %}app={{ selected_app }}&{% endif %}{% if selected_country %}country={{ selected_country }}&{% endif %}{% for i in selected_insights %}insight={{ i|urlencode }}&{% endfor %}{% if selected_pop_min %}pop_min={{ selected_pop_min }}&{% endif %}{% if selected_diff_max %}diff_max={{ selected_diff_max }}&{% endif %}{% if search_q %}q={{ search_q|urlencode }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"1" }}"
                    class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
                     Next →
                 </a>
@@ -758,7 +742,7 @@
                 Filtered to {{ selected_country|country_flag }} <span class="text-slate-200">{{ selected_country|country_name }}</span> —
                 but this app doesn't have any tracked keywords in that country.
             </p>
-            <a href="?{% if selected_app %}app={{ selected_app }}{% endif %}"
+            <a data-in-place href="?{% if selected_app %}app={{ selected_app }}{% endif %}"
                class="inline-flex items-center gap-1.5 mt-4 text-xs bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-lg transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 Clear country filter
@@ -780,7 +764,7 @@
 <!-- Auto-refresh progress bar (fixed bottom) -->
 <div id="auto-refresh-bar" class="fixed bottom-0 left-0 right-0 z-50 hidden">
     <div class="bg-[#1e293b] border-t border-white/10 px-4 py-2">
-        <div class="max-w-5xl mx-auto flex items-center gap-3">
+        <div class="max-w-[1600px] mx-auto sm:px-2 lg:px-4 flex items-center gap-3">
             <svg class="w-4 h-4 text-purple-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -801,6 +785,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{% static 'js/download-chart.js' %}"></script>
 <script src="{% static 'js/popularity-display.js' %}"></script>
 <script src="{% static 'js/keyword-highlight.js' %}"></script>
 <script src="{% static 'js/clipboard.js' %}"></script>
@@ -809,10 +794,13 @@
 {{ search_job|json_script:"search-job-data" }}
 <script>
 const csrfToken = '{{ csrf_token }}';
-const selectedApp = {{ selected_app|default:"null" }};
-const showRank = {{ show_rank|yesno:"true,false" }};
-const currentHistorySort = '{{ current_sort }}';
-const currentHistorySortDir = '{{ current_dir }}';
+// The app and sort the table on screen was rendered for. Read from the
+// table itself, because an in-place update replaces it.
+function currentAppId() {
+    const section = document.getElementById('history-section');
+    const id = section ? section.dataset.app : '';
+    return id ? parseInt(id, 10) : null;
+}
 
 // --- CSV Export (uses native save dialog in pywebview, blob fallback for browser) ---
 function exportHistoryCSV(includeApps) {
@@ -856,227 +844,117 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// --- Fixed-position tooltip system (escapes overflow containers) ---
-// The tooltip itself is hoverable — moving the mouse onto it cancels the hide
-// timer so the user can read long content without the tooltip vanishing.
-(function() {
-    const tip = document.createElement('div');
-    tip.className = 'fixed z-[9999] max-w-[320px] bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-slate-300 leading-snug shadow-xl opacity-0 transition-opacity duration-150';
-    tip.style.display = 'none';
-    tip.style.pointerEvents = 'auto';  // allow hovering the tooltip to keep it open
-    document.body.appendChild(tip);
+// The data-tip tooltip engine lives in static/js/tooltip.js
 
-    let hideTimeout = null;
-
-    // Hovering the tooltip itself keeps it visible.
-    tip.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
-    tip.addEventListener('mouseleave', () => hideSoon());
-
-    function show(e) {
-        // Capturing mouseenter/focusin also fire with the document itself as
-        // target (cursor entering the window), which has no .closest().
-        if (!(e.target instanceof Element)) return;
-        const el = e.target.closest('[data-tip]');
-        if (!el) return;
-        clearTimeout(hideTimeout);
-        tip.textContent = el.dataset.tip;
-        tip.style.display = 'block';
-
-        // Position: prefer above the element, fall below if clipped, clamp to viewport if both
-        const rect = el.getBoundingClientRect();
-        const tipRect = tip.getBoundingClientRect();
-        const margin = 8;
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-
-        // Vertical: try above, then below, then whichever side has more room
-        let top = rect.top - tipRect.height - margin;
-        if (top < margin) {
-            const below = rect.bottom + margin;
-            if (below + tipRect.height <= vh - margin) {
-                top = below;  // fits below
-            } else {
-                // Doesn't fit above OR below — pick the side with more space and clamp
-                const spaceAbove = rect.top;
-                const spaceBelow = vh - rect.bottom;
-                if (spaceBelow >= spaceAbove) {
-                    top = Math.max(margin, vh - tipRect.height - margin);
-                } else {
-                    top = margin;
-                }
-            }
-        }
-
-        // Horizontal: center on trigger, clamp to viewport
-        let left = rect.left + rect.width / 2 - tipRect.width / 2;
-        if (left < margin) left = margin;
-        if (left + tipRect.width > vw - margin) left = vw - tipRect.width - margin;
-
-        tip.style.top = top + 'px';
-        tip.style.left = left + 'px';
-        requestAnimationFrame(() => tip.style.opacity = '1');
-    }
-
-    function hideSoon() {
-        clearTimeout(hideTimeout);
-        // 250ms grace period — gives the user time to traverse from trigger to
-        // tooltip (or back) without it disappearing under the cursor.
-        hideTimeout = setTimeout(() => {
-            tip.style.opacity = '0';
-            setTimeout(() => { tip.style.display = 'none'; }, 150);
-        }, 250);
-    }
-
-    document.addEventListener('mouseenter', show, true);
-    document.addEventListener('mouseleave', hideSoon, true);
-    document.addEventListener('focusin', show, true);
-    document.addEventListener('focusout', hideSoon, true);
-})();
-
-// Country code → flag emoji + name
-const COUNTRY_NAMES = {
-    us:'United States',gb:'United Kingdom',ca:'Canada',au:'Australia',de:'Germany',
-    fr:'France',jp:'Japan',kr:'South Korea',cn:'China',br:'Brazil',in:'India',
-    mx:'Mexico',es:'Spain',it:'Italy',nl:'Netherlands',se:'Sweden',no:'Norway',
-    dk:'Denmark',fi:'Finland',ru:'Russia',pt:'Portugal',tr:'Türkiye',pl:'Poland',
-    id:'Indonesia',th:'Thailand',ph:'Philippines',my:'Malaysia',sg:'Singapore',
-    tw:'Taiwan',hk:'Hong Kong',nz:'New Zealand',at:'Austria',be:'Belgium',
-    ch:'Switzerland',ie:'Ireland',za:'South Africa',ar:'Argentina',cl:'Chile',
-    co:'Colombia',pe:'Peru',sa:'Saudi Arabia',ae:'UAE',il:'Israel',eg:'Egypt',
-    ng:'Nigeria',ke:'Kenya',cz:'Czechia',ro:'Romania',hu:'Hungary',gr:'Greece',
-    ua:'Ukraine',vn:'Vietnam',pk:'Pakistan',bd:'Bangladesh',lk:'Sri Lanka',
-    np:'Nepal',kh:'Cambodia',mm:'Myanmar',la:'Laos',mn:'Mongolia',kz:'Kazakhstan',
-    uz:'Uzbekistan',ge:'Georgia',am:'Armenia',az:'Azerbaijan',jo:'Jordan',
-    lb:'Lebanon',kw:'Kuwait',qa:'Qatar',bh:'Bahrain',om:'Oman',iq:'Iraq',
-    hr:'Croatia',bg:'Bulgaria',rs:'Serbia',si:'Slovenia',sk:'Slovakia',
-    ee:'Estonia',lv:'Latvia',lt:'Lithuania',lu:'Luxembourg',mt:'Malta',
-    cy:'Cyprus',is:'Iceland',gt:'Guatemala',hn:'Honduras',sv:'El Salvador',
-    ni:'Nicaragua',cr:'Costa Rica',pa:'Panama',do:'Dominican Republic',
-    jm:'Jamaica',tt:'Trinidad & Tobago',py:'Paraguay',uy:'Uruguay',
-    bo:'Bolivia',ec:'Ecuador',ve:'Venezuela',gy:'Guyana',sr:'Suriname',
-    bz:'Belize',bb:'Barbados',bs:'Bahamas',tz:'Tanzania',ug:'Uganda',
-    rw:'Rwanda',gh:'Ghana',sn:'Senegal',ci:'Ivory Coast',cm:'Cameroon',
-    dz:'Algeria',tn:'Tunisia',ma:'Morocco',ly:'Libya',sd:'Sudan'
-};
-
-function countryFlag(code) {
-    if (!code || code.length !== 2) return '';
-    return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
-}
-
-function countryDisplayText(code) {
-    if (!code) return '—';
-    const flag = countryFlag(code);
-    const name = COUNTRY_NAMES[code.toLowerCase()] || code.toUpperCase();
-    return `${flag} <span class="ml-0.5">${name}</span>`;
-}
-
-// --- Multi-country selector ---
-const SUPPORTED_COUNTRIES = [
-    'us','gb','ca','au','de','fr','jp','kr','cn','br',
-    'in','mx','es','it','nl','se','no','dk','fi','pt',
-    'ru','tr','sa','ae','sg','th','id','ph','vn','tw'
-];
-let selectedCountries = (function() {
-    try {
-        const saved = localStorage.getItem('aso_countries');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length) return parsed;
-        }
-    } catch(e) {}
-    return ['us'];
-})();
-
-function getSelectedCountries() {
-    return selectedCountries.length ? selectedCountries : ['us'];
-}
-
-function initCountryDropdown() {
-    const btn = document.getElementById('country-btn');
-    const panel = document.getElementById('country-panel');
-    const btnText = document.getElementById('country-btn-text');
-    if (!btn || !panel) return;
-
-    // Build options
-    panel.innerHTML = SUPPORTED_COUNTRIES.map(code => {
-        const flag = countryFlag(code);
-        const name = COUNTRY_NAMES[code] || code.toUpperCase();
-        const checked = selectedCountries.includes(code) ? 'checked' : '';
-        return `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-sm text-white">
-            <input type="checkbox" value="${code}" ${checked} class="country-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0">
-            <span>${flag} ${name}</span>
-        </label>`;
-    }).join('');
-
-    // Toggle panel
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        panel.classList.toggle('hidden');
-    });
-
-    // Close on outside click
-    document.addEventListener('click', (e) => {
-        if (!panel.contains(e.target) && e.target !== btn) {
-            panel.classList.add('hidden');
-        }
-    });
-
-    // Handle checkbox changes
-    panel.addEventListener('change', (e) => {
-        if (!e.target.classList.contains('country-cb')) return;
-        const allCbs = panel.querySelectorAll('.country-cb');
-        const checked = Array.from(allCbs).filter(cb => cb.checked);
-
-        // Enforce max 5
-        if (checked.length > 5) {
-            e.target.checked = false;
-            return;
-        }
-
-        selectedCountries = checked.map(cb => cb.value);
-        if (selectedCountries.length === 0) {
-            selectedCountries = ['us'];
-            const usCb = panel.querySelector('.country-cb[value="us"]');
-            if (usCb) usCb.checked = true;
-        }
-        try { localStorage.setItem('aso_countries', JSON.stringify(selectedCountries)); } catch(e) {}
-        updateCountryBtnText();
-    });
-
-    updateCountryBtnText();
-}
-
-function updateCountryBtnText() {
-    const btnText = document.getElementById('country-btn-text');
-    if (!btnText) return;
-    if (selectedCountries.length === 1) {
-        const c = selectedCountries[0];
-        btnText.textContent = `${countryFlag(c)} ${COUNTRY_NAMES[c] || c.toUpperCase()}`;
-    } else {
-        btnText.textContent = selectedCountries.map(c => countryFlag(c)).join(' ') + ` (${selectedCountries.length} countries)`;
-    }
-}
-
-initCountryDropdown();
+// Countries come from the shared picker (static/js/country-picker.js), which
+// reads the catalog base.html emits. Three hand kept lists used to live here.
+function countryFlag(code) { return CountryPicker.flag(code); }
+function countryDisplayText(code) { return CountryPicker.label(code); }
 
 // --- History sorting (server-side, across the full dataset) ---
 // Numeric/score columns default to DESC on first click (highest first), text columns default to ASC.
 const HISTORY_NUMERIC_COLUMNS = new Set(['popularity', 'difficulty', 'opportunity', 'rank', 'competitors', 'est_downloads']);
 function sortHistory(sortKey) {
     const params = new URLSearchParams(window.location.search);
+    const section = document.getElementById('history-section');
+    const currentSort = section ? section.dataset.sort : '';
+    const currentDir = section ? section.dataset.dir : '';
     const defaultDir = HISTORY_NUMERIC_COLUMNS.has(sortKey) ? 'desc' : 'asc';
-    const nextDir = currentHistorySort === sortKey
-        ? (currentHistorySortDir === 'asc' ? 'desc' : 'asc')
+    const nextDir = currentSort === sortKey
+        ? (currentDir === 'asc' ? 'desc' : 'asc')
         : defaultDir;
 
     params.set('sort', sortKey);
     params.set('dir', nextDir);
     params.delete('page');
-
-    const qs = params.toString();
-    window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+    loadHistory(params);
 }
+
+// --- Search History updates in place (static/js/in-place.js) ---
+// Every control of the table (filters, sort, country, page size, pages, the
+// app) goes through here: the table, the App Summary and the cleanup banner
+// are swapped from the page at the new URL, and the reader stays where they
+// were. They used to reload the whole page and land at the top.
+const DASHBOARD_URL = '{% url "aso:dashboard" %}';
+
+// What the view shows is remembered, so coming back to the Dashboard opens
+// the same view (restoreSavedView below). Kept in step with every change,
+// so clearing a filter also forgets it.
+function rememberHistoryView(params) {
+    try {
+        const app = params.get('app');
+        if (app) localStorage.setItem('aso_app', app); else localStorage.removeItem('aso_app');
+        const country = params.get('country');
+        if (country) localStorage.setItem('aso_history_country', country);
+        else localStorage.removeItem('aso_history_country');
+        if (params.get('per_page')) localStorage.setItem('aso_history_per_page', params.get('per_page'));
+        const filters = {};
+        if (params.getAll('insight').length) filters.insight = params.getAll('insight');
+        ['pop_min', 'diff_max', 'q'].forEach(k => { if (params.get(k)) filters[k] = params.get(k); });
+        if (Object.keys(filters).length) sessionStorage.setItem('dash_filters', JSON.stringify(filters));
+        else sessionStorage.removeItem('dash_filters');
+    } catch (e) { /* storage unavailable: the URL still carries the view */ }
+}
+
+function swapDashboardSections(doc) {
+    swapAppSummaryFromResponse(doc);
+    InPlace.swapSection(doc, 'keyword-cleanup-banner', 'history-section');
+    const fresh = doc.getElementById('history-section');
+    if (fresh) {
+        document.getElementById('history-section').replaceWith(fresh);
+        convertDatesToLocal();
+        initHistoryFilters();
+        syncHistorySelectionUI();
+    }
+}
+
+// `options.anchor` is what must not move on screen: the table by default,
+// or the control the reader used when it sits above the table.
+// `options.reveal` brings the table's start into view (Prev and Next), so a
+// new page starts at its first row.
+function loadHistory(params, options) {
+    options = options || {};
+    rememberHistoryView(params);
+    return InPlace.load(InPlace.urlFor(params, DASHBOARD_URL), {
+        swap: swapDashboardSections,
+        anchor: options.anchor || document.getElementById('history-section'),
+        reveal: options.reveal ? 'history-section' : null,
+    });
+}
+
+// Click on a per-country row in the App Summary: the History table below
+// filters to that country in place, then comes into view with a brief
+// highlight, so the reader sees what changed. It lives here rather than in
+// aso/_app_summary.html because that partial arrives by in-place update when
+// an app is picked, and a script inside swapped-in HTML never runs.
+function filterHistoryToCountry(cc) {
+    function showHistory() {
+        const el = document.getElementById('history-section');
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.style.transition = 'box-shadow 0.4s ease';
+        el.style.boxShadow = '0 0 0 2px rgba(168, 85, 247, 0.5)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 900);
+    }
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get('country') || '') === cc) {
+        showHistory();
+        return;
+    }
+    params.set('country', cc);
+    params.delete('page');
+    loadHistory(params).then(showHistory);
+}
+
+// Links that change the view (Prev, Next, Clear country filter, the cleanup
+// banner's "Show them") load in place too.
+document.addEventListener('click', function(e) {
+    const link = e.target.closest('a[data-in-place]');
+    if (!link || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    loadHistory(new URL(link.href, window.location.href).searchParams,
+                {reveal: link.dataset.inPlace === 'page'});
+});
 
 // --- Convert UTC dates to local timezone ---
 function convertDatesToLocal() {
@@ -1097,6 +975,9 @@ convertDatesToLocal();
 function toggleFilterPanel() {
     const panel = document.getElementById('filter-panel');
     panel.classList.toggle('hidden');
+    // Fade in when opened by hand only: kept open across an in-place update,
+    // the new panel must not flash.
+    panel.classList.toggle('animate-fade-in', !panel.classList.contains('hidden'));
 }
 
 function applyServerFilters() {
@@ -1111,10 +992,8 @@ function applyServerFilters() {
     params.delete('page');
 
     // Insight checkboxes
-    const insights = [];
     document.querySelectorAll('.insight-cb:checked').forEach(cb => {
         params.append('insight', cb.value);
-        insights.push(cb.value);
     });
 
     // Popularity min
@@ -1130,32 +1009,17 @@ function applyServerFilters() {
     const qVal = qInput ? qInput.value.trim() : '';
     if (qVal) params.set('q', qVal);
 
-    // Persist filter state so it survives tab switches
-    const filterState = {};
-    if (insights.length) filterState.insight = insights;
-    if (popVal && popVal.value) filterState.pop_min = popVal.value;
-    if (diffVal && diffVal.value) filterState.diff_max = diffVal.value;
-    if (qVal) filterState.q = qVal;
-    if (Object.keys(filterState).length) {
-        sessionStorage.setItem('dash_filters', JSON.stringify(filterState));
-    } else {
-        sessionStorage.removeItem('dash_filters');
-    }
-
-    const qs = params.toString();
-    window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+    loadHistory(params);
 }
 
 function clearAllFilters() {
-    sessionStorage.removeItem('dash_filters');
     const params = new URLSearchParams(window.location.search);
     params.delete('insight');
     params.delete('pop_min');
     params.delete('diff_max');
     params.delete('q');
     params.delete('page');
-    const qs = params.toString();
-    window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+    loadHistory(params);
 }
 
 // Render all pending download charts in the history table
@@ -1175,6 +1039,8 @@ function renderHistoryDownloadCharts() {
         }
     });
 }
+
+let historySearchTimer = null;
 
 // Reusable filter initialization — called on page load and after history refresh
 function initHistoryFilters() {
@@ -1199,11 +1065,21 @@ function initHistoryFilters() {
     if (popInput) popInput.addEventListener('change', applyServerFilters);
     if (diffInput) diffInput.addEventListener('change', applyServerFilters);
 
-    // Keyword text search — apply on Enter key
+    // Keyword text search: applies as you type (after a short pause), or at
+    // once on Enter. The box keeps its focus and caret while the table under
+    // it changes.
     const qInput = document.getElementById('keyword-search');
     if (qInput) {
+        qInput.addEventListener('input', () => {
+            clearTimeout(historySearchTimer);
+            historySearchTimer = setTimeout(applyServerFilters, 300);
+        });
         qInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); applyServerFilters(); }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(historySearchTimer);
+                applyServerFilters();
+            }
         });
     }
 
@@ -1211,23 +1087,10 @@ function initHistoryFilters() {
     const historyCountryFilter = document.getElementById('history-country-filter');
     if (historyCountryFilter) {
         historyCountryFilter.addEventListener('change', function() {
-            const country = this.value;
-            try {
-                if (country) {
-                    localStorage.setItem('aso_history_country', country);
-                } else {
-                    localStorage.removeItem('aso_history_country');
-                }
-            } catch(e) {}
             const params = new URLSearchParams(window.location.search);
-            if (country) {
-                params.set('country', country);
-            } else {
-                params.delete('country');
-            }
+            if (this.value) params.set('country', this.value); else params.delete('country');
             params.delete('page');
-            const qs = params.toString();
-            window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+            loadHistory(params);
         });
     }
 
@@ -1235,11 +1098,10 @@ function initHistoryFilters() {
     const perPageSelect = document.getElementById('history-per-page');
     if (perPageSelect) {
         perPageSelect.addEventListener('change', function() {
-            try { localStorage.setItem('aso_history_per_page', this.value); } catch (e) {}
             const params = new URLSearchParams(window.location.search);
             params.set('per_page', this.value);
             params.delete('page');
-            window.location.href = `?${params.toString()}`;
+            loadHistory(params);
         });
     }
 
@@ -1517,59 +1379,16 @@ async function deleteSelectedResults() {
 initHistoryFilters();
 syncHistorySelectionUI();
 
-// Restore saved filters when returning to Dashboard without filter params in URL
-(function restoreFiltersFromSession() {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('insight') || params.has('pop_min') || params.has('diff_max') || params.has('q')) return;
-    const saved = sessionStorage.getItem('dash_filters');
-    if (!saved) return;
-    try {
-        const state = JSON.parse(saved);
-        if (!state || !Object.keys(state).length) return;
-        // Preserve existing non-filter params (app, country, sort, dir)
-        if (state.insight) state.insight.forEach(v => params.append('insight', v));
-        if (state.pop_min) params.set('pop_min', state.pop_min);
-        if (state.diff_max) params.set('diff_max', state.diff_max);
-        if (state.q) params.set('q', state.q);
-        params.delete('page');
-        window.location.replace(`?${params.toString()}`);
-    } catch (_) { sessionStorage.removeItem('dash_filters'); }
-})();
-
-// --- Auto-refresh history section after search ---
-async function refreshHistorySection() {
-    try {
-        // Build the same URL the page was loaded with (preserves ?app= filter)
-        const currentUrl = window.location.href.split('#')[0];
-        const resp = await fetch(currentUrl, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        });
-        if (!resp.ok) return;
-
-        const html = await resp.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        // Swap the App Summary panel first (sits above the History table).
-        // After a new search or refresh, KPIs, per-country rows, and callouts all
-        // need to reflect the latest results — not just the History table below.
-        swapAppSummaryFromResponse(doc);
-
-        const newHistory = doc.getElementById('history-section');
-        if (newHistory) {
-            const oldHistory = document.getElementById('history-section');
-            oldHistory.replaceWith(newHistory);
-            // Re-run date conversion on the new content
-            convertDatesToLocal();
-            // Re-attach filter event listeners and render download charts
-            initHistoryFilters();
-            // Re-apply the persisted multi-select state to the fresh DOM
-            syncHistorySelectionUI();
-        }
-    } catch (e) {
-        // Silently fail — user can still manually reload
-        console.warn('History auto-refresh failed:', e);
-    }
+// --- Refresh the history in place (after a search, a delete, a refresh) ---
+// A background refresh steps aside when the reader has just asked for
+// another view, which brings fresh data anyway (static/js/in-place.js).
+function refreshHistorySection() {
+    return InPlace.load(window.location.href.split('#')[0], {
+        swap: swapDashboardSections,
+        anchor: document.getElementById('history-section'),
+        history: 'none',
+        background: true,
+    });
 }
 
 // Swap the App Summary panel from a parsed response document, preserving the
@@ -1659,7 +1478,7 @@ async function deleteResult(resultId, keyword, country, btn) {
     // so the user doesn't expect previous snapshots to resurrect.
     const cc = (country || '').toLowerCase();
     const flag = (typeof countryFlag === 'function') ? countryFlag(cc) : '';
-    const cname = (typeof COUNTRY_NAMES === 'object' && COUNTRY_NAMES[cc]) ? COUNTRY_NAMES[cc] : cc.toUpperCase();
+    const cname = CountryPicker.name(cc);
     const ok = await showConfirm(
         `Remove "${keyword}" from ${flag} ${cname} tracking? All historical snapshots for this keyword in this country will be deleted. This cannot be undone.`,
         {type: 'danger', title: 'Remove from tracking', confirmLabel: 'Remove', confirmStyle: 'danger'}
@@ -1687,10 +1506,12 @@ async function deleteResult(resultId, keyword, country, btn) {
     }
 }
 
-async function refreshKeyword(keywordId, btn) {
+// Refreshes the row's own keyword in the row's own storefront. It used to
+// take the first country of the search form's picker, so refreshing a
+// France row researched the keyword in the United States.
+async function refreshKeyword(keywordId, country, btn) {
     const row = btn.closest('tr');
     row.classList.add('animate-pulse');
-    const country = getSelectedCountries()[0] || 'us';
     try {
         const resp = await fetch(`/keywords/${keywordId}/refresh/`, {
             method: 'POST',
@@ -1699,7 +1520,7 @@ async function refreshKeyword(keywordId, btn) {
         });
         if (resp.ok) {
             row.classList.remove('animate-pulse');
-            setTimeout(() => location.reload(), 300);
+            await refreshHistorySection();
         }
     } catch (e) {
         row.classList.remove('animate-pulse');
@@ -1721,7 +1542,7 @@ async function bulkRefresh() {
         const resp = await fetch('{% url "aso:keywords_bulk_refresh" %}', {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
-            body: JSON.stringify({app_id: selectedApp, country: countryVal}),
+            body: JSON.stringify({app_id: currentAppId(), country: countryVal}),
         });
         const data = await resp.json();
         if (resp.ok && data.success) {
@@ -1747,7 +1568,7 @@ async function bulkRefresh() {
 }
 
 async function bulkDelete() {
-    const scope = selectedApp ? 'for this app' : '(all)';
+    const scope = currentAppId() ? 'for this app' : '(all)';
     const ok = await showConfirm(`Delete all keywords ${scope} and their search results?`, {type: 'danger', title: 'Bulk Delete', confirmLabel: 'Delete All', confirmStyle: 'danger'});
     if (!ok) return;
 
@@ -1755,13 +1576,13 @@ async function bulkDelete() {
         const resp = await fetch('{% url "aso:keywords_bulk_delete" %}', {
             method: 'POST',
             headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
-            body: JSON.stringify({app_id: selectedApp}),
+            body: JSON.stringify({app_id: currentAppId()}),
         });
         if (resp.ok) {
             // The wiped rows may include remembered selections (possibly from
             // other pages) — clear the store so no phantom selection survives.
             saveHistorySelection([]);
-            location.reload();
+            await refreshHistorySection();
         }
     } catch (e) {
         showAlert('Bulk delete failed.', {type: 'danger', title: 'Error'});
@@ -1769,157 +1590,7 @@ async function bulkDelete() {
 }
 
 // --- Global render functions (must be before DOMContentLoaded so inline scripts can use them) ---
-window.renderDownloadChart = function(estimates, appRank) {
-    if (!estimates || !estimates.positions) return '';
-    const positions = estimates.positions;
-    const maxDl = Math.max(...positions.map(p => p.downloads_high), 1);
-    const dailySearches = estimates.daily_searches || 0;
-
-    const W = 680, H = 220, PAD_L = 55, PAD_R = 15, PAD_T = 25, PAD_B = 35;
-    const chartW = W - PAD_L - PAD_R;
-    const chartH = H - PAD_T - PAD_B;
-    const barW = Math.floor(chartW / 20) - 3;
-    const barGap = Math.floor(chartW / 20);
-
-    function fmt(n) {
-        if (n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'K';
-        if (n < 1) return n.toFixed(1);
-        if (n < 10) return n.toFixed(1).replace(/\.0$/,'');
-        return Math.round(n).toString();
-    }
-
-    let yTicks = [];
-    const yStep = maxDl / 4;
-    for (let i = 0; i <= 4; i++) {
-        const val = Math.round(yStep * i);
-        const y = PAD_T + chartH - (chartH * val / maxDl);
-        yTicks.push(`<text x="${PAD_L - 8}" y="${y + 3}" fill="rgba(148,163,184,0.7)" text-anchor="end" font-size="10">${fmt(val)}</text>`);
-        yTicks.push(`<line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-dasharray="3,3"/>`);
-    }
-
-    const zoneX1 = PAD_L, zoneX2 = PAD_L + 5 * barGap, zoneX3 = PAD_L + 10 * barGap, zoneX4 = PAD_L + 20 * barGap;
-    const zones = `
-        <rect x="${zoneX1}" y="${PAD_T}" width="${zoneX2 - zoneX1}" height="${chartH}" fill="rgba(139,92,246,0.06)" rx="4"/>
-        <rect x="${zoneX2}" y="${PAD_T}" width="${zoneX3 - zoneX2}" height="${chartH}" fill="rgba(59,130,246,0.04)" rx="4"/>
-        <rect x="${zoneX3}" y="${PAD_T}" width="${zoneX4 - zoneX3}" height="${chartH}" fill="rgba(100,116,139,0.03)" rx="4"/>`;
-    const zoneLabels = `
-        <text x="${(zoneX1 + zoneX2) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(167,139,250,0.6)" text-anchor="middle" font-weight="600">TOP 5</text>
-        <text x="${(zoneX2 + zoneX3) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(96,165,250,0.5)" text-anchor="middle" font-weight="600">TOP 6\u201310</text>
-        <text x="${(zoneX3 + zoneX4) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(148,163,184,0.4)" text-anchor="middle" font-weight="600">TOP 11\u201320</text>`;
-
-    let bars = '';
-    positions.forEach((p, i) => {
-        const x = PAD_L + i * barGap + (barGap - barW) / 2;
-        const hHigh = (p.downloads_high / maxDl) * chartH;
-        const hLow = (p.downloads_low / maxDl) * chartH;
-        const yHigh = PAD_T + chartH - hHigh;
-        const yLow = PAD_T + chartH - hLow;
-        const hRange = hHigh - hLow;
-        const isAppPos = appRank && appRank === p.pos;
-        let barColor, solidOpacity, rangeOpacity;
-        if (p.pos <= 5) { barColor = 'rgb(139,92,246)'; solidOpacity = isAppPos ? 1 : 0.8; rangeOpacity = isAppPos ? 0.35 : 0.22; }
-        else if (p.pos <= 10) { barColor = 'rgb(59,130,246)'; solidOpacity = isAppPos ? 1 : 0.7; rangeOpacity = isAppPos ? 0.3 : 0.18; }
-        else { barColor = 'rgb(100,116,139)'; solidOpacity = isAppPos ? 0.9 : 0.5; rangeOpacity = isAppPos ? 0.25 : 0.12; }
-
-        // Optimistic range segment (downloads_low → downloads_high) — lighter top portion
-        if (hRange > 0.5) {
-            bars += `<rect x="${x}" y="${yHigh}" width="${barW}" height="${hRange}" fill="${barColor}" opacity="${rangeOpacity}" rx="2"/>`;
-        }
-        // Conservative base segment (0 → downloads_low) — solid bottom portion
-        if (hLow > 0.5) {
-            bars += `<rect x="${x}" y="${yLow}" width="${barW}" height="${hLow}" fill="${barColor}" opacity="${solidOpacity}" rx="2"/>`;
-        }
-
-        // Download value label above bar for key positions
-        if (p.downloads_high > 0 && (p.pos <= 5 || p.pos === 10 || p.pos === 15 || p.pos === 20 || isAppPos)) {
-            const labelY = yHigh - (isAppPos ? 16 : 5);
-            bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}\u2013${fmt(p.downloads_high)}</text>`;
-        }
-
-        // "YOU" marker for your app position
-        if (isAppPos) {
-            bars += `<rect x="${x - 2}" y="${yHigh - 2}" width="${barW + 4}" height="${hHigh + 4}" rx="3" fill="none" stroke="rgb(250,204,21)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
-            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="700" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
-        }
-
-        // Position number on x-axis
-        bars += `<text x="${x + barW/2}" y="${PAD_T + chartH + 14}" font-size="9" fill="${isAppPos ? 'rgb(250,204,21)' : 'rgba(148,163,184,0.7)'}" ${isAppPos ? 'font-weight="bold"' : ''} text-anchor="middle">${p.pos}</text>`;
-    });
-
-    const axisLabels = `
-        <text x="${PAD_L + chartW/2}" y="${H - 2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle">Ranking Position</text>
-        <text x="12" y="${PAD_T + chartH/2}" font-size="10" fill="rgba(148,163,184,0.7)" text-anchor="middle" transform="rotate(-90, 12, ${PAD_T + chartH/2})">Downloads / day</text>`;
-
-    // Per-position tier cards (not averages — show what each position actually gets)
-    function posRow(pos, p, isBold) {
-        const cls = isBold ? 'font-semibold' : 'opacity-80';
-        return '<div style="display:flex;justify-content:space-between;font-size:0.75rem;"><span style="color:#94a3b8;">#' + pos + '</span><span class="' + cls + '">' + fmt(p.downloads_low) + '\u2013' + fmt(p.downloads_high) + '/day</span></div>';
-    }
-    const p1 = positions[0], p3 = positions[2], p5 = positions[4];
-    const p6 = positions[5], p8 = positions[7], p10 = positions[9];
-    const p11 = positions[10], p15 = positions[14], p20 = positions[19];
-
-    const tierCards = `
-        <div class="grid grid-cols-3 gap-3 mt-3">
-            <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5 — per position</p>
-                <div class="space-y-1 text-purple-300">
-                    ${posRow(1, p1, true)}
-                    ${posRow(3, p3, false)}
-                    ${posRow(5, p5, false)}
-                </div>
-            </div>
-            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310 — per position</p>
-                <div class="space-y-1 text-blue-300">
-                    ${posRow(6, p6, true)}
-                    ${posRow(8, p8, false)}
-                    ${posRow(10, p10, false)}
-                </div>
-            </div>
-            <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320 — per position</p>
-                <div class="space-y-1 text-slate-300">
-                    ${posRow(11, p11, true)}
-                    ${posRow(15, p15, false)}
-                    ${posRow(20, p20, false)}
-                </div>
-            </div>
-        </div>`;
-
-    return `
-        <div class="mb-4">
-            <div class="flex items-center gap-2 mb-2">
-                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Estimated Downloads by Position</h4>
-                <span class="relative group/dlinfo">
-                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on \u2248${fmt(dailySearches)} estimated daily searches for this keyword. Solid bars show the low end (5% CVR — unknown indie app), lighter extensions show the high end (20% CVR — established category leader). Where your app falls in this range depends on your ratings, screenshots, icon, and brand recognition.</span>
-                </span>
-            </div>
-            <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3 overflow-x-auto">
-                <div class="mb-2 text-[10px] text-slate-500">
-                    <span>Estimated daily searches: <span class="text-slate-300 font-medium">\u2248${fmt(dailySearches)}</span></span>
-                </div>
-                <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:500px;max-width:700px">
-                    ${zones}
-                    ${zoneLabels}
-                    ${yTicks.join('')}
-                    ${bars}
-                    <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${PAD_T + chartH}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.1)"/>
-                    ${axisLabels}
-                </svg>
-                <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
-                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> Conservative</span>
-                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Optimistic</span>
-                    <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-2 rounded-sm" style="border:1px dashed rgb(250,204,21);"></span> Your Position</span>
-                </div>
-                <p class="mt-2 text-[10px] text-slate-500">
-                    These are directional ranges for keyword contribution, not precise planning numbers.
-                </p>
-                ${tierCards}
-            </div>
-        </div>`;
-};
+// renderDownloadChart lives in static/js/download-chart.js
 
 window.renderRankingTiers = function(tiers) {
     if (!tiers) return '';
@@ -1993,83 +1664,59 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchBtn = document.getElementById('search-btn');
     const globalApp = document.getElementById('global-app');
 
-    // App filter: reload page with ?app= param to filter history
-    // Restore app selection from localStorage if no ?app= param
-    const urlParams = new URLSearchParams(window.location.search);
-    if (!urlParams.has('app')) {
-        const savedApp = localStorage.getItem('aso_app');
-        if (savedApp && globalApp.querySelector(`option[value="${savedApp}"]`)) {
-            globalApp.value = savedApp;
-            const params = new URLSearchParams(window.location.search);
-            params.set('app', savedApp);
-            window.location.href = `?${params.toString()}`;
-            return;
-        }
-    }
+    // The app picked here also filters Search History. Switching apps starts
+    // from an unfiltered view: only the app survives, so a country filter
+    // from the previous app cannot leave the new app's table mysteriously
+    // empty. It updates in place, like every other History control.
     globalApp.addEventListener('change', function() {
-        const appId = this.value;
-        try {
-            if (appId) {
-                localStorage.setItem('aso_app', appId);
-            } else {
-                localStorage.removeItem('aso_app');
-            }
-            // Reset the persisted History country filter when switching apps.
-            // Otherwise a country filter from the previous app (e.g. "Canada")
-            // would carry over and hide a new app's keywords that live in other
-            // storefronts — leaving the History table mysteriously empty.
-            localStorage.removeItem('aso_history_country');
-        } catch(e) {}
-        // Build a CLEAN URL — only the app param survives. Every History view
-        // filter (country, insight, pop_min, diff_max, q, page, sort, dir) is
-        // dropped so switching apps always starts from an unfiltered view.
         const params = new URLSearchParams();
-        if (appId) {
-            params.set('app', appId);
-        }
-        const qs = params.toString();
-        window.location.href = qs ? `?${qs}` : '{% url "aso:dashboard" %}';
+        if (this.value) params.set('app', this.value);
+        loadHistory(params, {anchor: globalApp});
     });
 
     // Render download charts now that renderDownloadChart is defined
     renderHistoryDownloadCharts();
 
-    // Saved per-page size worth restoring (default {{ per_page_choices.0 }} needs no redirect)
-    function savedPerPage() {
-        try {
-            const choices = [{% for n in per_page_choices %}'{{ n }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
-            const v = localStorage.getItem('aso_history_per_page');
-            return (v && v !== choices[0] && choices.includes(v)) ? v : null;
-        } catch (e) { return null; }
-    }
-
-    // Restore country filter from localStorage if no ?country= param
-    const historyCountryFilter = document.getElementById('history-country-filter');
-    if (historyCountryFilter) {
-        if (!urlParams.has('country')) {
-            const savedCountry = localStorage.getItem('aso_history_country');
-            if (savedCountry && historyCountryFilter.querySelector(`option[value="${savedCountry}"]`)) {
-                historyCountryFilter.value = savedCountry;
-                const params = new URLSearchParams(window.location.search);
-                params.set('country', savedCountry);
-                // Carry the saved page size along so this redirect and the
-                // per-page restore below don't chain two reloads.
-                if (!params.has('per_page') && savedPerPage()) {
-                    params.set('per_page', savedPerPage());
-                }
-                window.location.href = `?${params.toString()}`;
-                return;
-            }
-        }
-    }
-
-    // Restore per-page size from localStorage if no ?per_page= param
-    if (document.getElementById('history-per-page') && !urlParams.has('per_page') && savedPerPage()) {
+    // Coming back to the Dashboard (the address carries no view) opens the
+    // view last used: the app, the country, the page size and the filters,
+    // in one in-place update. It used to be up to three page reloads.
+    (function restoreSavedView() {
         const params = new URLSearchParams(window.location.search);
-        params.set('per_page', savedPerPage());
-        window.location.href = `?${params.toString()}`;
-        return;
-    }
+        const before = params.toString();
+        try {
+            const savedApp = localStorage.getItem('aso_app');
+            const appChanges = !params.has('app') && savedApp
+                && globalApp.querySelector(`option[value="${savedApp}"]`);
+            if (appChanges) {
+                params.set('app', savedApp);
+                globalApp.value = savedApp;
+            }
+            const savedCountry = localStorage.getItem('aso_history_country');
+            const countrySelect = document.getElementById('history-country-filter');
+            // A country the table offers, or any saved one when the app
+            // changes too (the options on screen belong to the other app).
+            if (!params.has('country') && savedCountry && (appChanges
+                || (countrySelect && countrySelect.querySelector(`option[value="${savedCountry}"]`)))) {
+                params.set('country', savedCountry);
+            }
+            const choices = [{% for n in per_page_choices %}'{{ n }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+            const savedPerPage = localStorage.getItem('aso_history_per_page');
+            if (!params.has('per_page') && savedPerPage && savedPerPage !== choices[0]
+                && choices.includes(savedPerPage)) {
+                params.set('per_page', savedPerPage);
+            }
+            const hasFilter = ['insight', 'pop_min', 'diff_max', 'q'].some(k => params.has(k));
+            const saved = JSON.parse(sessionStorage.getItem('dash_filters') || 'null');
+            if (!hasFilter && saved) {
+                (saved.insight || []).forEach(v => params.append('insight', v));
+                ['pop_min', 'diff_max', 'q'].forEach(k => { if (saved[k]) params.set(k, saved[k]); });
+            }
+        } catch (e) { /* storage unavailable: show the view as rendered */ }
+        if (params.toString() !== before) {
+            params.delete('page');
+            loadHistory(params);
+        }
+    })();
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -2080,7 +1727,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Append shared filter values
         formData.set('app_id', globalApp.value);
-        formData.set('countries', getSelectedCountries().join(','));
 
         SearchJob.hideError();
         searchBtn.disabled = true;
@@ -2119,10 +1765,10 @@ document.addEventListener('DOMContentLoaded', function() {
         header.className = 'bg-[#1e293b] border border-white/10 rounded-xl px-4 py-3 flex items-start sm:items-center justify-between gap-3';
         const title = job.status === 'cancelled'
             ? `Stopped at ${fmt(job.keywords_done)} of ${fmt(job.total_keywords)} keywords`
-            : `Done - ${plural(job.total_keywords, 'keyword')} researched in ${esc(job.countries_text)}`;
+            : `${plural(job.total_keywords, 'keyword')} researched in ${esc(job.countries_text)}`;
         const subtitle = job.status === 'cancelled'
             ? `The remaining ${plural(job.remaining_count, 'keyword')} were discarded. Everything researched so far is in your Search History.`
-            : `${plural(job.results_total, 'result')} · Saved to your Search History below`;
+            : `${plural(job.results_total, 'result')} · Saved to your Search History below. Close this to see only the history.`;
         header.innerHTML = `
             <div class="flex items-start gap-3 min-w-0">
                 <span class="text-lg">${job.status === 'cancelled' ? '⏹' : '🔎'}</span>
@@ -2133,11 +1779,11 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <button type="button" data-action="dismiss"
                     class="text-xs text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
-                    title="Dismiss results (Esc)">
+                    title="Close these results (Esc). They stay in your Search History.">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
-                Done
+                Close
             </button>`;
         container.appendChild(header);
 
@@ -2162,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (job.results_total > results.length) {
             const note = document.createElement('p');
             note.className = 'text-xs text-slate-500 px-1';
-            note.textContent = `Showing the first ${fmt(results.length)} of ${fmt(job.results_total)} results - all of them are in your Search History below.`;
+            note.textContent = `Showing the first ${fmt(results.length)} of ${fmt(job.results_total)} results. All of them are in your Search History below.`;
             container.appendChild(note);
         }
 
@@ -2267,27 +1913,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function classificationBadge(label) {
-        // Render a classification badge from a server-provided label.
-        // classify_keyword() in aso/scoring.py is the single source of truth.
-        const map = {
-            'Sweet Spot':       {icon: '🎯', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'High search volume + low competition — the ideal ASO target.'},
-            'Good Target':      {icon: '✅', css: 'bg-green-900/20 border-green-500/20 text-green-300',  advice: 'Solid search volume with manageable competition.'},
-            'Hidden Gem':       {icon: '💎', css: 'bg-blue-900/20 border-blue-500/20 text-blue-300',     advice: 'Moderate search volume with minimal competition — a genuine opportunity others have overlooked.'},
-            'High Competition': {icon: '⚔️', css: 'bg-yellow-900/20 border-yellow-500/20 text-yellow-300', advice: 'Dominated by established apps with thousands of ratings. Focus on long-tail variants instead.'},
-            'Moderate':         {icon: '👍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Reasonable opportunity. Can work as a supporting keyword.'},
-            'Low Volume':       {icon: '🔍', css: 'bg-slate-800 border-white/10 text-slate-300',          advice: 'Very few searches. Only worth targeting if highly relevant to your app.'},
-            'Avoid':            {icon: '🚫', css: 'bg-red-900/20 border-red-500/20 text-red-300',        advice: 'Low opportunity. Effort better spent elsewhere.'},
-        };
-        const info = map[label] || map['Moderate'];
-        return `
-            <div class="${info.css} border rounded-lg p-2.5">
-                <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
-                <p class="text-xs font-medium">${info.icon} ${label}</p>
-                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${info.advice}</p>
-            </div>`;
-    }
-
     // renderDownloadChart and renderRankingTiers are now defined before DOMContentLoaded (above)
 
     function renderOpportunityRanking(ranking) {
@@ -2302,7 +1927,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cls = isBest ? 'text-green-400 font-bold' : 'text-slate-400';
                 return `<td class="px-3 py-1.5 text-center text-xs ${cls}">${countryFlag(c)} ${d.opportunity}</td>`;
             }).join('');
-            rows += `<tr class="border-b border-white/5 hover:bg-white/5"><td class="px-3 py-1.5 text-white text-sm font-medium">${item.keyword}</td><td class="px-3 py-1.5 text-center"><span class="text-green-400 font-bold text-sm">${countryFlag(best)} ${COUNTRY_NAMES[best] || best.toUpperCase()}</span><span class="text-slate-500 text-xs ml-1">(${item.best_score})</span></td>${cells}</tr>`;
+            rows += `<tr class="border-b border-white/5 hover:bg-white/5"><td class="px-3 py-1.5 text-white text-sm font-medium">${item.keyword}</td><td class="px-3 py-1.5 text-center"><span class="text-green-400 font-bold text-sm">${countryFlag(best)} ${CountryPicker.name(best)}</span><span class="text-slate-500 text-xs ml-1">(${item.best_score})</span></td>${cells}</tr>`;
         });
         const countryHeaders = Object.keys(ranking[0].countries).map(c =>
             `<th class="px-3 py-2 text-center text-xs font-medium text-slate-400">${countryFlag(c)} ${c.toUpperCase()}</th>`
@@ -2312,7 +1937,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-lg">🏆</span>
                 <div>
                     <h3 class="text-sm font-semibold text-white">Country Opportunity Comparison</h3>
-                    <p class="text-xs text-slate-500">Opportunity combines search volume and competition — higher means more realistic ranking potential.</p>
+                    <p class="text-xs text-slate-500">Opportunity in each storefront, for the same app. The best storefront is the one where the keyword is worth most; when several tie, the one whose #1 pays most.</p>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -2338,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', function() {
         countries.forEach((code, i) => {
             const btn = document.createElement('button');
             btn.className = `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${i === 0 ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`;
-            btn.textContent = `${countryFlag(code)} ${COUNTRY_NAMES[code] || code.toUpperCase()} (${(resultsByCountry[code] || []).length})`;
+            btn.textContent = `${countryFlag(code)} ${CountryPicker.name(code)} (${(resultsByCountry[code] || []).length})`;
             btn.addEventListener('click', () => {
                 tabBar.querySelectorAll('button').forEach(b => {
                     b.className = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap text-slate-400 hover:text-white hover:bg-white/5';
@@ -2468,7 +2093,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="flex gap-4 lg:w-1/3">
                     <div class="flex-1">
                         <h3 class="text-base font-bold text-white mb-1">${result.keyword}</h3>
-                        ${result.country ? `<p class="text-xs text-slate-500 mb-2">${countryFlag(result.country)} ${COUNTRY_NAMES[result.country] || result.country.toUpperCase()}</p>` : ''}
+                        ${result.country ? `<p class="text-xs text-slate-500 mb-2">${countryFlag(result.country)} ${CountryPicker.name(result.country)}</p>` : ''}
                         <div class="space-y-2">
                             <div class="bg-slate-800 rounded-lg p-2.5">
                                 <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide inline-flex items-center gap-1">Popularity
@@ -2495,14 +2120,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide inline-flex items-center gap-1">Opportunity
                                     <span class="relative group/otip">
                                         <svg class="w-3 h-3 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/otip:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal">Combined score reflecting how likely you are to rank AND get downloads. High popularity + low difficulty = high opportunity.</span>
+                                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-60 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/otip:opacity-100 transition-opacity z-50 shadow-lg normal-case tracking-normal">What this keyword is worth in this storefront to the app it is tracked for, at the rank that app can realistically reach, judged by its own ratings there, or to a brand new app when it is not tied to one; the sentence below says which rank and why. 50 is about one download a day, and every tenfold change moves it 20 points. What #1 pays is the Downloads at #1 figure.</span>
                                     </span>
                                 </p>
                                 <span class="text-2xl font-bold text-cyan-400">${result.opportunity_score}</span>
                                 <span class="text-slate-500 text-xs ml-1">/ 100</span>
+                                ${result.targeting && result.targeting.basis ? `<p class="text-[10px] text-slate-500 mt-1 leading-snug">${result.targeting.basis}</p>` : ''}
                             </div>
                             ${getAppRankDisplay(result)}
-                            ${classificationBadge(result.classification)}
+                            ${window.ClassificationBadge.render(result.targeting, { withBasis: false })}
                         </div>
                     </div>
                 </div>
@@ -2557,30 +2183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             `).join('')}
                         </div>
                     </div>` : ''}
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
-                        ${[{k:'rating_volume',    label:'Rating count',        w:30, tip:'Measures total rating count of top competitors. More ratings = harder to outrank.'},
-                           {k:'review_velocity',   label:'Rating growth speed', w:10, tip:'How fast competitors gain new ratings. Fast growth means they are actively maintained and harder to compete with.'},
-                           {k:'dominant_players',   label:'Big-brand presence',  w:20, tip:'Whether big-name apps dominate the results. Big brands are harder to displace.'},
-                           {k:'title_relevance',    label:'Keyword in titles',   w:10, tip:'How many competitor apps use this exact keyword in their title. More usage = more competitive.'},
-                           {k:'rating_quality',     label:'Competitor ratings',  w:10, tip:'Average star ratings of competitors. Highly-rated apps are harder to displace.'},
-                           {k:'market_age',         label:'Market maturity',     w:10, tip:'How long competitors have been on the App Store. Older apps are more entrenched.'},
-                           {k:'publisher_diversity', label:'Publisher variety',   w:10, tip:'Whether many different publishers compete, or a few dominate. More variety = healthier market.'}]
-                          .map(({k,label,w,tip}) => {
-                            const val = result.difficulty_breakdown[k];
-                            const lvl = val <= 25 ? 'Low' : val <= 50 ? 'Medium' : val <= 75 ? 'High' : 'Very High';
-                            const barColor = val <= 25 ? 'bg-green-500' : val <= 50 ? 'bg-yellow-500' : val <= 75 ? 'bg-orange-500' : 'bg-red-500';
-                            const textColor = val <= 25 ? 'text-green-400' : val <= 50 ? 'text-yellow-400' : val <= 75 ? 'text-orange-400' : 'text-red-400';
-                            const fullTip = `${tip}<br><br><strong>Score: ${Math.round(val)}/100</strong> — higher means harder competition. This factor contributes <strong>${w}%</strong> to the overall difficulty score.`;
-                            return `<div class="bg-slate-800 rounded p-2 group/tip relative cursor-help">
-                                <p class="text-slate-500">${label}</p>
-                                <p class="${textColor} font-semibold mt-0.5">${lvl}</p>
-                                <div class="w-full bg-slate-700 rounded-full h-1 mt-1">
-                                    <div class="${barColor} h-1 rounded-full" style="width:${Math.min(val,100)}%"></div>
-                                </div>
-                                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-lg">${fullTip}</div>
-                            </div>`;
-                          }).join('')}
-                    </div>
+                    ${DifficultyFactors.gridHtml(result.difficulty_breakdown)}
                 </div>
             </details>`;
 

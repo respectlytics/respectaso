@@ -94,15 +94,126 @@ def ui_state(request):
     return {"respectlytics_banner_dismissed": dismissed}
 
 
-def search_job_strip(request):
-    """The keyword search the global strip shows on every page but the
-    dashboard: the active job, else the newest finished one not yet
-    dismissed (see aso.search_jobs). Never breaks a page render."""
-    from . import search_jobs
+def job_strip(request):
+    """The one line the global strip shows about whatever long job is running,
+    a keyword search or a country scan (see aso.job_strip). Never breaks a
+    page render."""
+    from . import job_strip as strip
 
     try:
-        job = search_jobs.strip_job()
-        payload = search_jobs.job_payload(job) if job else None
+        state = strip.strip_state()
     except Exception:  # e.g. the table does not exist yet on first migrate
-        payload = None
-    return {"search_job_strip": payload}
+        state = None
+    return {"job_strip": state}
+
+
+def country_catalog(request):
+    """Every storefront, once per page, for the shared country picker.
+
+    Emitted by base.html as JSON and read by static/js/country-picker.js. It
+    lives in a context processor rather than in the picker include so that a
+    page with two pickers sends the list once, and so that any script that
+    needs a country name can read it instead of keeping its own map.
+    Never breaks a page render.
+    """
+    from . import country_picker
+    from .apple_ads import storage as apple_storage
+
+    try:
+        apple_source = (
+            apple_storage.load_apple_settings()["popularity_source"]
+            == apple_storage.SOURCE_APPLE
+        )
+        return {
+            "country_catalog": country_picker.catalog(
+                tracked=country_picker.tracked_countries(),
+                apple_source=apple_source,
+            )
+        }
+    except Exception:  # e.g. the table does not exist yet on first migrate
+        return {"country_catalog": country_picker.catalog()}
+
+# Pages that already carry their own Pro call to action, where the button
+# under the navbar would only repeat it.
+PRO_INVITE_HIDDEN_ON = {
+    "pro_promo_researcher", "pro_promo_competitor", "pro_promo_simulator",
+    "pro_promo_top_terms", "top_terms", "ai_researcher", "ai_competitor",
+    "simulator", "settings_license",
+}
+PRO_INVITE_MAC = "Go Pro: let AI find your best keywords"
+PRO_INVITE_DOCKER = "Automate your ASO with Pro for Mac"
+
+
+def _pro_or_expired() -> bool:
+    """Pro works here, or it did: an expired license has its own banner with
+    its own button, so the invite stays out of the way."""
+    from django.apps import apps as django_apps
+
+    from .pro_access import has_pro_license
+
+    if has_pro_license():
+        return True
+    if not django_apps.is_installed("licensing"):
+        return False
+    from licensing.decorators import get_license_info
+
+    info = get_license_info()
+    return info is not None and info.is_expired
+
+
+def pro_invite(request):
+    """The button under the navbar that invites a free user to Pro.
+
+    In the Mac app without a license it points to the pricing page; in
+    Docker, where Pro cannot run, it points to the Pro page with the Mac
+    download. Hidden for Pro users, for an expired license (which has its own
+    banner) and on pages that already make the offer. ``pricing_url`` is the
+    one pricing address every template links to.
+    """
+    from django.conf import settings
+
+    from .links import PRICING_URL, PRO_PAGE_URL
+
+    context = {"pricing_url": PRICING_URL, "pro_invite": None}
+    try:
+        match = getattr(request, "resolver_match", None)
+        if match is not None and match.url_name in PRO_INVITE_HIDDEN_ON:
+            return context
+        if getattr(settings, "IS_NATIVE_APP", False):
+            if not _pro_or_expired():
+                context["pro_invite"] = {"text": PRO_INVITE_MAC, "url": PRICING_URL}
+        else:
+            context["pro_invite"] = {"text": PRO_INVITE_DOCKER, "url": PRO_PAGE_URL}
+    except Exception:
+        # A button must never break a page.
+        context["pro_invite"] = None
+    return context
+
+
+def difficulty_factors(request):
+    """The difficulty factors and their weights, for every breakdown on screen.
+
+    Published once per page, read by static/js/difficulty-factors.js, so the
+    percentages shown are always the ones the score uses.
+    """
+    from .scoring import difficulty_factor_legend
+
+    try:
+        return {"difficulty_factors": difficulty_factor_legend()}
+    except Exception:
+        return {"difficulty_factors": []}
+
+
+def classification_legend(request):
+    """The seven keyword classifications, for any screen that shows one.
+
+    Published once per page like the country catalog, because the icons, the
+    colours and the wording used to be copied into every renderer that drew a
+    badge and each copy drifted from the classifier at its own pace.
+    """
+    from .scoring import classification_legend as legend
+
+    try:
+        return {"classification_legend": legend()}
+    except Exception:
+        return {"classification_legend": []}

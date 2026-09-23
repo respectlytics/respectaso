@@ -445,6 +445,27 @@ class EndpointTest(JobTestBase):
         self.client.post(reverse("aso:search_job_dismiss", args=[finished.pk]))
         self.assertIsNone(self.client.get(url).json()["finished"])
 
+    def test_closing_the_newest_results_never_brings_up_an_older_search(self):
+        """Three searches finished and never closed: one Close clears the
+        results for good. Each older search used to take the place of the
+        one just closed, with the same title, so Close seemed to do nothing."""
+        url = reverse("aso:search_job_current")
+        now = timezone.now()
+        older = [self.job(status="completed", next_index=2,
+                          finished_at=now - timezone.timedelta(minutes=m)) for m in (3, 2)]
+        newest = self.job(status="completed", next_index=2, finished_at=now)
+        self.assertEqual(self.client.get(url).json()["finished"]["id"], newest.pk)
+        self.client.post(reverse("aso:search_job_dismiss", args=[newest.pk]))
+        self.assertIsNone(self.client.get(url).json()["finished"])
+        self.assertIsNone(search_jobs.strip_job())
+        self.assertNotContains(self.client.get(reverse("aso:dashboard")), f'"id": {older[1].pk}')
+
+    def test_a_newer_search_replaces_the_results_on_show(self):
+        now = timezone.now()
+        self.job(status="completed", next_index=2, finished_at=now - timezone.timedelta(minutes=1))
+        newer = self.job(status="cancelled", next_index=1, finished_at=now)
+        self.assertEqual(search_jobs.finished_job(), newer)
+
     def test_the_panel_prefers_running_over_paused_over_queued(self):
         queued = self.job()
         self.assertEqual(search_jobs.panel_job(), queued)
@@ -501,10 +522,15 @@ class EndpointTest(JobTestBase):
         self.assertEqual(set(payload), {
             "keyword", "country", "popularity_score", "popularity_internal", "popularity_apple",
             "popularity_source", "popularity_fallback", "popularity_cap", "popularity_genre",
-            "difficulty_score", "opportunity_score", "difficulty_label", "difficulty_color",
+            "difficulty_score", "opportunity_score",
+            "difficulty_label", "difficulty_color",
             "difficulty_breakdown", "competitors", "result_id", "app_rank", "app_name",
-            "app_icon", "classification",
+            "app_icon", "classification", "targeting",
         })
+        # The badge is composed on the server so no renderer carries a copy of
+        # the labels. It travels with the row it describes.
+        self.assertEqual(payload["targeting"]["label"], payload["classification"])
+        self.assertTrue(payload["targeting"]["basis"])
         self.assertEqual(payload["keyword"], "alpha")
         self.assertEqual(payload["popularity_score"], 55)
         self.assertEqual(payload["popularity_internal"], 55)
@@ -527,6 +553,23 @@ class EndpointTest(JobTestBase):
 
 
 class DashboardTest(JobTestBase):
+    def test_the_history_table_says_whose_score_each_row_is(self):
+        """KEYWORD_DECISIONS_PLAN.md round 4: one number, for the app named
+        under the keyword, or a new app, which the row says. A keyword worth
+        little today but more at #1 is not hidden: its tag says Worth
+        Climbing and Downloads at #1 shows the prize."""
+        keyword = Keyword.objects.create(keyword="betting tips")
+        row = SearchResult.objects.create(
+            keyword=keyword, country="us", difficulty_score=40, popularity_score=52,
+            difficulty_breakdown={}, competitors_data=fake_competitors(3),
+        )
+        self.assertEqual(row.classification, "Worth Climbing")
+        resp = self.client.get(reverse("aso:dashboard"))
+        self.assertContains(resp, "for the app under each keyword")
+        self.assertContains(resp, "No app: scored for a new app")
+        self.assertNotContains(resp, "\u2192 at #1")
+        self.assertContains(resp, "but a new app can expect only")
+
     def test_context_carries_the_job_the_limit_and_the_cleanup(self):
         job = self.job(status="running")
         resp = self.client.get(reverse("aso:dashboard"))
@@ -566,6 +609,28 @@ class DashboardTest(JobTestBase):
         self.job(status="running", keywords=["a"] * 4)
         resp = self.client.get(reverse("aso:methodology"))
         self.assertContains(resp, 'id="search-job-strip"')
-        self.assertContains(resp, "search-job-strip-data")
+        self.assertContains(resp, "job-strip-data")
+        # The sentence is composed on the server now, for either job type.
+        self.assertContains(resp, "Keyword research running")
         resp = self.client.get(reverse("aso:dashboard"))
+        self.assertNotContains(resp, 'id="search-job-strip"')
+
+    def test_the_strip_shows_a_country_scan_too(self):
+        """The strip belongs to whichever long job is running."""
+        from aso.models import OpportunityScan
+
+        OpportunityScan.objects.create(
+            keyword="fitness tracker", countries=["us", "de", "bg"],
+            status="running", done_count=1,
+        )
+        resp = self.client.get(reverse("aso:methodology"))
+        self.assertContains(resp, "Country scan running: 1 of 3 countries")
+
+    def test_the_strip_is_hidden_on_the_page_that_owns_the_job(self):
+        from aso.models import OpportunityScan
+
+        OpportunityScan.objects.create(
+            keyword="fitness tracker", countries=["us"], status="running",
+        )
+        resp = self.client.get(reverse("aso:opportunity"))
         self.assertNotContains(resp, 'id="search-job-strip"')

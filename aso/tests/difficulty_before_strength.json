@@ -1,0 +1,206 @@
+{
+ "budget planner couples": {
+  "score": 18,
+  "subs": {
+   "dominant_players": 10.2,
+   "market_age": 21.7,
+   "publisher_diversity": 30.0,
+   "rating_quality": 21.5,
+   "rating_volume": 12.9,
+   "review_velocity": 29.0,
+   "title_relevance": 20.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "fasting": {
+  "score": 50,
+  "subs": {
+   "dominant_players": 32.4,
+   "market_age": 55.6,
+   "publisher_diversity": 50.0,
+   "rating_quality": 43.8,
+   "rating_volume": 82.4,
+   "review_velocity": 71.0,
+   "title_relevance": 50.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "focus timer": {
+  "score": 52,
+  "subs": {
+   "dominant_players": 33.5,
+   "market_age": 49.9,
+   "publisher_diversity": 60.0,
+   "rating_quality": 50.3,
+   "rating_volume": 65.4,
+   "review_velocity": 60.7,
+   "title_relevance": 40.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "habit tracker": {
+  "score": 50,
+  "subs": {
+   "dominant_players": 30.3,
+   "market_age": 46.5,
+   "publisher_diversity": 40.0,
+   "rating_quality": 42.7,
+   "rating_volume": 80.0,
+   "review_velocity": 69.7,
+   "title_relevance": 50.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "lan invoice": {
+  "score": 37,
+  "subs": {
+   "dominant_players": 30.4,
+   "market_age": 38.5,
+   "publisher_diversity": 26.0,
+   "rating_quality": 23.0,
+   "rating_volume": 94.5,
+   "review_velocity": 80.5,
+   "title_relevance": 10.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "meditation": {
+  "score": 67,
+  "subs": {
+   "dominant_players": 50.7,
+   "market_age": 54.3,
+   "publisher_diversity": 80.0,
+   "rating_quality": 71.4,
+   "rating_volume": 82.1,
+   "review_velocity": 69.6,
+   "title_relevance": 50.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "nasdaq": {
+  "score": 30,
+  "subs": {
+   "dominant_players": 22.4,
+   "market_age": 78.0,
+   "publisher_diversity": 26.0,
+   "rating_quality": 22.7,
+   "rating_volume": 96.5,
+   "review_velocity": 89.1,
+   "title_relevance": 10.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "one app keyword": {
+  "score": 10,
+  "subs": {
+   "dominant_players": 5.3,
+   "market_age": 46.1,
+   "publisher_diversity": 10.0,
+   "rating_quality": 8.5,
+   "rating_volume": 65.0,
+   "review_velocity": 57.5,
+   "title_relevance": 10.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "pdf scanner": {
+  "score": 80,
+  "subs": {
+   "dominant_players": 66.0,
+   "market_age": 65.0,
+   "publisher_diversity": 100.0,
+   "rating_quality": 79.8,
+   "rating_volume": 92.8,
+   "review_velocity": 78.8,
+   "title_relevance": 70.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "period tracker": {
+  "score": 60,
+  "subs": {
+   "dominant_players": 46.1,
+   "market_age": 74.0,
+   "publisher_diversity": 60.0,
+   "rating_quality": 52.4,
+   "rating_volume": 96.0,
+   "review_velocity": 87.5,
+   "title_relevance": 60.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "sleep sounds": {
+  "score": 66,
+  "subs": {
+   "dominant_players": 45.1,
+   "market_age": 63.2,
+   "publisher_diversity": 70.0,
+   "rating_quality": 61.8,
+   "rating_volume": 85.6,
+   "review_velocity": 69.7,
+   "title_relevance": 50.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ },
+ "two apps keyword": {
+  "score": 18,
+  "subs": {
+   "dominant_players": 7.1,
+   "market_age": 16.2,
+   "publisher_diversity": 20.0,
+   "rating_quality": 11.6,
+   "rating_volume": 25.5,
+   "review_velocity": 35.7,
+   "title_relevance": 10.0
+  },
+  "tiers": {
+   "top_10": null,
+   "top_20": null,
+   "top_5": null
+  }
+ }
+}
