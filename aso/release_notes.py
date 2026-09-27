@@ -38,7 +38,42 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.28.0',
+RELEASES = [{'version': '2.28.1',
+  'date': '2026-09-27',
+  'title': 'The AI Competitor runs again, and the AI tabs say whose chances they score',
+  'kind': 'patch',
+  'sections': [
+      {'heading': 'Fixed',
+       'items': [
+           '<strong>Every AI Competitor analysis stopped at its second keyword</strong> with '
+           '"RespectASO ran into a problem of its own". It runs to the end again, for a new '
+           'app and for your own app.',
+       ]},
+      {'heading': 'A clearer choice of whose chances to score',
+       'items': [
+           'The AI Researcher and AI Competitor forms offer two choices: <strong>A new '
+           'app</strong> shows what any app starting from zero can win, and <strong>My '
+           'app</strong> uses your app\'s ratings and the ranks your Dashboard measured. The '
+           'choice does not change how keywords are found, only their scores and the '
+           'keywords the AI recommends.',
+           'Every run\'s header and its Overview say whose chances its scores show, with '
+           'the app\'s ratings in that country.',
+           'When your app is in another App Store category than the niche, the results say '
+           'so, and the AI Competitor form warns before the run: the App Store ranks apps for '
+           'keywords that match what they do, so the scores read too high there.',
+           'Every dropdown shows an arrow, so it looks like one.',
+       ]},
+      {'heading': 'The ASO Score Simulator says what to do next',
+       'items': [
+           'The card under the score now ends on the next step. A first run points to both '
+           'ways up: collecting ratings, and trying the versions in the Suggested Metadata '
+           'tab. A refined version names the step it refines, as the Iteration Trail does, '
+           'and reads its comparison with it: keep refining while versions gain; once one '
+           'brings about the same, it says so, repeats what the version still brings over '
+           'your current metadata, and names ratings as what moves the score from there.',
+       ]},
+  ]},
+ {'version': '2.28.0',
   'date': '2026-09-27',
   'title': 'A Simulator score that explains itself, AI tabs that score for your app, and honest download ranges',
   'kind': 'feature',

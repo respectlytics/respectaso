@@ -26,9 +26,9 @@
                 </div>
                 <div class="w-full lg:w-48">
                     <label class="block text-xs font-medium text-slate-300 mb-1.5" for="opp-app">App (optional)</label>
-                    {% comment %}appearance-none + custom chevron, the same reason as on the
-                    dashboard: a native select ignores the vertical padding and renders
-                    shorter than the fields beside it.{% endcomment %}
+                    {% comment %}appearance-none (its chevron comes from static/css/tailwind.source.css),
+                    the same reason as on the dashboard: a native select ignores the vertical
+                    padding and renders shorter than the fields beside it.{% endcomment %}
                     <div class="relative">
                         <select id="opp-app"
                                 class="w-full appearance-none bg-slate-700 border border-white/10 rounded-lg pl-3 pr-9 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -37,9 +37,6 @@
                             <option value="{{ app.id }}">{{ app.name }}</option>
                             {% endfor %}
                         </select>
-                        <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
                     </div>
                 </div>
                 <div>

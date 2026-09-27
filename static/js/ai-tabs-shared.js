@@ -361,6 +361,39 @@
     // heading's hover text. One copy for the three AI tabs
     // (READINESS_CLARITY_PLAN.md, D7).
     function applyWhoseScore(data) {
+        // The run header's "Scored for Pausely" / "Scored for a new app", and
+        // the amber card when that app sits in another category than the
+        // niche. The Simulator sends neither: it always scores the app itself.
+        var badge = document.getElementById('results-scored-for-badge');
+        if (badge) {
+            badge.textContent = data.scored_for_label || '';
+            badge.classList.toggle('hidden', !data.scored_for_label);
+        }
+        // The Overview's "Scored for: OpPreds (173 ratings in ...)" line, styled
+        // like the popularity-source line under it.
+        var line = document.getElementById('scored-for-overview');
+        if (line) {
+            var whose = data.overview_scored_for;
+            line.textContent = '';
+            if (whose) {
+                var label = document.createElement('span');
+                label.className = 'text-slate-500';
+                label.textContent = 'Scored for: ';
+                var who = document.createElement('span');
+                who.className = 'text-slate-300 font-medium';
+                who.textContent = whose.who;
+                var detail = document.createElement('span');
+                detail.className = 'text-slate-500';
+                detail.textContent = whose.detail;
+                line.append(label, who, detail);
+            }
+            line.classList.toggle('hidden', !whose);
+        }
+        var card = document.getElementById('category-note-card');
+        if (card) {
+            document.getElementById('category-note-text').textContent = data.category_note || '';
+            card.classList.toggle('hidden', !data.category_note);
+        }
         if (data.scored_for) {
             document.querySelectorAll('.scored-for-note').forEach(function (el) {
                 el.textContent = data.scored_for;

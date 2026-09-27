@@ -8,7 +8,9 @@ ratings per storefront, so the profile is per storefront too: an app with
 
 This module is the only reader and writer of ``App.store_profiles``, shaped
 ``{code: {"count": int, "average": float | None, "released": iso8601,
-"checked_at": iso8601}}``:
+"genre": str, "checked_at": iso8601}}``. ``genre`` is the app's App Store
+category, which the AI tabs compare with a niche's (``app_category``):
+
 
     cached_profile()        read, no network; every read-time score uses it,
                             so all rows of one app in one storefront agree
@@ -18,6 +20,7 @@ This module is the only reader and writer of ``App.store_profiles``, shaped
     profile_for_track()     the same for a bare track id, for the Simulator,
                             which can run for an app you do not track
     backfill_from_history() once, at upgrade, from stored competitor lists
+    app_category()          the app's App Store category, as last read
 
 Free-tier module: no aso_pro, licensing or llm_providers import.
 """
@@ -76,8 +79,20 @@ def cached_profile(app, country: str) -> AppProfile | None:
 
 
 def _is_fresh(app, country: str) -> bool:
-    checked = _parse(_entry(app, country).get("checked_at"))
-    return checked is not None and _now() - checked < PROFILE_MAX_AGE
+    entry = _entry(app, country)
+    checked = _parse(entry.get("checked_at"))
+    # A profile stored before the category was kept is read again once.
+    return "genre" in entry and checked is not None and _now() - checked < PROFILE_MAX_AGE
+
+
+def app_category(app) -> str:
+    """The app's App Store category ("Productivity"), as last read in any
+    storefront; "" when it has not been read. Apple gives an app one primary
+    category everywhere."""
+    for entry in (getattr(app, "store_profiles", None) or {}).values():
+        if isinstance(entry, dict) and entry.get("genre"):
+            return entry["genre"]
+    return ""
 
 
 def _store(app, country: str, found: dict, checked_at: datetime | None = None) -> bool:
@@ -92,6 +107,7 @@ def _store(app, country: str, found: dict, checked_at: datetime | None = None) -
         "count": int(found["count"]),
         "average": found.get("average"),
         "released": found.get("released"),
+        "genre": found.get("genre") or "",
         "checked_at": (checked_at or _now()).isoformat(),
     }
     app.store_profiles = data
@@ -116,11 +132,13 @@ def _lookup(track_id: int, country: str, itunes_service) -> dict | None:
     average = found.get("averageUserRating")
     released = found.get("releaseDate")
     name = found.get("trackName")
+    genre = found.get("primaryGenreName")
     return {
         "count": int(count),
         "average": float(average) if isinstance(average, (int, float)) else None,
         "released": released if isinstance(released, str) else None,
         "name": name if isinstance(name, str) else None,
+        "genre": genre if isinstance(genre, str) else "",
     }
 
 

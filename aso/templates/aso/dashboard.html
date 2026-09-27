@@ -17,9 +17,10 @@
         <div class="flex flex-col sm:flex-row gap-3">
             <div class="flex-1">
                 <label for="global-app" class="block text-xs font-medium text-slate-300 mb-1.5">App</label>
-                {% comment %}appearance-none + custom chevron: the native select ignores the
-                vertical padding, rendering shorter than the Countries button next to it.
-                This keeps both fields pixel-identical in height and look.{% endcomment %}
+                {% comment %}appearance-none (its chevron comes from static/css/tailwind.source.css):
+                the native select ignores the vertical padding, rendering shorter than the
+                Countries button next to it. This keeps both fields pixel-identical in height
+                and look.{% endcomment %}
                 <div class="relative">
                     <select id="global-app"
                             class="w-full appearance-none bg-slate-700 border border-white/10 rounded-lg pl-3 pr-9 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
@@ -28,9 +29,6 @@
                         <option value="{{ app.id }}" {% if selected_app == app.id %}selected{% endif %}>{{ app.name }}</option>
                         {% endfor %}
                     </select>
-                    <svg class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
                 </div>
             </div>
             <div class="flex-1">

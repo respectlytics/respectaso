@@ -30,6 +30,7 @@ from .scoring import (
     classify_keyword,
     CLASSIFICATION_LABELS,
     scoring_guide,
+    sentence_app_name,
 )
 from .services import (
     DifficultyCalculator,
@@ -906,6 +907,8 @@ def app_lookup_view(request):
                             "artworkUrl100": app_data["artworkUrl100"],
                             "bundleId": app_data["bundleId"],
                             "sellerName": app_data["sellerName"],
+                            "genre": app_data.get("primaryGenreName") or "",
+                            "shortName": sentence_app_name(app_data["trackName"]),
                         }
                     ]
                 }
@@ -928,6 +931,8 @@ def app_lookup_view(request):
                     "artworkUrl100": r["artworkUrl100"],
                     "bundleId": r["bundleId"],
                     "sellerName": r["sellerName"],
+                    "genre": r.get("primaryGenreName") or "",
+                    "shortName": sentence_app_name(r["trackName"]),
                 }
                 for r in results
             ]
