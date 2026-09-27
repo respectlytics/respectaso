@@ -142,6 +142,12 @@ def main():
     call_command("migrate", "--no-input", verbosity=0)
     call_command("collectstatic", "--no-input", verbosity=0)
 
+    # Re-score stored history when a version marker bumped, now that every
+    # column it reads exists (aso/apps.py leaves this to the Mac app).
+    from aso.popularity import start_history_upgrade
+
+    start_history_upgrade()
+
     # Resume the run queue now that the schema is up to date: a keyword search
     # that was executing when the app was last closed continues from the first
     # keyword that was not finished, AI runs that were executing are marked

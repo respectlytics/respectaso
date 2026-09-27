@@ -8,7 +8,7 @@ Build with:
 
 import os
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import copy_metadata
 
 block_cipher = None
 
@@ -38,12 +38,15 @@ shared_datas = [
     (str(BASE_DIR / "licensing" / "public_key.pem"), "licensing"),
 ] + copy_metadata("fastmcp")
 
-# Our own packages go in whole, collected rather than listed by hand.
-# Django reaches some modules only through dotted strings in settings and
-# urls (handler404, CSRF_FAILURE_VIEW, middleware, context processors),
-# which PyInstaller cannot follow, and a hand list misses every new file:
-# the first 2.28.0 build left out aso.error_views, so every 404 crashed.
-# Tests stay out; migrations ship as source files through shared_datas.
+# Our own packages go in whole, found by walking their files rather than
+# listed by hand. Django reaches some modules only through dotted strings in
+# settings and urls (handler404, CSRF_FAILURE_VIEW, middleware, context
+# processors), which PyInstaller cannot follow, and a hand list misses every
+# new file: the first 2.28.0 build left out aso.error_views, so every 404
+# crashed. (PyInstaller's collect_submodules cannot import our packages from
+# here and quietly returns nothing, so the walk is ours.) Tests stay out;
+# migrations ship as source files through shared_datas. After analysis the
+# build stops if any of these modules did not make it into the bundle.
 FIRST_PARTY = ["core", "aso", "aso_pro", "licensing", "llm_providers"]
 
 
@@ -56,9 +59,30 @@ def _is_shipped(name):
 
 def _own_modules(package):
     # The public repo has no aso_pro, licensing or llm_providers.
-    if not (BASE_DIR / package / "__init__.py").exists():
+    root = BASE_DIR / package
+    if not (root / "__init__.py").exists():
         return []
-    return collect_submodules(package, filter=_is_shipped, on_error="raise")
+    modules = []
+    for path in sorted(root.rglob("*.py")):
+        if not (path.parent / "__init__.py").exists():
+            continue
+        parts = path.relative_to(BASE_DIR).with_suffix("").parts
+        if parts[-1] == "__init__":
+            parts = parts[:-1]
+        name = ".".join(parts)
+        if _is_shipped(name):
+            modules.append(name)
+    return modules
+
+
+OWN_MODULES = [module for package in FIRST_PARTY for module in _own_modules(package)]
+
+
+def _require_own_modules(analysis):
+    bundled = {name for name, *_ in analysis.pure}
+    missing = sorted(set(OWN_MODULES) - bundled)
+    if missing:
+        raise SystemExit("Modules of ours missing from the bundle: " + ", ".join(missing))
 
 
 shared_hiddenimports = [
@@ -90,7 +114,7 @@ shared_hiddenimports = [
         # MCP server
         "fastmcp",
         "mcp",
-    ] + [module for package in FIRST_PARTY for module in _own_modules(package)]
+    ] + OWN_MODULES
 
 a = Analysis(
     [str(BASE_DIR / "desktop" / "main.py")],
@@ -107,6 +131,8 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+_require_own_modules(a)
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
@@ -145,6 +171,8 @@ mcp_a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+_require_own_modules(mcp_a)
 
 # De-duplicate shared binaries/datas between GUI and MCP analyses
 for d in a.datas:

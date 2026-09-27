@@ -774,6 +774,23 @@ def upgrade_stored_history() -> None:
     maybe_upgrade_classification_version()
 
 
+def start_history_upgrade() -> None:
+    """Run ``upgrade_stored_history`` on a background thread.
+
+    DB work that must never delay startup; idempotent via the stored version
+    markers. The caller starts it only once the schema is migrated, since a
+    step that reads a column a pending migration adds fails until the next
+    launch. Shares the scheduler's env gate so scratch and E2E servers never
+    mutate seeded data.
+    """
+    import os
+    import threading
+
+    if os.environ.get("RESPECTASO_DISABLE_SCHEDULER") == "1":
+        return
+    threading.Thread(target=upgrade_stored_history, daemon=True, name="history-upgrade").start()
+
+
 def recalculate_stored_popularity() -> dict:
     """Re-score every stored SearchResult with the current estimator.
 

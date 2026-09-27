@@ -25,25 +25,21 @@ class AsoConfig(AppConfig):
 
         migrate_legacy_settings()
 
-        # One-time history re-score when the estimator version bumps
-        # (estimate v2 calibration). Background thread: DB work that must
-        # never delay startup; idempotent via the stored version marker.
-        # Shares the scheduler's env gate so scratch/E2E servers never
-        # mutate seeded data.
+        # One-time history re-score when a version marker bumps, in one
+        # background thread. The Mac app starts it itself once its migrations
+        # have run (desktop/main.py): started from here it raced them, and on
+        # a new install or an upgrade that adds a column every step failed
+        # with "no such column" until the next launch. The Docker image
+        # migrates in a separate process before gunicorn starts.
         import os
         import threading
 
-        if os.environ.get("RESPECTASO_DISABLE_SCHEDULER") != "1":
-            from .popularity import upgrade_stored_history
+        from django.conf import settings
 
-            # One thread, in dependency order: popularity, then difficulty,
-            # then the labels that read both. Each step has its own marker,
-            # so only what changed runs.
-            threading.Thread(
-                target=upgrade_stored_history,
-                daemon=True,
-                name="history-upgrade",
-            ).start()
+        if not settings.IS_NATIVE_APP:
+            from .popularity import start_history_upgrade
+
+            start_history_upgrade()
 
         from .scheduler import start_scheduler
 
@@ -57,8 +53,6 @@ class AsoConfig(AppConfig):
         # calls resume_after_startup() itself, after migrations have run.
         # Shares the scheduler's env gate so the /verify scratch server never
         # starts real Apple traffic on launch.
-        from django.conf import settings
-
         from . import run_queue
 
         if (os.environ.get("RESPECTASO_DISABLE_SCHEDULER") != "1"
