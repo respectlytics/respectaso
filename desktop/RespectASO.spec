@@ -8,7 +8,7 @@ Build with:
 
 import os
 from pathlib import Path
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 block_cipher = None
 
@@ -38,6 +38,29 @@ shared_datas = [
     (str(BASE_DIR / "licensing" / "public_key.pem"), "licensing"),
 ] + copy_metadata("fastmcp")
 
+# Our own packages go in whole, collected rather than listed by hand.
+# Django reaches some modules only through dotted strings in settings and
+# urls (handler404, CSRF_FAILURE_VIEW, middleware, context processors),
+# which PyInstaller cannot follow, and a hand list misses every new file:
+# the first 2.28.0 build left out aso.error_views, so every 404 crashed.
+# Tests stay out; migrations ship as source files through shared_datas.
+FIRST_PARTY = ["core", "aso", "aso_pro", "licensing", "llm_providers"]
+
+
+def _is_shipped(name):
+    parts = name.split(".")
+    return not any(
+        part in ("tests", "migrations") or part.startswith("test_") for part in parts
+    )
+
+
+def _own_modules(package):
+    # The public repo has no aso_pro, licensing or llm_providers.
+    if not (BASE_DIR / package / "__init__.py").exists():
+        return []
+    return collect_submodules(package, filter=_is_shipped, on_error="raise")
+
+
 shared_hiddenimports = [
         # Django core
         "django",
@@ -52,74 +75,6 @@ shared_hiddenimports = [
         "whitenoise.middleware",
         "dotenv",
         "certifi",
-        # Core app
-        "core.settings",
-        "core.urls",
-        "core.wsgi",
-        "core.context_processors",
-        # Free features (aso)
-        "aso",
-        "aso.apps",
-        "aso.models",
-        "aso.views",
-        "aso.urls",
-        "aso.scoring",
-        "aso.services",
-        "aso.scheduler",
-        "aso.templatetags",
-        "aso.templatetags.aso_tags",
-        "aso.popularity",
-        "aso.context_processors",
-        "aso.settings_views",
-        "aso.ui_state",
-        "aso.run_queue",
-        "aso.search_jobs",
-        "aso.keyword_scoring",
-        "aso.keyword_cleanup",
-        "aso.pro_access",
-        "aso.dashboard_summary",
-        "aso.top_terms_preview",
-        "aso.apple_ads",
-        "aso.apple_ads.auth",
-        "aso.apple_ads.client",
-        "aso.apple_ads.storage",
-        "aso.apple_ads.sync",
-        # Pro features (aso_pro)
-        "aso_pro",
-        "aso_pro.apps",
-        "aso_pro.models",
-        "aso_pro.views",
-        "aso_pro.urls",
-        "aso_pro.researcher",
-        "aso_pro.competitor_analyzer",
-        "aso_pro.simulator",
-        "aso_pro.agents",
-        "aso_pro.constraints",
-        "aso_pro.keyword_pipeline",
-        "aso_pro.prompts",
-        "aso_pro.schemas",
-        "aso_pro.metadata_evaluator",
-        "aso_pro.settings_storage",
-        # LLM providers
-        "llm_providers",
-        "llm_providers.base",
-        "llm_providers.factory",
-        "llm_providers.openai_provider",
-        "llm_providers.anthropic_provider",
-        "llm_providers.gemini_provider",
-        "llm_providers.openrouter_provider",
-        "llm_providers.local_provider",
-        "llm_providers.structured_json",
-        "llm_providers.token_counter",
-        # Licensing
-        "licensing",
-        "licensing.api_client",
-        "licensing.apps",
-        "licensing.decorators",
-        "licensing.middleware",
-        "licensing.refresh",
-        "licensing.storage",
-        "licensing.validator",
         # Third-party LLM SDKs
         "openai",
         "anthropic",
@@ -135,19 +90,7 @@ shared_hiddenimports = [
         # MCP server
         "fastmcp",
         "mcp",
-        "aso_pro.mcp",
-        "aso_pro.mcp.bootstrap",
-        "aso_pro.mcp.server",
-        "aso_pro.mcp.license_gate",
-        "aso_pro.mcp.tools",
-        "aso_pro.mcp.tools.core",
-        "aso_pro.mcp.tools.config",
-        "aso_pro.mcp.tools.researcher",
-        "aso_pro.mcp.tools.competitor",
-        "aso_pro.mcp.tools.simulator",
-        "aso_pro.mcp.tools.sessions",
-        "aso_pro.mcp.tools.utilities",
-    ]
+    ] + [module for package in FIRST_PARTY for module in _own_modules(package)]
 
 a = Analysis(
     [str(BASE_DIR / "desktop" / "main.py")],

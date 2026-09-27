@@ -82,6 +82,27 @@ class WiredInTest(SimpleTestCase):
             self.skipTest("no Dockerfile in this tree")
         self.assertRegex(dockerfile.read_text(), r"(?m)^ENV DEBUG=False$")
 
+    def test_the_mac_build_ships_every_package_of_ours(self):
+        # The handlers are named only as strings, which PyInstaller cannot
+        # follow: the first 2.28.0 build left aso.error_views out and every
+        # 404 in the Mac app became a bare server error. The spec collects
+        # each package of ours whole, so this checks that it names them all.
+        import ast
+
+        base = Path(settings.BASE_DIR)
+        spec_file = base / "desktop" / "RespectASO.spec"
+        if not spec_file.exists():
+            self.skipTest("no Mac build spec in this tree")
+        spec = spec_file.read_text()
+        listed = next(
+            ast.literal_eval(node.value)
+            for node in ast.parse(spec).body
+            if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == "FIRST_PARTY"
+        )
+        self.assertLessEqual({p.parent.name for p in base.glob("*/__init__.py")}, set(listed))
+        self.assertIn(error_views.__name__.split(".")[0], listed)
+        self.assertIn("collect_submodules(package", spec)
+
 
 @override_settings(ROOT_URLCONF="aso.tests.test_error_pages", DEBUG=False)
 class PagesTest(TestCase):
