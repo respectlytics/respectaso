@@ -281,13 +281,14 @@ class EveryTagIsOneRangeTest(TestCase):
         self.assertEqual(REAL_DEMAND_PER_DAY, 1.0)
 
     def test_the_demand_bar_reads_the_column_as_printed(self):
-        """Low Volume exactly when the low end of Downloads at #1, as the
-        table prints it, is under 1.0."""
+        """Low Volume exactly when the estimate at the top of Downloads at #1,
+        as the table prints it, is under 1.0 (the range runs from a tenth of
+        the estimate to the estimate)."""
         from aso.scoring import fmt_downloads, has_real_demand, top_spot_range
 
         for country in self.COUNTRIES:
             for popularity in range(1, 101):
-                shown = fmt_downloads(top_spot_range(popularity, country)[0])
+                shown = fmt_downloads(top_spot_range(popularity, country)[1])
                 shown = float(shown[:-1]) * 1000 if shown.endswith("K") else float(shown)
                 self.assertEqual(has_real_demand(popularity, country), shown >= 1.0,
                                  (country, popularity, shown))
@@ -457,8 +458,8 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
         _, label, _, text = self.advice(39, 27, "fr", keyword="minuteur")
         self.assertEqual(label, "Low Volume")
         self.assertTrue(text.startswith(
-            "Skip. Even #1 for \u201cminuteur\u201d in the France App Store brings only "))
-        self.assertIn(" to ", text)
+            "Skip. Even #1 for \u201cminuteur\u201d in the France App Store brings "), text)
+        self.assertTrue(" to " in text or "at most" in text, text)
 
     def test_every_sentence_names_the_keyword_it_is_about(self):
         """A tooltip over a filtered table must say which row it belongs to:
@@ -602,3 +603,101 @@ class WhereAppsTypicallyLandTest(TestCase):
                         self.assertNotIn("on average", text)
                         self.assertNotIn("taps as #", text)
                         self.assertNotIn("can expect about #", text)
+
+
+class DownloadsPhraseSecondFigureTest(TestCase):
+    """noun=False drops the word "download" for the second figure of a
+    sentence that has already said it (READINESS_CLARITY_PLAN.md, 5.0)."""
+
+    def test_the_second_figure_drops_the_noun(self):
+        from aso.scoring import downloads_phrase
+
+        expected = {
+            0.2: "about one every 5 days",
+            0.9: "about one a day",
+            1.6: "about 1.6 a day",
+            24: "about 24 a day",
+            0: "none",
+        }
+        for per_day, text in expected.items():
+            self.assertEqual(downloads_phrase(per_day, noun=False), text)
+
+    def test_the_default_is_unchanged(self):
+        from aso.scoring import downloads_phrase
+
+        expected = {
+            0.2: "about one download every 5 days",
+            0.9: "about one download a day",
+            1.6: "about 1.6 downloads a day",
+            24: "about 24 downloads a day",
+            0: "no downloads",
+        }
+        for per_day, text in expected.items():
+            self.assertEqual(downloads_phrase(per_day), text)
+
+    def test_nothing_reads_the_same_both_ways(self):
+        from aso.scoring import downloads_phrase
+
+        self.assertEqual(downloads_phrase(0.0004), "effectively nothing")
+        self.assertEqual(downloads_phrase(0.0004, noun=False), "effectively nothing")
+
+
+class OneDownloadRangeTest(TestCase):
+    """Every download figure is one range: a tenth of the estimate up to the
+    estimate (DownloadEstimator.RANGE_LOW_SHARE). The estimate itself, the
+    5% install rate behind every score and tag, does not move."""
+
+    def test_the_range_at_any_rank(self):
+        from aso.services import DownloadEstimator
+
+        est = DownloadEstimator()
+        for popularity, rank in ((51, 1), (51, 2.5), (38, 14), (70, 40)):
+            low, high = est.range_at(popularity, rank, "us")
+            self.assertEqual(high, est.downloads_at(popularity, rank, "us"))
+            self.assertAlmostEqual(low, high * est.RANGE_LOW_SHARE)
+
+    def test_the_positions_table(self):
+        from aso.services import DownloadEstimator
+
+        for position in DownloadEstimator().estimate(51, country="us")["positions"]:
+            self.assertAlmostEqual(position["downloads_low"], position["downloads_high"] * 0.1, delta=0.01)
+
+    def test_in_words(self):
+        from aso.scoring import estimate_range_phrase
+
+        self.assertEqual(estimate_range_phrase(14.0), "1.4 to 14 downloads a day")
+        self.assertEqual(estimate_range_phrase(0.25), "at most one download every 4 days")
+
+    def test_the_app_summary_never_prints_a_lone_high_figure(self):
+        from aso.dashboard_summary import format_interval
+
+        self.assertEqual(format_interval(0.8, 8), "~0.8–8")
+        self.assertEqual(format_interval(0.03, 0.3), "~0–0.3")
+        self.assertEqual(format_interval(0, 0.3), "~0–0.3")
+        self.assertEqual(format_interval(0, 0), "—")
+
+
+class SearchesUpToTest(TestCase):
+    """A search figure is "up to" unless the popularity is Apple's own
+    reported value: for a term Apple does not report, search volume is the
+    least certain part of every estimate."""
+
+    def test_the_phrase(self):
+        from aso.scoring import searches_phrase
+
+        self.assertEqual(searches_phrase(338), "up to about 338 searches a day")
+        self.assertEqual(searches_phrase(338, reported=True), "about 338 searches a day")
+        self.assertEqual(searches_phrase(0.4), "under one search a day")
+
+    def test_the_explanation_says_it(self):
+        from aso.scoring import opportunity_reach
+
+        self.assertIn("With up to about", opportunity_reach(51, 39, "us")["explanation"])
+        self.assertIn("With about", opportunity_reach(51, 39, "us", reported=True)["explanation"])
+
+    def test_what_counts_as_reported(self):
+        from aso.popularity import PopularityResolution, reported_by_apple
+
+        self.assertTrue(reported_by_apple(PopularityResolution(55, 51, 55, "apple", False)))
+        self.assertFalse(reported_by_apple(PopularityResolution(51, 51, None, "apple", True)))
+        self.assertFalse(reported_by_apple(PopularityResolution(51, 51, 55, "internal", False)))

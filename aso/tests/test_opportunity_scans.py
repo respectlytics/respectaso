@@ -298,6 +298,23 @@ class PayloadTest(ScanTestBase):
         self.assertTrue(payload["opportunity_tip"])
         self.assertTrue(payload["classification_tip"])
 
+    def test_a_stored_scan_draws_todays_range(self):
+        """A scan stored before the estimate changed draws today's range: the
+        chart's estimates are worked out from the row's popularity when read."""
+        from aso.services import DownloadEstimator
+
+        scan = self.scan(countries=("us",), status="running")
+        opportunity_scans._execute(scan.pk)
+        row = scan.results.get()
+        breakdown = dict(row.difficulty_breakdown or {})
+        breakdown["download_estimates"] = {"positions": [{"pos": 1, "downloads_low": 5, "downloads_high": 20}]}
+        row.difficulty_breakdown = breakdown
+        row.save(update_fields=["difficulty_breakdown"])
+        payload = opportunity_scans.country_payload(row, heavy=True)
+        self.assertEqual(payload["difficulty_breakdown"]["download_estimates"],
+                         {**DownloadEstimator().estimate(payload["popularity"] or 0, country="us"),
+                          "searches_reported": False})
+
     def test_light_payload_omits_the_heavy_columns(self):
         scan = self.scan(countries=("us",), status="running")
         opportunity_scans._execute(scan.pk)

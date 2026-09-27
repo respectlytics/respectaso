@@ -2,6 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Users see RespectASO's own error pages, never Django's debug page
+# (aso/error_views.py). Override with DEBUG=True only to develop.
+ENV DEBUG=False
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

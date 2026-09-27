@@ -33,6 +33,10 @@ logger = logging.getLogger(__name__)
 
 PROFILE_MAX_AGE = timedelta(hours=24)
 
+# How old a Dashboard rank may be and still count for a picked app on the AI
+# tabs: a week, the span over which a daily refreshed rank stays a fair guide.
+KNOWN_RANK_MAX_AGE = timedelta(days=7)
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -154,6 +158,48 @@ def profile_for_track(track_id, country: str, *, itunes_service) -> AppProfile |
         return None
     return AppProfile(name=found["name"], ratings=found["count"],
                       average=found["average"], released=found["released"])
+
+
+def known_ranks(app, country: str) -> dict[str, int]:
+    """The app's real ranks in one storefront as the Dashboard measured them
+    in the last week, by lowercased keyword: the newest measurement of each
+    keyword tracked for the app, kept only when it found the app ranked.
+
+    The AI Researcher and the AI Competitor tab score a picked app with these,
+    so a keyword the Dashboard tracks scores there as it does on the
+    Dashboard (READINESS_CLARITY_BACKLOG.md, B3). No App Store call.
+    """
+    if app is None or not getattr(app, "pk", None):
+        return {}
+    from .models import SearchResult
+
+    newest: dict[str, int | None] = {}
+    rows = (
+        SearchResult.objects
+        .filter(keyword__app=app, country=(country or "").lower(),
+                searched_at__gte=_now() - KNOWN_RANK_MAX_AGE)
+        .order_by("-searched_at")
+        .values_list("keyword__keyword", "app_rank")
+    )
+    for keyword, rank in rows:
+        key = (keyword or "").strip().lower()
+        if key and key not in newest:
+            newest[key] = rank
+    return {key: rank for key, rank in newest.items() if rank}
+
+
+def scoring_inputs(app, country: str, *, itunes_service) -> tuple[AppProfile | None, dict]:
+    """What a run scores a picked app with: its profile in this storefront
+    (refreshed through one lookup when stale; None for an app without an App
+    Store ID) and its known ranks. (None, {}) when no app is picked. One copy
+    for the web views and the MCP tools."""
+    if app is None:
+        return None, {}
+    profile = (
+        profile_in_storefront(app, country, itunes_service=itunes_service)
+        if app.track_id else None
+    )
+    return profile, known_ranks(app, country)
 
 
 def reclassify(app, country: str) -> int:

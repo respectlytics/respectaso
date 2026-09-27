@@ -1,0 +1,7 @@
+{% extends "aso/base.html" %}
+{% comment %}The 403 page, inside the app's shell (aso/error_views.py).{% endcomment %}
+{% block title %}Request refused · RespectASO{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+{% include "aso/partials/error_card.html" with code="Error 403" heading="RespectASO refused this request" message="Go back and try again from the page you were on." %}
+{% endblock %}

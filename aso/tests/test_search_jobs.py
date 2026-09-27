@@ -102,7 +102,7 @@ class SearchViewTest(JobTestBase):
         self.assertEqual(resp.status_code, 400)
         data = resp.json()
         self.assertEqual(data["error"],
-                         "That is 1,204 keywords. A search holds up to 1,000 - start a second search for the rest.")
+                         "That is 1,204 keywords. A search holds up to 1,000. Start a second search for the rest.")
         self.assertEqual((data["count"], data["limit"]), (1204, 1000))
         self.assertEqual(KeywordSearchJob.objects.count(), 0)
 

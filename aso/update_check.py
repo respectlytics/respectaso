@@ -20,6 +20,8 @@ import urllib.request
 
 from django.conf import settings
 
+from .copy_rules import no_dash_punctuation
+
 logger = logging.getLogger(__name__)
 
 RELEASES_URL = "https://api.github.com/repos/respectlytics/respectaso/releases/latest"
@@ -72,7 +74,7 @@ def _fetch_latest_release():
             "current": current,
             "latest": latest,
             "release_url": data.get("html_url", ""),
-            "release_notes": data.get("body", ""),
+            "release_notes": no_dash_punctuation(data.get("body") or ""),
             "download_url": download_url,
             "is_native": is_native,
         }

@@ -431,8 +431,27 @@ OPPORTUNITY_TABLE_NOTE = (
     "Opportunity is what a keyword is worth to this app today; At #1 is what it "
     "is worth to whoever holds the top spot, on the same 0 to 100 scale. A keyword "
     "low today but high At #1 is worth targeting, since it pays as the app climbs; "
-    "one low on both is worth little."
+    "one low on both is worth little. Expected/day is the downloads a day the app "
+    "can expect from the keyword where it would rank. Opportunity is a log scale, "
+    "so never add, subtract or average Opportunity values: to compare swaps or "
+    "whole versions, add up Expected/day and compare the totals as a percentage."
 )
+
+# The column the AI prompts compare swaps and versions by
+# (READINESS_CLARITY_PLAN.md, D6).
+EXPECTED_DAY_HEADER = "Expected/day"
+
+
+def fmt_expected(per_day: float) -> str:
+    """Expected downloads a day for the AI prompts, to two significant
+    figures, so small values stay comparable: 0.002, 0.015, 0.12, 1.3, 24."""
+    if not per_day or per_day <= 0:
+        return "0"
+    if per_day < 0.001:
+        return "<0.001"
+    if per_day >= 99.5:
+        return str(int(round(per_day)))
+    return f"{per_day:.2g}"
 
 
 def keyword_rank_key(row, country=None) -> tuple:
@@ -608,8 +627,8 @@ def classification_legend() -> list[dict]:
 SWEET_SPOT_SCORE = 70
 GOOD_TARGET_SCORE = 50
 SUPPORTING_SCORE = 30
-# Real demand: #1 brings at least one download a day, at the low end of the
-# Downloads at #1 column, the conservative end every score counts on.
+# Real demand: #1 brings at least one download a day, by the estimate every
+# score counts on, the top of the Downloads at #1 column's range.
 REAL_DEMAND_PER_DAY = 1.0
 
 
@@ -646,10 +665,11 @@ def opportunity_css(score, chip=False) -> str:
 
 
 def has_real_demand(popularity, country=None) -> bool:
-    """Whether #1 here brings at least one download a day, as the low end of
-    the Downloads at #1 column shows it. A fact about the keyword in this
+    """Whether #1 here brings at least one download a day, as the estimate at
+    the top of the Downloads at #1 column shows it (the range runs from a
+    tenth of the estimate to the estimate). A fact about the keyword in this
     storefront, the same for every app and every difficulty."""
-    return as_shown(top_spot_range(popularity, country)[0]) >= REAL_DEMAND_PER_DAY
+    return as_shown(top_spot_range(popularity, country)[1]) >= REAL_DEMAND_PER_DAY
 
 
 def classify_keyword(popularity: int, difficulty: int, country=None,
@@ -735,40 +755,68 @@ def downloads_range_phrase(low: float, high: float) -> str:
     return "at most " + downloads_phrase(high).removeprefix("about ")
 
 
-def downloads_phrase(per_day: float) -> str:
+def estimate_range(per_day: float) -> tuple[float, float]:
+    """A download estimate as the range every screen shows: from a tenth of
+    the estimate to the estimate (DownloadEstimator.RANGE_LOW_SHARE)."""
+    from .services import DownloadEstimator
+
+    return per_day * DownloadEstimator.RANGE_LOW_SHARE, per_day
+
+
+def _capitalized(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def estimate_range_phrase(per_day: float) -> str:
+    """A download estimate as its range in words: "1.4 to 14 downloads a day"."""
+    return downloads_range_phrase(*estimate_range(per_day))
+
+
+def downloads_phrase(per_day: float, noun: bool = True) -> str:
     """A download figure a person can picture.
 
     Three a day stays three a day. A fiftieth of one becomes "one every seven
     weeks", because nobody reads 0.02 as anything at all.
+
+    noun=False drops the word "download" for the second figure of a sentence
+    that has already said it: "about one every 5 days".
     """
+    unit = " downloads" if noun else ""
+    one = "one download" if noun else "one"
     if per_day >= 10:
-        return f"about {per_day:,.0f} downloads a day"
+        return f"about {per_day:,.0f}{unit} a day"
     if per_day >= 1.5:
-        return f"about {per_day:.1f} downloads a day"
+        return f"about {per_day:.1f}{unit} a day"
     if per_day <= 0:
-        return "no downloads"
+        return "no downloads" if noun else "none"
     days = 1 / per_day
     if days < 1.5:
-        return "about one download a day"
+        return f"about {one} a day"
     if days >= 1825:
         # Past about five years the figure stops being information. Say so.
         return "effectively nothing"
     if days < 60:
-        return f"about one download every {days:.0f} days"
+        return f"about {one} every {days:.0f} days"
     if days < 730:
-        return f"about one download every {days / 30:.0f} months"
-    return f"about one download every {days / 365:.0f} years"
+        return f"about {one} every {days / 30:.0f} months"
+    return f"about {one} every {days / 365:.0f} years"
 
 
-def searches_phrase(per_day: float) -> str:
-    """Searches a day, rounded the way a person would say them."""
+def searches_phrase(per_day: float, reported: bool = False) -> str:
+    """Searches a day, rounded the way a person would say them. Unless the
+    popularity is Apple's own reported value, "up to": for a term Apple does
+    not report, search volume is the least certain part of every estimate
+    (Apple only says it is below its reporting floor), and the real figure
+    can be far below it."""
     if per_day >= 100:
-        return f"about {per_day:,.0f} searches a day"
-    if per_day >= 10:
-        return f"about {per_day:.0f} searches a day"
-    if per_day >= 1:
-        return f"about {per_day:.1f} searches a day"
-    return "under one search a day"
+        phrase = f"about {per_day:,.0f} searches a day"
+    elif per_day >= 10:
+        phrase = f"about {per_day:.0f} searches a day"
+    elif per_day >= 1:
+        phrase = f"about {per_day:.1f} searches a day"
+    else:
+        return "under one search a day"
+    return phrase if reported else f"up to {phrase}"
 
 
 def _store_name(country) -> str:
@@ -842,7 +890,7 @@ def quoted_keyword(keyword) -> str:
 
 
 def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=None,
-                      keyword=None) -> dict:
+                      keyword=None, reported=False) -> dict:
     """Where an app could rank for a keyword, what that pays, and why.
 
     The opportunity score is the downloads at this rank, so this is the
@@ -854,6 +902,8 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     profile marked unknown is an app whose store data has not been read yet.
     ``app_rank`` is its real rank for this keyword here, when known, and
     ``keyword`` the keyword, which decides whether that rank is final.
+    ``reported`` says the popularity is Apple's own reported value, so its
+    searches are written "about" rather than "up to" (searches_phrase).
 
     Returns:
         position     the effective rank (whose taps the app can expect), rounded
@@ -970,9 +1020,9 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     elif real_rank_decides:
         explanation = (
             f"{prefix}{opening} At #{position}, with "
-            f"{searches_phrase(searches)} here, that is "
-            f"{downloads_phrase(downloads)}, and that is what the Opportunity "
-            f"score measures.{past_first_page}{ceiling}"
+            f"{searches_phrase(searches, reported)} here, that is "
+            f"{estimate_range_phrase(downloads)}, and the Opportunity score "
+            f"counts the top of that range.{past_first_page}{ceiling}"
         )
     else:
         # The score is the average over where apps land. Said as downloads,
@@ -986,9 +1036,9 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
             share = f" averaged over where they land, {subject}"
         explanation = (
             f"{prefix}{opening} That comes from {why}. With "
-            f"{searches_phrase(searches)} here,{share} can expect "
-            f"{downloads_phrase(downloads)}, and that is what the Opportunity "
-            f"score measures.{ceiling}"
+            f"{searches_phrase(searches, reported)} here,{share} can expect "
+            f"{estimate_range_phrase(downloads)}, and the Opportunity score "
+            f"counts the top of that range.{ceiling}"
         )
     if stronger:
         explanation += (
@@ -1030,10 +1080,18 @@ def opportunity_basis(popularity, difficulty, country=None, app=None, app_rank=N
 def scored_for(app=None, country=None, *, reason=None) -> str:
     """One sentence above a keyword table saying whose score it is.
 
-    ``reason`` covers two surfaces: "competitor" (the AI Competitor tab
-    analyses someone else's app) and "each_storefront" (a Finder scan for an
-    app, across many storefronts).
+    ``reason`` covers three surfaces: "competitor" (the AI Competitor tab
+    analyses someone else's app), "each_storefront" (a Finder scan for an
+    app, across many storefronts) and "picked" (the AI Researcher or the AI
+    Competitor tab scoring for an app the user picked, which also counts the
+    ranks the Dashboard measured for it).
     """
+    if reason == "picked":
+        base = scored_for(app, country)
+        if app is not None and getattr(app, "known", True):
+            return (base + " For keywords you track for it on the Dashboard, "
+                    "its rank there counts too.")
+        return base
     if reason == "competitor":
         return (
             "Opportunity is scored for a brand new app, because the app "
@@ -1106,13 +1164,13 @@ def scoring_guide() -> dict:
         per_day = OPPORTUNITY_MIDPOINT_DOWNLOADS * 10 ** ((score - 50) / per_decade)
         opportunity.append({
             "range": f"{score}+" if score == SWEET_SPOT_SCORE else str(score),
-            "meaning": downloads_phrase(per_day).capitalize(),
+            "meaning": _capitalized(estimate_range_phrase(per_day)),
             "tag": starts.get(score, ""),
         })
     floor = OPPORTUNITY_MIDPOINT_DOWNLOADS * 10 ** (-50 / per_decade)
     opportunity.append({
         "range": "0",
-        "meaning": f"{downloads_phrase(floor).capitalize()}, or fewer",
+        "meaning": _capitalized(estimate_range_phrase(floor)),
     })
 
     difficulty = []
@@ -1200,7 +1258,7 @@ def targeting_description(label, popularity, difficulty, country=None, app=None,
         reach = opportunity_reach(popularity, difficulty, country, app=app,
                                   app_rank=app_rank, keyword=keyword)
     position = reach["position"]
-    now = downloads_phrase(reach["downloads"])
+    now = estimate_range_phrase(reach["downloads"])
     name = reach["name"]
     store = _store_name(country)
     typical = reach["typical"]
@@ -1257,7 +1315,7 @@ def targeting_description(label, popularity, difficulty, country=None, app=None,
 # Difficulty-only fallbacks (when popularity is unknown)
 _DIFF_ONLY_TARGETING = {
     25: ("🟢", "Easy to Rank", "bg-green-900/20 text-green-300 border-green-500/20",
-         "Low competition — a well-optimized app can rank quickly."),
+         "Low competition: a well-optimized app can rank quickly."),
     50: ("🟡", "Moderate", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
          "Achievable with strong ASO."),
     75: ("🟠", "Competitive", "bg-orange-900/20 text-orange-300 border-orange-500/20",
@@ -1289,7 +1347,7 @@ def get_targeting_advice(popularity, difficulty, country=None, app=None, app_ran
 
 
 def targeting_payload(popularity, difficulty, country=None, app=None,
-                      app_rank=None, keyword=None) -> dict:
+                      app_rank=None, keyword=None, reported=False) -> dict:
     """What a classification badge needs, ready to render.
 
     Every screen that shows the badge reads this. ``reach`` is the line under
@@ -1299,7 +1357,7 @@ def targeting_payload(popularity, difficulty, country=None, app=None,
         popularity, difficulty, country, app, app_rank, keyword
     )
     reach = opportunity_reach(popularity, difficulty, country, app=app, app_rank=app_rank,
-                              keyword=keyword)
+                              keyword=keyword, reported=reported)
     return {
         "icon": icon,
         "label": label,

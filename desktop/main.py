@@ -103,14 +103,22 @@ def wait_for_server(port, timeout=30):
     return False
 
 
+def configure_environment(data_dir):
+    """The environment Django starts in inside the Mac app. DEBUG is off, so a
+    user sees RespectASO's own error pages (aso/error_views.py), never
+    Django's debug page with its traceback; running from source with
+    DEBUG=True set still turns it on."""
+    os.environ["DJANGO_SETTINGS_MODULE"] = "core.settings"
+    os.environ["DATA_DIR"] = str(data_dir)
+    os.environ["RESPECTASO_NATIVE"] = "1"
+    os.environ.setdefault("DEBUG", "False")
+
+
 def main():
     base_dir = get_base_dir()
     data_dir = get_data_dir()
 
-    # Configure Django environment
-    os.environ["DJANGO_SETTINGS_MODULE"] = "core.settings"
-    os.environ["DATA_DIR"] = str(data_dir)
-    os.environ["RESPECTASO_NATIVE"] = "1"
+    configure_environment(data_dir)
 
     # Ensure the project root is on sys.path so Django can find modules
     sys.path.insert(0, str(base_dir))

@@ -19,10 +19,16 @@
         if (el) { el.classList.toggle('hidden', !show); }
     }
 
+    // The strip is fixed to the bottom of the window; while it shows, the page
+    // keeps that much room free at its end, so the footer is never under it.
+    function reserveRoom(strip) {
+        document.body.style.paddingBottom = strip.classList.contains('hidden') ? '' : strip.offsetHeight + 'px';
+    }
+
     function render(state) {
         var strip = byId('search-job-strip');
         if (!strip) { return; }
-        if (!state) { strip.classList.add('hidden'); return; }
+        if (!state) { strip.classList.add('hidden'); reserveRoom(strip); return; }
 
         var text = byId('sjs-text');
         if (text) { text.textContent = state.text; }
@@ -38,6 +44,7 @@
         var fill = byId('sjs-fill');
         if (fill && state.show_bar) { fill.style.width = (state.progress_percent || 0) + '%'; }
         strip.classList.remove('hidden');
+        reserveRoom(strip);
     }
 
     function refresh() {

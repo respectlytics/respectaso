@@ -54,6 +54,13 @@ class PopularityResolution(NamedTuple):
     absent_ceiling: int | None = None  # cap applied on fallback (None = uncapped)
 
 
+def reported_by_apple(resolution) -> bool:
+    """Whether the popularity every figure uses is Apple's own reported value
+    (the Apple source, and the term is in Apple's dataset)."""
+    return (resolution.source == "apple" and not resolution.is_fallback
+            and resolution.apple is not None)
+
+
 def effective_from_pair(internal, apple, source_setting, absent_ceiling=None):
     """Pure resolution of (internal, apple, setting) -> (effective, source, fallback).
 
@@ -260,7 +267,7 @@ def prompt_source_note() -> str:
             "per category and storefront, roughly 500+ weekly searches). "
             "Keywords NOT among Apple's top terms are scored from "
             "RespectASO's calibrated estimate, capped just below their "
-            "category's least-reported Apple value - absence from the top "
+            "category's least-reported Apple value, absence from the top "
             "terms bounds a keyword's popularity, it does not make the "
             "keyword or the metadata irrelevant. Apple-reported values "
             "start around 40 on this scale. Treat strong disagreement "
@@ -667,7 +674,9 @@ CLASSIFICATION_VERSION = 9
 # history. v2 removed the jumps: the weak leader cap that vanished at 1,000
 # reviews, the 20% match ratio switch, the 95-to-100 steps at the top of the
 # rating and velocity curves, and the small result set cap that ended at 4.
-DIFFICULTY_VERSION = 2
+# v3: the breakdown's sentences carry no dash between words (aso/copy_rules.py);
+# the scores do not move.
+DIFFICULTY_VERSION = 3
 
 
 def recalculate_stored_difficulty() -> dict:

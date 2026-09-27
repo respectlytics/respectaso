@@ -1,0 +1,223 @@
+"""No dash stands between words in anything RespectASO writes for a person.
+
+The owner's rule, for every project (settled 2026-09-15): not an em dash, not
+an en dash, not a hyphen doing a dash's job, in any text a person reads. A
+reader who has learned to spot machine writing spots the dash, whichever
+length it is. What a dash was doing, a comma, a colon, brackets or two
+sentences can do.
+
+ONE predicate both fixes and checks, so a check can never disagree with the
+fix: ``no_dash_punctuation`` rewrites a text, ``dash_punctuation_in`` finds
+the first offending dash, and both read the same ``_dash_role``. Every writer
+of text a person reads goes through it: the AI's written feedback and
+suggestions (aso_pro), the markdown exports, and the rendered pages, which a
+test scans (aso/tests/test_no_dashes.py). Ported from the reference
+implementation in thereseai (apps/reports/copy_rules.py), with one addition
+for RespectASO's data tables: a dash that is the whole content of a table
+cell is the missing-value glyph, not punctuation.
+
+Five dashes are NOT that dash and survive, or the rule would do damage of its
+own:
+  * a hyphen inside a word ("long-tail", "Covid-19") and a tight number range
+    ("2025-2026", "0.9-3.8/day");
+  * the minus sign on a number ("-12 percent");
+  * the list marker opening a line;
+  * the hanging hyphen of a compound ("pre- and post-war");
+  * the missing-value glyph alone in a table cell ("| — |") or named in
+    quotes ('a rank of "—"').
+"""
+
+from __future__ import annotations
+
+import re
+
+_DASH_CHARS = "-‐‑‒–—―−﹘﹣－"
+# Tight between two characters, these are a compound, a range or a quoted
+# compound, never punctuation. The em dash is deliberately absent from both.
+_HYPHENS = "-‐‑"
+_TIGHT_DASHES = _HYPHENS + "–"
+# The dash run plus the spaces around it, so the substitution sees what it is
+# replacing. Only spaces and tabs are eaten: a line break is content.
+_DASH_RUN = re.compile(f"[ \t]*[{_DASH_CHARS}]+[ \t]*")
+_OPENERS = "([{«“\"'"
+# "}" is not here: in RespectASO's prompts a closing brace ends a placeholder
+# ("{language_label} — do not"), which is a word, not a closing bracket.
+_CLOSERS = ",;:.!?…)]»”"
+# Punctuation that already separates two clauses. A closing bracket or quote
+# does not: "(Top 5) — the most visible" reads "(Top 5), the most visible".
+_SEPARATORS = ",;:.!?…"
+# A straight quote opens or closes. Followed by a space and then the dash
+# (the dash run starts with that space), it closed a quotation.
+_STRAIGHT_QUOTES = "\"'"
+
+
+def _dash_role(m: re.Match) -> str:
+    """What the dash run at ``m`` is doing in its line: 'word', 'hanging',
+    'range', 'minus', 'marker', 'arrow', 'flag', 'cell' or 'punct' (the one
+    the rule bans). Reads the line around the match."""
+    s, raw = m.string, m.group()
+    core = raw.strip(" \t")
+    space_left, space_right = raw[:1] in (" ", "\t"), raw[-1:] in (" ", "\t")
+    before = s[m.start() - 1] if m.start() else ""
+    after = s[m.end()] if m.end() < len(s) else ""
+    if not space_left and not space_right and len(core) == 1 and core in _TIGHT_DASHES \
+            and before and after:
+        return "word"
+    if not before and not space_right and after and core in ("-", "--"):
+        return "flag"                        # "-created_at", "-d": a token of code, never prose
+    if not after and not space_left and before.isalnum() and core in _HYPHENS:
+        return "flag"                        # "gpt-", "data-": a prefix, never prose
+    if not space_left and space_right and len(core) == 1 and core in _HYPHENS \
+            and before.isalnum() and after:
+        return "hanging"
+    if len(core) == 1 and before.isdigit() and after.isdigit():
+        return "range"
+    if core == "-" and after.isdigit() and not space_right \
+            and (space_left or not before or before in "(["):
+        return "minus"
+    if len(core) >= 3 and set(core) == {"-"}:
+        return "flag"                        # "--- RETRY": a separator, not punctuation
+    if not before and space_right:
+        return "marker"
+    if after == ">" or before == "<" or s[m.end():m.end() + 4] == "&gt;":
+        return "arrow"                       # "->", "<-" and the escaped "-&gt;"
+    if core in ("-", "--") and space_left and not space_right and after.isalpha():
+        return "flag"                        # "up -d", "--no-cache": a command's option
+    if before == "|" and after in ("|", ""):
+        return "cell"
+    if len(core) == 1 and not space_left and not space_right \
+            and before in "\"'“‘`" and after in "\"'”’`":
+        return "cell"                        # the glyph named in quotes: a rank of "—"
+    return "punct"
+
+
+def _dash_sub(m: re.Match) -> str:
+    """The text that replaces one dash run: itself for the dashes that
+    survive, and a comma (or the punctuation already there) for the one that
+    does not."""
+    raw, role = m.group(), _dash_role(m)
+    if role in ("word", "range"):
+        return "-"
+    if role in ("minus", "hanging", "arrow", "flag", "cell"):
+        return raw
+    if role == "marker":
+        return raw[:len(raw) - len(raw.lstrip(" \t"))] + "- "
+    s = m.string
+    before = s[m.start() - 1] if m.start() else ""
+    after = s[m.end()] if m.end() < len(s) else ""
+    if not before or not after:
+        return ""
+    if s[max(0, m.start() - 2):m.start()] == "**":
+        return ": "                                 # "**Label** — text" is a label
+    if before in _STRAIGHT_QUOTES and raw[:1] in (" ", "\t"):
+        return ", "                                 # '"Savings" — each' closes a quotation
+    if before in _OPENERS:
+        return ""
+    if before in _SEPARATORS or after in _CLOSERS:
+        return " "
+    head = s[:m.start()]
+    if head.count("“") > head.count("”") or head.count('"') % 2:
+        return ": "                                 # a quoted name: “Brand - Tagline”
+    return ", "
+
+
+# A line with no letter or digit in it is structure, not prose: a Markdown
+# rule or table separator, an ASCII box. It never carries a dash a reader
+# would read as punctuation, so the whole line is left alone.
+_HAS_WORD = re.compile(r"[^\W_]", re.UNICODE)
+
+
+def no_dash_punctuation(text: str) -> str:
+    """``text`` with every dash that stands between words or clauses replaced.
+    Word hyphens, number ranges, minus signs, list markers, hanging hyphens
+    and the empty-cell glyph are left alone. Idempotent, and a no-op on text
+    that never had one."""
+    lines, changed = [], 0
+    for line in (text or "").split("\n"):
+        if not _HAS_WORD.search(line):
+            lines.append(line)
+            continue
+        out, n = _DASH_RUN.subn(_dash_sub, line)
+        lines.append(out)
+        changed += n
+    text = "\n".join(lines)
+    if not changed:
+        return text
+    text = re.sub(r"[^\S\n]+([,.;:!?)\]}])", r"\1", text)   # no space before punctuation
+    text = re.sub(r",(?:[^\S\n]*,)+", ",", text)            # never a doubled comma
+    return re.sub(r"(?<=\S)[^\S\n]{2,}", " ", text)         # collapse doubled spaces, keep indents
+
+
+def dash_punctuation_in(text: str) -> str:
+    """The first dash standing between words in ``text``, with the words
+    either side, '' when there is none. One predicate with
+    ``no_dash_punctuation`` (the same ``_dash_role``)."""
+    for line in (text or "").split("\n"):
+        if not _HAS_WORD.search(line):
+            continue
+        for m in _DASH_RUN.finditer(line):
+            if _dash_role(m) == "punct":
+                return line[max(0, m.start() - 25):m.end() + 25].strip()
+    return ""
+
+
+def walk_prose(obj, fn, *, keep=()):
+    """``obj`` with ``fn`` applied to every string inside it, recursively.
+    ``keep`` names dict keys whose values pass through untouched."""
+    if isinstance(obj, str):
+        return fn(obj)
+    if isinstance(obj, dict):
+        return {k: (v if k in keep else walk_prose(v, fn, keep=keep)) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(walk_prose(v, fn, keep=keep) for v in obj)
+    return obj
+
+
+def dashless(obj, *, keep=()):
+    """``obj`` with ``no_dash_punctuation`` applied to every string in it."""
+    return walk_prose(obj, no_dash_punctuation, keep=keep)
+
+
+def no_dash_in_name(text: str) -> str:
+    """An App Store title or subtitle with a separating dash written as a
+    colon: "Pausely - Digital Wellbeing" reads "Pausely: Digital Wellbeing",
+    the way App Store names separate a brand from what the app does. Word
+    hyphens stay ("Long-Tail"). Never longer than the input."""
+    def sub(m: re.Match) -> str:
+        if _dash_role(m) != "punct":
+            return m.group()
+        s = m.string
+        before = s[m.start() - 1] if m.start() else ""
+        after = s[m.end()] if m.end() < len(s) else ""
+        if not before or not after:
+            return ""
+        return ": "
+    return re.sub(r"[^\S\n]+", " ", _DASH_RUN.sub(sub, text or "")).strip()
+
+
+_HELD_MARK = re.compile("\u2060?\ue000(\\d+)\ue001\u2060?")
+
+
+def no_dash_punctuation_keeping(text: str, keep: re.Pattern) -> str:
+    """``no_dash_punctuation`` with every span ``keep`` matches left exactly
+    as written: tags and code in markup, App Store names in a sentence."""
+    held = []
+
+    def hold(m: re.Match) -> str:
+        held.append(m.group())
+        return f"\u2060\ue000{len(held) - 1}\ue001\u2060"
+
+    body = no_dash_punctuation(keep.sub(hold, text or ""))
+    return _HELD_MARK.sub(lambda m: held[int(m.group(1))], body)
+
+
+# A bold or code label closed right before the dash: "<strong>Label</strong> — text".
+_MARKUP_LABEL = re.compile(r"(</(?:strong|b|em|code)>)[ \t]+[—–-][ \t]+")
+_MARKUP_HELD = re.compile(r"<code\b[^>]*>.*?</code>|<[^>]+>", re.S)
+
+
+def no_dash_in_markup(text: str) -> str:
+    """``no_dash_punctuation`` for text that carries inline HTML (the
+    release notes): a dash after a closing bold or code tag is a label's
+    colon, and tags and ``<code>`` are left exactly as they are."""
+    return no_dash_punctuation_keeping(_MARKUP_LABEL.sub(r"\1: ", text or ""), _MARKUP_HELD)

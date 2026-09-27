@@ -41,7 +41,7 @@ class App(models.Model):
         null=True,
         blank=True,
         unique=True,
-        help_text="iTunes trackId — used for rank tracking in search results",
+        help_text="iTunes trackId, used for rank tracking in search results",
     )
     store_url = models.URLField(
         blank=True,
@@ -127,7 +127,7 @@ class SearchResult(models.Model):
         blank=True,
         help_text=(
             "RespectASO's estimate (1-100, calibrated to Apple's official "
-            "popularity scale - estimate v2)."
+            "popularity scale, estimate v2)."
         ),
     )
     apple_popularity_score = models.IntegerField(
@@ -180,7 +180,7 @@ class SearchResult(models.Model):
         ordering = ["-searched_at"]
 
     def __str__(self):
-        return f"{self.keyword.keyword} — {self.searched_at:%Y-%m-%d %H:%M}"
+        return f"{self.keyword.keyword} ({self.searched_at:%Y-%m-%d %H:%M})"
 
     @classmethod
     def upsert_today(cls, keyword, country, **fields):
@@ -311,9 +311,12 @@ class SearchResult(models.Model):
         behind it, so the score arrives with its working shown. Same inputs
         as opportunity_score, so the two cannot disagree.
         """
+        from .popularity import reported_by_apple
+
         return opportunity_reach(
             self.effective_popularity or 0, self.difficulty_score, self.country,
             app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+            reported=reported_by_apple(self.popularity_resolution()),
         )
 
     @property
@@ -342,9 +345,12 @@ class SearchResult(models.Model):
         effective = self.effective_popularity
         if effective is None:
             return None
+        from .popularity import reported_by_apple
         from .services import DownloadEstimator
 
-        return DownloadEstimator().estimate(effective, country=self.country)
+        # The chart writes the searches "up to" unless Apple reports the term.
+        return {**DownloadEstimator().estimate(effective, country=self.country),
+                "searches_reported": reported_by_apple(self.popularity_resolution())}
 
 
 
@@ -418,7 +424,7 @@ class KeywordSearchJob(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.total_keywords} keywords ({', '.join(c.upper() for c in self.countries)}) - {self.status}"
+        return f"{self.total_keywords} keywords ({', '.join(c.upper() for c in self.countries)}): {self.status}"
 
     @property
     def total_keywords(self) -> int:
@@ -504,7 +510,7 @@ class AppleSearchPopularity(models.Model):
         verbose_name_plural = "Apple search popularities"
 
     def __str__(self):
-        return f"{self.term} ({self.country}) — {self.popularity}"
+        return f"{self.term} ({self.country}): {self.popularity}"
 
     @classmethod
     def lookup(cls, term, country):
@@ -583,7 +589,7 @@ class AppleTopTerm(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.term} ({self.country}, {self.week}) - {self.popularity}"
+        return f"{self.term} ({self.country}, {self.week}): {self.popularity}"
 
     @classmethod
     def latest_ingested_week(cls, country):
@@ -769,7 +775,7 @@ class AppleImpressionShare(models.Model):
 
     def __str__(self):
         return (
-            f"{self.search_term} ({self.country}, {self.week}) - "
+            f"{self.search_term} ({self.country}, {self.week}): "
             f"{self.low_share:.0%}-{self.high_share:.0%}"
         )
 
@@ -855,7 +861,7 @@ class OpportunityScan(models.Model):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.keyword} across {self.total_countries} countries - {self.status}"
+        return f"{self.keyword} across {self.total_countries} countries ({self.status})"
 
     @property
     def total_countries(self) -> int:
@@ -977,7 +983,10 @@ class OpportunityScanResult(models.Model):
     def opportunity_reach(self) -> dict:
         """Where the scan's app (or a new app) lands here, what that pays and
         why: the same inputs as opportunity_score, as SearchResult has it."""
+        from .popularity import reported_by_apple
+
         return opportunity_reach(
             self.effective_popularity or 0, self.difficulty_score, self.country,
             app=self.app_profile, app_rank=self.app_rank, keyword=self.keyword_text,
+            reported=reported_by_apple(self.popularity_resolution()),
         )

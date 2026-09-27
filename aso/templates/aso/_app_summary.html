@@ -18,7 +18,7 @@
             </button>
             <div class="min-w-0">
                 <h2 class="text-base font-semibold text-white">
-                    App Summary{% if summary.app_name %} — {{ summary.app_name }}{% endif %}
+                    App Summary{% if summary.app_name %}: {{ summary.app_name }}{% endif %}
                 </h2>
                 <p class="text-slate-500 text-xs mt-0.5">
                     {{ summary.total_keywords }} keyword{{ summary.total_keywords|pluralize }} tracked
@@ -36,7 +36,7 @@
             {% if summary.stale_state == 'stale_7d' %}
             <div class="inline-flex items-center gap-2 text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 px-2.5 py-1 rounded-md">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.78-2.94l-7.07-12a2 2 0 00-3.56 0l-7.07 12A2 2 0 004.93 19z"/></svg>
-                <span title="{{ summary.last_refresh|date:'Y-m-d H:i:s' }}">Stale — refreshed {{ summary.last_refresh|timesince }} ago</span>
+                <span title="{{ summary.last_refresh|date:'Y-m-d H:i:s' }}">Stale: refreshed {{ summary.last_refresh|timesince }} ago</span>
                 <button onclick="bulkRefresh()" class="ml-1 text-red-200 hover:text-white underline underline-offset-2">Refresh now</button>
             </div>
             {% elif summary.stale_state == 'stale_24h' %}
@@ -69,7 +69,7 @@
     <div class="px-4 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
 
         {# Daily downloads now — always an interval, never a point #}
-        <div class="bg-slate-900/40 border border-white/5 rounded-lg p-3 cursor-help {% if summary.stale_state == 'stale_7d' %}opacity-50{% endif %}" data-tip="Estimated downloads per day your app is getting RIGHT NOW from these tracked keywords, at their current ranks. Shown as a range — treat it as a ballpark, not a precise figure.">
+        <div class="bg-slate-900/40 border border-white/5 rounded-lg p-3 cursor-help {% if summary.stale_state == 'stale_7d' %}opacity-50{% endif %}" data-tip="Estimated downloads per day your app is getting RIGHT NOW from these tracked keywords, at their current ranks. Shown as a range: treat it as a ballpark, not a precise figure.">
             <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wider inline-flex items-center gap-1.5">
                 Daily downloads now
                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -81,7 +81,7 @@
         </div>
 
         {# Growth potential — additional /day if everything hit #1 #}
-        <div class="bg-slate-900/40 border border-white/5 rounded-lg p-3 cursor-help {% if summary.stale_state == 'stale_7d' %}opacity-50{% endif %}" data-tip="Additional downloads per day you could capture if every tracked keyword reached rank #1. This is the ceiling — represents untapped opportunity, not a forecast. Actual gains depend on which keywords you can realistically rank for.">
+        <div class="bg-slate-900/40 border border-white/5 rounded-lg p-3 cursor-help {% if summary.stale_state == 'stale_7d' %}opacity-50{% endif %}" data-tip="Additional downloads per day you could capture if every tracked keyword reached rank #1. This is the ceiling. It represents untapped opportunity, not a forecast. Actual gains depend on which keywords you can realistically rank for.">
             <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wider inline-flex items-center gap-1.5">
                 Growth potential
                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -112,7 +112,7 @@
         {% else %}
         <div class="bg-slate-900/20 border border-white/5 rounded-lg p-3 opacity-60">
             <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Rank movement</p>
-            <p class="text-sm text-slate-500 mt-3">Hidden — data too stale to compare movement reliably.</p>
+            <p class="text-sm text-slate-500 mt-3">Hidden: the data is too stale to compare movement reliably.</p>
         </div>
         {% endif %}
     </div>
@@ -136,17 +136,17 @@
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
                         </th>
-                        <th class="px-2 py-2 cursor-help" data-tip="Estimated downloads per day your app is getting RIGHT NOW from these keywords at their current ranks. Shown as a range — treat it as a ballpark, not a precise figure.">
+                        <th class="px-2 py-2 cursor-help" data-tip="Estimated downloads per day your app is getting RIGHT NOW from these keywords at their current ranks. Shown as a range: treat it as a ballpark, not a precise figure.">
                             <span class="inline-flex items-center gap-1">Daily downloads now
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
                         </th>
-                        <th class="px-2 py-2 cursor-help" data-tip="Additional downloads per day you could capture IF every tracked keyword in this country reached rank #1. This is the ceiling — represents untapped opportunity, not a forecast.">
+                        <th class="px-2 py-2 cursor-help" data-tip="Additional downloads per day you could capture IF every tracked keyword in this country reached rank #1. This is the ceiling. It represents untapped opportunity, not a forecast.">
                             <span class="inline-flex items-center gap-1">Growth potential
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
                         </th>
-                        <th class="px-2 py-2 cursor-help" data-tip="Your best (lowest-numbered) rank across this country's tracked keywords, plus how many of them sit inside the Top 20 — the rank range that drives meaningful traffic.">
+                        <th class="px-2 py-2 cursor-help" data-tip="Your best (lowest-numbered) rank across this country's tracked keywords, plus how many of them sit inside the Top 20, the rank range that drives meaningful traffic.">
                             <span class="inline-flex items-center gap-1">Where you rank
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
@@ -156,7 +156,7 @@
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
                         </th>
-                        <th class="px-2 py-2 cursor-help" data-tip="The keyword with the largest untapped download potential — the gap between what you'd get at #1 and what you're getting now. No category judgment: high-competition keywords qualify just like easy ones.">
+                        <th class="px-2 py-2 cursor-help" data-tip="The keyword with the largest untapped download potential, the gap between what you'd get at #1 and what you're getting now. No category judgment: high-competition keywords qualify just like easy ones.">
                             <span class="inline-flex items-center gap-1">Biggest opportunity
                                 <svg class="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </span>
@@ -176,7 +176,7 @@
 
                         {# Daily downloads now — current state #}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
-                            <div class="tabular-nums text-white font-semibold cursor-help" data-tip="Estimated downloads/day from these {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} at their current ranks. {% if row.ranking_keywords == 0 %}You're not ranking anywhere in this country yet — so estimated downloads are ~0.{% else %}{{ row.ranking_keywords }} of {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} contribute. Shown as a range to reflect traffic-model uncertainty.{% endif %}">
+                            <div class="tabular-nums text-white font-semibold cursor-help" data-tip="Estimated downloads/day from these {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} at their current ranks. {% if row.ranking_keywords == 0 %}You're not ranking anywhere in this country yet, so estimated downloads are ~0.{% else %}{{ row.ranking_keywords }} of {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} contribute. Shown as a range to reflect traffic-model uncertainty.{% endif %}">
                                 {{ row.downloads_low|dl_interval_from:row.downloads_high }}
                             </div>
                             <div class="text-[10px] text-slate-500">downloads/day</div>
@@ -184,7 +184,7 @@
 
                         {# Growth potential — the ceiling minus current #}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
-                            <div class="tabular-nums text-purple-300 font-semibold cursor-help" data-tip="If you reached rank #1 for every tracked keyword in this country, you could add this many downloads/day on top of what you have now. It's the upper bound — actual gains depend on which keywords you can realistically rank for.">
+                            <div class="tabular-nums text-purple-300 font-semibold cursor-help" data-tip="If you reached rank #1 for every tracked keyword in this country, you could add this many downloads/day on top of what you have now. It's the upper bound. Actual gains depend on which keywords you can realistically rank for.">
                                 +{{ row.headroom_low|dl_interval_from:row.headroom_high }}
                             </div>
                             <div class="text-[10px] text-slate-500">extra/day at #1</div>
@@ -229,7 +229,7 @@
                         <td class="px-2 py-3 align-top max-w-[16rem]">
                             {% if row.biggest_gap %}
                             <div class="text-white truncate font-medium" title="{{ row.biggest_gap.keyword }}">{{ row.biggest_gap.keyword }}</div>
-                            <div class="text-[10px] text-slate-400 cursor-help" data-tip="{% if row.biggest_gap.rank %}You currently rank #{{ row.biggest_gap.rank }} for this keyword.{% else %}You don't currently rank for this keyword in this country.{% endif %} It has popularity {{ row.biggest_gap.popularity }}/100 — closing the gap to rank #1 could add up to ~{{ row.biggest_gap.headroom_high|floatformat:0 }} downloads/day.">
+                            <div class="text-[10px] text-slate-400 cursor-help" data-tip="{% if row.biggest_gap.rank %}You currently rank #{{ row.biggest_gap.rank }} for this keyword.{% else %}You don't currently rank for this keyword in this country.{% endif %} It has popularity {{ row.biggest_gap.popularity }}/100, closing the gap to rank #1 could add up to ~{{ row.biggest_gap.headroom_high|floatformat:0 }} downloads/day.">
                                 {% if row.biggest_gap.rank %}
                                     <span class="tabular-nums">#{{ row.biggest_gap.rank }}</span>
                                 {% else %}
@@ -252,7 +252,7 @@
         </div>
         {% if summary.overflow_count > 0 %}
         <p class="text-[11px] text-slate-500 mt-2 italic">
-            +{{ summary.overflow_count }} more countr{{ summary.overflow_count|pluralize:"y,ies" }} not shown — sorted by current downloads.
+            +{{ summary.overflow_count }} more countr{{ summary.overflow_count|pluralize:"y,ies" }} not shown, sorted by current downloads.
         </p>
         {% endif %}
     </div>
@@ -264,7 +264,7 @@
         {# Rank distribution — diagnostic shape, no copy about what's "good" #}
         <div>
             <div class="flex items-center justify-between mb-1.5">
-                <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1.5 cursor-help" data-tip="Each tracked keyword sits in one rank bracket — from Top 5 (positions 1–5, the most visible) all the way down to Not ranking (outside Top 200). The bar shows the count in each bracket so you can see at a glance whether your app's ranking distribution is healthy, mid-pack, or thin.">
+                <h4 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1.5 cursor-help" data-tip="Each tracked keyword sits in one rank bracket, from Top 5 (positions 1-5, the most visible) all the way down to Not ranking (outside Top 200). The bar shows the count in each bracket so you can see at a glance whether your app's ranking distribution is healthy, mid-pack, or thin.">
                     Where your keywords rank
                     <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </h4>
@@ -272,24 +272,24 @@
             </div>
             <div class="flex h-2.5 rounded-full overflow-hidden bg-slate-900/60">
                 {% with rd=summary.rank_dist tot=summary.total_keywords %}
-                {% if rd.t5 %}<div class="bg-emerald-500 cursor-help" style="width: {{ rd.t5|pct_of:tot }}%" data-tip="{{ rd.t5 }} keyword{{ rd.t5|pluralize }} in positions 1–5 (Top 5) — the most visible search positions."></div>{% endif %}
-                {% if rd.t10 %}<div class="bg-green-500 cursor-help" style="width: {{ rd.t10|pct_of:tot }}%" data-tip="{{ rd.t10 }} keyword{{ rd.t10|pluralize }} in positions 6–10 — still on the first page of results for most users."></div>{% endif %}
-                {% if rd.t20 %}<div class="bg-yellow-500 cursor-help" style="width: {{ rd.t20|pct_of:tot }}%" data-tip="{{ rd.t20 }} keyword{{ rd.t20|pluralize }} in positions 11–20 — visible but require some scrolling."></div>{% endif %}
-                {% if rd.t50 %}<div class="bg-orange-500 cursor-help" style="width: {{ rd.t50|pct_of:tot }}%" data-tip="{{ rd.t50 }} keyword{{ rd.t50|pluralize }} in positions 21–50 — drives very little organic traffic."></div>{% endif %}
-                {% if rd.t100 %}<div class="bg-red-500/70 cursor-help" style="width: {{ rd.t100|pct_of:tot }}%" data-tip="{{ rd.t100 }} keyword{{ rd.t100|pluralize }} in positions 51–100 — effectively no download contribution."></div>{% endif %}
-                {% if rd.t200 %}<div class="bg-slate-600 cursor-help" style="width: {{ rd.t200|pct_of:tot }}%" data-tip="{{ rd.t200 }} keyword{{ rd.t200|pluralize }} in positions 101–200 — visible only to users who scroll deep."></div>{% endif %}
-                {% if rd.unranked %}<div class="bg-slate-700 cursor-help" style="width: {{ rd.unranked|pct_of:tot }}%" data-tip="{{ rd.unranked }} keyword{{ rd.unranked|pluralize }} are not ranking in the Top 200 at all — your app isn't visible for these search terms."></div>{% endif %}
+                {% if rd.t5 %}<div class="bg-emerald-500 cursor-help" style="width: {{ rd.t5|pct_of:tot }}%" data-tip="{{ rd.t5 }} keyword{{ rd.t5|pluralize }} in positions 1-5 (Top 5), the most visible search positions."></div>{% endif %}
+                {% if rd.t10 %}<div class="bg-green-500 cursor-help" style="width: {{ rd.t10|pct_of:tot }}%" data-tip="{{ rd.t10 }} keyword{{ rd.t10|pluralize }} in positions 6-10, still on the first page of results for most users."></div>{% endif %}
+                {% if rd.t20 %}<div class="bg-yellow-500 cursor-help" style="width: {{ rd.t20|pct_of:tot }}%" data-tip="{{ rd.t20 }} keyword{{ rd.t20|pluralize }} in positions 11-20, visible but require some scrolling."></div>{% endif %}
+                {% if rd.t50 %}<div class="bg-orange-500 cursor-help" style="width: {{ rd.t50|pct_of:tot }}%" data-tip="{{ rd.t50 }} keyword{{ rd.t50|pluralize }} in positions 21-50, drives very little organic traffic."></div>{% endif %}
+                {% if rd.t100 %}<div class="bg-red-500/70 cursor-help" style="width: {{ rd.t100|pct_of:tot }}%" data-tip="{{ rd.t100 }} keyword{{ rd.t100|pluralize }} in positions 51-100, effectively no download contribution."></div>{% endif %}
+                {% if rd.t200 %}<div class="bg-slate-600 cursor-help" style="width: {{ rd.t200|pct_of:tot }}%" data-tip="{{ rd.t200 }} keyword{{ rd.t200|pluralize }} in positions 101-200, visible only to users who scroll deep."></div>{% endif %}
+                {% if rd.unranked %}<div class="bg-slate-700 cursor-help" style="width: {{ rd.unranked|pct_of:tot }}%" data-tip="{{ rd.unranked }} keyword{{ rd.unranked|pluralize }} are not ranking in the Top 200 at all, so your app isn't visible for these search terms."></div>{% endif %}
                 {% endwith %}
             </div>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] text-slate-500">
                 {% with rd=summary.rank_dist %}
-                {% if rd.t5 %}<span class="cursor-help" data-tip="Positions 1–5 — the most visible search slots."><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 align-middle mr-1"></span>Top 5: <span class="text-slate-300">{{ rd.t5 }}</span></span>{% endif %}
-                {% if rd.t10 %}<span class="cursor-help" data-tip="Positions 6–10 — still on the first page of results for most users."><span class="inline-block w-2 h-2 rounded-sm bg-green-500 align-middle mr-1"></span>Top 6–10: <span class="text-slate-300">{{ rd.t10 }}</span></span>{% endif %}
-                {% if rd.t20 %}<span class="cursor-help" data-tip="Positions 11–20 — visible with some scrolling."><span class="inline-block w-2 h-2 rounded-sm bg-yellow-500 align-middle mr-1"></span>Top 11–20: <span class="text-slate-300">{{ rd.t20 }}</span></span>{% endif %}
-                {% if rd.t50 %}<span class="cursor-help" data-tip="Positions 21–50 — very limited organic visibility."><span class="inline-block w-2 h-2 rounded-sm bg-orange-500 align-middle mr-1"></span>Top 21–50: <span class="text-slate-300">{{ rd.t50 }}</span></span>{% endif %}
-                {% if rd.t100 %}<span class="cursor-help" data-tip="Positions 51–100 — effectively no download contribution."><span class="inline-block w-2 h-2 rounded-sm bg-red-500/70 align-middle mr-1"></span>Top 51–100: <span class="text-slate-300">{{ rd.t100 }}</span></span>{% endif %}
-                {% if rd.t200 %}<span class="cursor-help" data-tip="Positions 101–200 — only visible to deep scrollers."><span class="inline-block w-2 h-2 rounded-sm bg-slate-600 align-middle mr-1"></span>101–200: <span class="text-slate-300">{{ rd.t200 }}</span></span>{% endif %}
-                {% if rd.unranked %}<span class="cursor-help" data-tip="Outside the Top 200 — your app isn't visible for these searches."><span class="inline-block w-2 h-2 rounded-sm bg-slate-700 align-middle mr-1"></span>Not ranking: <span class="text-slate-300">{{ rd.unranked }}</span></span>{% endif %}
+                {% if rd.t5 %}<span class="cursor-help" data-tip="Positions 1-5, the most visible search slots."><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 align-middle mr-1"></span>Top 5: <span class="text-slate-300">{{ rd.t5 }}</span></span>{% endif %}
+                {% if rd.t10 %}<span class="cursor-help" data-tip="Positions 6-10, still on the first page of results for most users."><span class="inline-block w-2 h-2 rounded-sm bg-green-500 align-middle mr-1"></span>Top 6–10: <span class="text-slate-300">{{ rd.t10 }}</span></span>{% endif %}
+                {% if rd.t20 %}<span class="cursor-help" data-tip="Positions 11-20, visible with some scrolling."><span class="inline-block w-2 h-2 rounded-sm bg-yellow-500 align-middle mr-1"></span>Top 11–20: <span class="text-slate-300">{{ rd.t20 }}</span></span>{% endif %}
+                {% if rd.t50 %}<span class="cursor-help" data-tip="Positions 21-50, very limited organic visibility."><span class="inline-block w-2 h-2 rounded-sm bg-orange-500 align-middle mr-1"></span>Top 21–50: <span class="text-slate-300">{{ rd.t50 }}</span></span>{% endif %}
+                {% if rd.t100 %}<span class="cursor-help" data-tip="Positions 51-100, effectively no download contribution."><span class="inline-block w-2 h-2 rounded-sm bg-red-500/70 align-middle mr-1"></span>Top 51–100: <span class="text-slate-300">{{ rd.t100 }}</span></span>{% endif %}
+                {% if rd.t200 %}<span class="cursor-help" data-tip="Positions 101-200, only visible to deep scrollers."><span class="inline-block w-2 h-2 rounded-sm bg-slate-600 align-middle mr-1"></span>101–200: <span class="text-slate-300">{{ rd.t200 }}</span></span>{% endif %}
+                {% if rd.unranked %}<span class="cursor-help" data-tip="Outside the Top 200, your app isn't visible for these searches."><span class="inline-block w-2 h-2 rounded-sm bg-slate-700 align-middle mr-1"></span>Not ranking: <span class="text-slate-300">{{ rd.unranked }}</span></span>{% endif %}
                 {% endwith %}
             </div>
         </div>

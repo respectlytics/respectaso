@@ -289,7 +289,7 @@
             return job.progress_message;
         }
         return 'Resume when you are ready. Everything researched so far is already in your Search History, ' +
-            'and this search stays here until you resume or discard it - quitting the app is fine.';
+            'and this search stays here until you resume or discard it. Quitting the app is fine.';
     }
 
     function actionsFor(job) {

@@ -1,0 +1,12 @@
+{% extends "error_standalone.html" %}
+{% block title %}Request not understood{% endblock %}
+{% block code %}Error 400{% endblock %}
+{% block heading %}RespectASO couldn't read this request{% endblock %}
+{% block message %}
+{% if disallowed_host %}
+<p>RespectASO only answers at the addresses it knows: localhost, 127.0.0.1 and respectaso.private.</p>
+<p>Open it at one of those, for example http://localhost, and try again.</p>
+{% else %}
+<p>Go back to the Dashboard and try again from there.</p>
+{% endif %}
+{% endblock %}

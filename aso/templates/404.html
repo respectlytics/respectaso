@@ -1,0 +1,7 @@
+{% extends "aso/base.html" %}
+{% comment %}The 404 page, inside the app's shell (aso/error_views.py).{% endcomment %}
+{% block title %}Page not found · RespectASO{% endblock %}
+{% block extra_head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+{% include "aso/partials/error_card.html" with code="Error 404" heading="This page doesn't exist" message="The link may be out of date, or what it pointed to was deleted." %}
+{% endblock %}

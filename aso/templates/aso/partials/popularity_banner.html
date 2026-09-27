@@ -32,7 +32,7 @@ Context flags come from aso.context_processors.popularity_source.
 <div id="apple-upgrade-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
-            <span class="font-semibold">Apple Ads popularity now uses Apple's official API - reconnect once to keep it flowing.</span>
+            <span class="font-semibold">Apple Ads popularity now uses Apple's official API. Reconnect once to keep it flowing.</span>
             Your scores keep using the last-synced Apple data, but it stops refreshing until you connect
             with the new one-time API key setup (about 5 minutes).
         </p>
@@ -48,7 +48,7 @@ Context flags come from aso.context_processors.popularity_source.
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple Ads is disconnected but still your popularity source.</span>
             Scores keep using your last-synced Apple data; new keywords use the estimate.
-            Connect again - or switch to the RespectASO estimate in Settings.
+            Connect again, or switch to the RespectASO estimate in Settings.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -61,7 +61,7 @@ Context flags come from aso.context_processors.popularity_source.
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple rejected the API credentials.</span>
-            Popularity data stopped refreshing - the key may have been revoked or replaced at Apple.
+            Popularity data stopped refreshing. The key may have been revoked or replaced at Apple.
             Re-verify the connection in Settings.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
@@ -74,7 +74,7 @@ Context flags come from aso.context_processors.popularity_source.
 <div id="apple-needsverify-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
-            <span class="font-semibold">Apple Ads is almost connected - one step left.</span>
+            <span class="font-semibold">Apple Ads is almost connected: one step left.</span>
             Run the connection verification in Settings to resume Apple popularity syncing.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
@@ -88,7 +88,7 @@ Context flags come from aso.context_processors.popularity_source.
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-indigo-200/90">
             <span class="font-semibold">Recommended: connect Apple Ads for official search popularity.</span>
-            Apple now publishes its search popularity data through an official API - a free, read-only,
+            Apple now publishes its search popularity data through an official API, a free, read-only,
             one-time key setup (about 5 minutes, no ads or spend required). Your scores currently use
             RespectASO's estimate; prefer to keep it? Choose "stay on the estimate" in Settings.
         </p>

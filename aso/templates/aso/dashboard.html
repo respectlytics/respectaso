@@ -2,7 +2,7 @@
 {% load static %}
 {% load aso_tags %}
 
-{% block title %}Dashboard — RespectASO{% endblock %}
+{% block title %}Dashboard · RespectASO{% endblock %}
 
 {% block content %}
 <div class="space-y-5">
@@ -246,7 +246,7 @@
                     <p>
                         RespectASO knows two popularity sources: its own estimate (<span class="font-mono text-[10px]">EST</span>)
                         and, when you connect Apple Ads, <span class="text-slate-200">Apple's official search popularity</span>
-                        (<span class="font-mono text-[10px] text-sky-300">ASA</span>) from the Apple Ads Platform API -
+                        (<span class="font-mono text-[10px] text-sky-300">ASA</span>) from the Apple Ads Platform API,
                         Apple's weekly ranking of each category's 500 most-searched terms. Each cell shows the one value that
                         powers your scores; hover its badge for the full story, including the other source's value. You pick the source in
                         <a href="{% url 'aso:settings_popularity' %}" class="text-purple-400 hover:text-purple-300">Settings → Popularity Source</a>.
@@ -255,21 +255,21 @@
                         <div class="bg-sky-500/[0.04] border border-sky-500/15 rounded-lg p-3">
                             <p class="text-[11px] font-semibold uppercase tracking-wider text-sky-300 mb-2">Reading the badges</p>
                             <ul class="space-y-1.5">
-                                <li><span class="font-mono text-[10px] text-sky-300">ASA</span> <span class="text-slate-500">— Apple's official value for this keyword (reported values start around 40 on the 1–100 scale).</span></li>
-                                <li><span class="font-mono text-[10px] text-slate-300">EST</span> <span class="text-slate-500">— RespectASO's estimate, calibrated against Apple's official data so both speak the same 1–100 scale.</span></li>
-                                <li><span class="font-mono text-[10px] text-slate-300">EST*</span> <span class="text-slate-500">— this keyword is outside Apple's published top terms, so the calibrated estimate covers it, capped just below the least-reported value of its category. Hover the badge for the exact numbers.</span></li>
+                                <li><span class="font-mono text-[10px] text-sky-300">ASA</span><span class="text-slate-500">: Apple's official value for this keyword (reported values start around 40 on the 1–100 scale).</span></li>
+                                <li><span class="font-mono text-[10px] text-slate-300">EST</span><span class="text-slate-500">: RespectASO's estimate, calibrated against Apple's official data so both speak the same 1–100 scale.</span></li>
+                                <li><span class="font-mono text-[10px] text-slate-300">EST*</span><span class="text-slate-500">: this keyword is outside Apple's published top terms, so the calibrated estimate covers it, capped just below the least-reported value of its category. Hover the badge for the exact numbers.</span></li>
                             </ul>
                         </div>
                         <div class="bg-emerald-500/[0.04] border border-emerald-500/15 rounded-lg p-3">
                             <p class="text-[11px] font-semibold uppercase tracking-wider text-emerald-300 mb-2">Reading the arrows</p>
                             <ul class="space-y-1.5">
-                                <li><span class="text-green-400 font-mono text-[10px]">(↑6)</span> <span class="text-slate-500">— change since this keyword's previous check: popularity moved up 6 vs the last snapshot. The same arrows appear on difficulty and rank.</span></li>
-                                <li><span class="text-emerald-400 font-mono text-[10px]">▲ / ▼</span> <span class="text-slate-500">— Apple's weekly movement: the keyword's official popularity rose or fell vs the previous dataset week (hover for the exact change).</span></li>
+                                <li><span class="text-green-400 font-mono text-[10px]">(↑6)</span><span class="text-slate-500">: change since this keyword's previous check: popularity moved up 6 vs the last snapshot. The same arrows appear on difficulty and rank.</span></li>
+                                <li><span class="text-emerald-400 font-mono text-[10px]">▲ / ▼</span><span class="text-slate-500">: Apple's weekly movement: the keyword's official popularity rose or fell vs the previous dataset week (hover for the exact change).</span></li>
                             </ul>
                         </div>
                     </div>
                     <p class="pt-1">
-                        Where Apple publishes a value, it is Apple's own measurement; where it doesn't, the estimate steps in -
+                        Where Apple publishes a value, it is Apple's own measurement; where it doesn't, the estimate steps in,
                         clearly badged, on the same scale, so every keyword stays comparable.
                         <a href="{% url 'aso:methodology' %}" class="text-purple-400 hover:text-purple-300 font-medium">How both sources work →</a>
                     </p>
@@ -446,7 +446,7 @@
                                 </div>
                                 <span class="text-slate-500 text-xs block">{{ result.difficulty_label }}</span>
                                 {% if result.difficulty_breakdown.is_brand_keyword %}
-                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword - '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's ratings.">🏷️ Brand</span>
+                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword: '{{ result.keyword }}' matches the #1 app's publisher. Difficulty reflects the full competitive field, not just the #1 app's ratings.">🏷️ Brand</span>
                                 {% endif %}
                             </td>
                             <td class="px-3 py-2 text-center text-base font-bold bg-cyan-500/5" data-sort-value="{{ result.opportunity_score }}">
@@ -739,7 +739,7 @@
                 No results match the active filter
             </h3>
             <p class="text-slate-400 text-xs mt-1.5">
-                Filtered to {{ selected_country|country_flag }} <span class="text-slate-200">{{ selected_country|country_name }}</span> —
+                Filtered to {{ selected_country|country_flag }} <span class="text-slate-200">{{ selected_country|country_name }}</span>,
                 but this app doesn't have any tracked keywords in that country.
             </p>
             <a data-in-place href="?{% if selected_app %}app={{ selected_app }}{% endif %}"
@@ -1529,7 +1529,7 @@ async function refreshKeyword(keywordId, country, btn) {
 }
 
 async function bulkRefresh() {
-    const ok = await showConfirm('Refresh all tracked keywords across all countries? This runs in the background — you can navigate away safely.', {type: 'alert', title: 'Bulk Refresh'});
+    const ok = await showConfirm('Refresh all tracked keywords across all countries? This runs in the background, so you can navigate away safely.', {type: 'alert', title: 'Bulk Refresh'});
     if (!ok) return;
 
     const btn = document.getElementById('bulk-refresh-btn');
@@ -2050,7 +2050,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const difficultyColorClass = result.difficulty_color;
         const overrideNote = '';
         const brandBadge = result.difficulty_breakdown.is_brand_keyword
-            ? `<span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" title="Brand keyword — '${result.keyword}' matches the #1 app's publisher. Difficulty reflects the full competitive field.">🏷️ Brand</span>`
+            ? `<span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-[10px] inline-flex items-center gap-0.5 mt-0.5 cursor-help" title="Brand keyword: '${result.keyword}' matches the #1 app's publisher. Difficulty reflects the full competitive field.">🏷️ Brand</span>`
             : '';
 
         let competitorsRows = '';

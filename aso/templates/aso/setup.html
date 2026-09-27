@@ -1,6 +1,6 @@
 {% extends "aso/base.html" %}
 
-{% block title %}Setup Guide — RespectASO{% endblock %}
+{% block title %}Setup Guide · RespectASO{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
@@ -24,7 +24,7 @@
             <span class="text-purple-400">🚀</span> Installation
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
-            <p>You're running the native Mac app — the recommended way to use RespectASO.</p>
+            <p>You're running the native Mac app, the recommended way to use RespectASO.</p>
             <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
                 <li><a href="{% url 'aso:download_dmg' %}" class="text-purple-400 hover:text-purple-300">Download the latest <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">.dmg</code></a></li>
                 <li>Open the <code class="bg-slate-800 px-1.5 py-0.5 rounded">.dmg</code> and drag <strong class="text-white">RespectASO</strong> into <strong class="text-white">Applications</strong></li>
@@ -33,7 +33,7 @@
             <div class="bg-slate-800/80 rounded-lg p-3 text-xs text-slate-400 mt-2">
                 <p class="text-white font-medium mb-1">First launch on macOS</p>
                 <p>
-                    If macOS shows "RespectASO can't be opened because Apple cannot check it for malicious software," right-click the app → Open → Open. You only need to do this once — the app is code-signed and notarized by Apple.
+                    If macOS shows "RespectASO can't be opened because Apple cannot check it for malicious software," right-click the app → Open → Open. You only need to do this once. The app is code-signed and notarized by Apple.
                 </p>
             </div>
         </div>
@@ -52,8 +52,8 @@
                 ~/Library/Application Support/RespectASO/
             </div>
             <ul class="list-disc list-inside space-y-1.5 text-slate-400">
-                <li><strong class="text-white">App updates</strong> — your data survives (it's outside the .app bundle)</li>
-                <li><strong class="text-white">Deleting the app</strong> — your data survives (delete the folder above to fully remove)</li>
+                <li><strong class="text-white">App updates</strong>: your data survives (it's outside the .app bundle)</li>
+                <li><strong class="text-white">Deleting the app</strong>: your data survives (delete the folder above to fully remove)</li>
             </ul>
         </div>
     </section>
@@ -88,7 +88,7 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                RespectASO is now available as a <strong class="text-white">native Mac app</strong> — no Docker required.
+                RespectASO is now available as a <strong class="text-white">native Mac app</strong>: no Docker required.
                 It's faster, simpler, and updates with a single drag-and-drop.
             </p>
             <div class="flex items-center gap-3">
@@ -158,9 +158,9 @@
                 Your data is stored in a Docker volume (<code class="bg-slate-800 px-1.5 py-0.5 rounded">aso_data</code>). This means:
             </p>
             <ul class="list-disc list-inside space-y-1.5 text-slate-400">
-                <li><strong class="text-white">Container restarts</strong> — your data survives</li>
-                <li><strong class="text-white">Image rebuilds</strong> — your data survives</li>
-                <li><strong class="text-white"><code class="bg-slate-800 px-1 py-0.5 rounded text-red-300">docker compose down -v</code></strong> — this deletes the volume and all your data</li>
+                <li><strong class="text-white">Container restarts</strong>: your data survives</li>
+                <li><strong class="text-white">Image rebuilds</strong>: your data survives</li>
+                <li><strong class="text-white"><code class="bg-slate-800 px-1 py-0.5 rounded text-red-300">docker compose down -v</code></strong>: this deletes the volume and all your data</li>
             </ul>
         </div>
     </section>
@@ -231,7 +231,7 @@
             <p>
                 After saving, open your browser and go to
                 <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">http://respectaso.private</code>.
-                No restart needed — it works immediately.
+                No restart needed: it works immediately.
             </p>
 
             <div class="bg-slate-800/80 rounded-lg p-4 text-xs text-slate-400">
@@ -239,9 +239,9 @@
                 <p>
                     We recommend the <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code> TLD because it's reserved for
                     private use and won't conflict with real domains or macOS mDNS resolution (<code class="bg-slate-800 px-1 py-0.5 rounded">.local</code>
-                    can cause slowdowns on macOS because it triggers Bonjour lookups). You can use any name you want —
-                    <code class="bg-slate-800 px-1 py-0.5 rounded">aso.test</code>,
-                    <code class="bg-slate-800 px-1 py-0.5 rounded">respectaso.dev</code>, etc. — but <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code>
+                    can cause slowdowns on macOS because it triggers Bonjour lookups). You can use any name you want
+                    (<code class="bg-slate-800 px-1 py-0.5 rounded">aso.test</code>,
+                    <code class="bg-slate-800 px-1 py-0.5 rounded">respectaso.dev</code>, etc.), but <code class="bg-slate-800 px-1 py-0.5 rounded">.private</code>
                     is the safest choice.
                 </p>
             </div>

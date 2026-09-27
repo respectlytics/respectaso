@@ -1,7 +1,7 @@
 {% extends "aso/base.html" %}
 {% load aso_tags %}
 
-{% block title %}Apple Ads Setup - RespectASO{% endblock %}
+{% block title %}Apple Ads Setup · RespectASO{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
@@ -10,7 +10,7 @@
         <h1 class="text-2xl font-bold text-white mb-1">Connect Apple Ads</h1>
         <p class="text-sm text-slate-400">
             A one-time setup (about 5 minutes) that unlocks Apple's official search popularity as a source in
-            RespectASO, through the Apple Ads Platform API. Free - no campaigns, no spend required.
+            RespectASO, through the Apple Ads Platform API. Free, no campaigns, no spend required.
             Works in every edition: desktop, browser, and Docker.
         </p>
     </div>
@@ -24,7 +24,7 @@
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
             <p>
                 Go to <a href="https://ads.apple.com" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300">ads.apple.com</a>
-                and sign up with your Apple Account. Choose the <span class="text-white font-medium">Advanced</span> plan when asked - it's the
+                and sign up with your Apple Account. Choose the <span class="text-white font-medium">Advanced</span> plan when asked: it's the
                 free self-service tier, and creating the account costs nothing. You need the
                 <span class="text-white font-medium">Admin</span> role in it (you have it automatically on your own account).
             </p>
@@ -43,14 +43,14 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
             <p>
-                Apple only shows the API key-upload field to users holding an <span class="text-white font-medium">API role</span> -
-                an Admin login alone sees a different page (the third-party "Manage API Access" list). To get the role:
+                Apple only shows the API key-upload field to users holding an <span class="text-white font-medium">API role</span>.
+                An Admin login alone sees a different page (the third-party "Manage API Access" list). To get the role:
             </p>
             <ol class="list-decimal pl-5 space-y-1.5 text-sm">
                 <li>In the Apple Ads UI, open <span class="text-white">Account Settings → User Management</span> and click
                     <span class="text-white">Invite Users</span>.</li>
-                <li>Enter a name and an Apple Account email that is not already in this Apple Ads account -
-                    a second email you own works (it must be, or become, an Apple Account).</li>
+                <li>Enter a name and an Apple Account email that is not already in this Apple Ads account.
+                    A second email you own works (it must be, or become, an Apple Account).</li>
                 <li>Under User Access and Role, choose <span class="text-white font-medium">API Account Manager</span>.
                     (With the read-only API role, Apple does not display the key-upload field.)</li>
                 <li>Send the invite, open the email, follow the secure link, and enter the code to activate.</li>
@@ -68,7 +68,7 @@
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
             <p>
                 In <a href="{% url 'aso:settings_popularity' %}" class="text-sky-400 hover:text-sky-300">Settings → Popularity Source</a>,
-                click <span class="text-white font-medium">"Start - generate my key pair"</span>. RespectASO creates a secure key on
+                click <span class="text-white font-medium">"Generate my key pair"</span>. RespectASO creates a secure key on
                 this computer and shows you the <span class="text-white">public</span> half.
             </p>
             <p>
@@ -77,7 +77,7 @@
             </p>
             <p class="text-xs text-slate-500">
                 The private key stays in your local data folder with owner-only permissions and never leaves this
-                computer - Apple only ever receives the public key and signed requests.
+                computer. Apple only ever receives the public key and signed requests.
             </p>
         </div>
     </section>
@@ -92,7 +92,7 @@
             <p>
                 After saving, Apple shows three values right above the key field: <span class="text-white font-mono text-xs">clientId</span>,
                 <span class="text-white font-mono text-xs">teamId</span>, and <span class="text-white font-mono text-xs">keyId</span>
-                (Client ID and Team ID are often identical - that's normal). Paste them into RespectASO and click
+                (Client ID and Team ID are often identical, and that's normal). Paste them into RespectASO and click
                 <span class="text-white font-medium">"Save &amp; verify connection"</span>. Verification makes a real API call,
                 picks your ad account, and starts the first data sync immediately.
             </p>
@@ -116,7 +116,7 @@
                 <span class="text-white font-medium">Top terms only:</span> Apple reports each category's top 500
                 most-searched terms (roughly 500+ weekly searches). Keywords outside them show the
                 <span class="text-slate-300 font-mono text-xs">EST*</span> badge and score from the calibrated estimate,
-                capped just below their category's reported range - a bound on their popularity, not an error.
+                capped just below their category's reported range, a bound on their popularity, not an error.
                 Hovering the badge explains the exact cap for that keyword.
             </span></li>
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
@@ -125,8 +125,8 @@
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Extras included:</span> the
                 <a href="{% if pro_edition %}{% url 'aso_pro:top_terms' %}{% else %}{% url 'aso:pro_promo_top_terms' %}{% endif %}" class="text-sky-400 hover:text-sky-300">Top Terms</a> browser
-                (Apple's full ranking, with movers - part of RespectASO Pro), weekly trend arrows on your keywords, and - if you run Apple Ads
-                campaigns - your ads' impression share per search term on the dashboard.
+                (Apple's full ranking, with movers, part of RespectASO Pro), weekly trend arrows on your keywords, and, if you run Apple Ads
+                campaigns, your ads' impression share per search term on the dashboard.
             </span></li>
         </ul>
     </section>
@@ -154,7 +154,7 @@
                     </tr>
                     <tr class="border-b border-white/5">
                         <td class="py-2.5 pr-4 align-top text-slate-400">No Public Key field at Apple</td>
-                        <td class="py-2.5">You are signed in as an Admin without an API role - the API page then only lists
+                        <td class="py-2.5">You are signed in as an Admin without an API role, so the API page only lists
                             third-party providers. Complete step 2 and sign in as the API user.</td>
                     </tr>
                     <tr class="border-b border-white/5">
@@ -164,8 +164,8 @@
                     </tr>
                     <tr class="border-b border-white/5">
                         <td class="py-2.5 pr-4 align-top text-slate-400">A storefront shows no Apple data</td>
-                        <td class="py-2.5">Apple Ads doesn't operate there (e.g. Russia), or its first sync hasn't run yet -
-                            storefronts sync automatically once you track keywords in them.</td>
+                        <td class="py-2.5">Apple Ads doesn't operate there (e.g. Russia), or its first sync hasn't run yet.
+                            Storefronts sync automatically once you track keywords in them.</td>
                     </tr>
                     <tr>
                         <td class="py-2.5 pr-4 align-top text-slate-400">What does Disconnect do?</td>

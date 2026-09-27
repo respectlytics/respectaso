@@ -259,11 +259,11 @@ def _fetch_week(credentials, ad_account_id, country, week, run_state,
     pages = 0
     while True:
         if run_state["requests"] >= MAX_REQUESTS_PER_RUN:
-            raise _CeilingReached("per-run request ceiling reached")
+            raise _CeilingReached("Per-run request ceiling reached")
         if _requests_in_last_24h() >= MAX_REQUESTS_PER_DAY:
-            raise _CeilingReached("daily request ceiling reached")
+            raise _CeilingReached("Daily request ceiling reached")
         if max_pages is not None and pages >= max_pages:
-            raise _CeilingReached("inline page ceiling reached")
+            raise _CeilingReached("Inline page ceiling reached")
         if pages > 0:
             _pace(run_state["pacing"], sleeper=sleeper)
         _record_request()
@@ -403,8 +403,8 @@ def _run_sync(force: bool = False) -> None:
                     outcome = "partial"
                     error_message = (
                         f"Apple's data for {country.upper()} (week of "
-                        f"{week}) looked incomplete ({reason}) - keeping "
-                        "the last good week. Retrying automatically."
+                        f"{week}) looked incomplete ({reason}), so the "
+                        "last good week stays. Retrying automatically."
                     )
                     logger.warning("Week quarantined: %s", error_message)
                     continue
@@ -417,19 +417,19 @@ def _run_sync(force: bool = False) -> None:
         _run_backfill(credentials, ad_account_id, run_state)
     except _CeilingReached as e:
         outcome, error_message = "partial", (
-            f"{e} - the remaining work resumes on the next automatic sync."
+            f"{e}. The remaining work resumes on the next automatic sync."
         )
     except AppleAdsAuthError:
         storage.mark_credentials_rejected()
         outcome, error_message = "error", (
-            "Apple rejected the API credentials - reconnect from Settings."
+            "Apple rejected the API credentials. Reconnect from Settings."
         )
     except AppleAdsAccessError as e:
         outcome, error_message = "error", str(e)
     except AppleAdsRateLimitedError:
         run_state["pacing"] = min(MAX_PACING_DELAY, run_state["pacing"] * 2)
         outcome, error_message = "rate_limited", (
-            "Rate limited by Apple - the sync resumes automatically."
+            "Rate limited by Apple. The sync resumes automatically."
         )
     except AppleAdsError as e:
         outcome, error_message = "partial", str(e)

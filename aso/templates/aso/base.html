@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}RespectASO — Free ASO Keyword Research Tool{% endblock %}</title>
+    <title>{% block title %}RespectASO: Free ASO Keyword Research Tool{% endblock %}</title>
     {# Compiled locally via scripts/build_css.sh - never load Tailwind from a CDN (see tailwind.instructions.md) #}
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
@@ -25,7 +25,7 @@
         <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
             <p class="text-xs text-amber-200/90">
                 <span class="font-semibold">RespectASO is now a native Mac app!</span>
-                Download the <code class="bg-amber-900/40 px-1 py-0.5 rounded">.dmg</code> for a faster experience — no Docker required.
+                Download the <code class="bg-amber-900/40 px-1 py-0.5 rounded">.dmg</code> for a faster experience, no Docker required.
             </p>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <a href="{% url 'aso:download_dmg' %}"
@@ -109,7 +109,7 @@
                     <span class="border-l border-white/10 h-4"></span>
                     <a href="https://www.youtube.com/@TheCreatorBehind"
                        target="_blank" rel="noopener"
-                       title="The Creator Behind — YouTube"
+                       title="The Creator Behind on YouTube"
                        class="inline-flex items-center gap-1.5 text-xs text-red-300/70 hover:text-red-300 transition-colors">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.498 6.186a2.997 2.997 0 00-2.11-2.12C19.507 3.56 12 3.56 12 3.56s-7.507 0-9.388.506a2.997 2.997 0 00-2.11 2.12A31.427 31.427 0 000 12a31.427 31.427 0 00.502 5.814 2.997 2.997 0 002.11 2.12c1.881.506 9.388.506 9.388.506s7.507 0 9.388-.506a2.997 2.997 0 002.11-2.12A31.427 31.427 0 0024 12a31.427 31.427 0 00-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                         <span class="hidden sm:inline">The Creator Behind</span>
@@ -172,8 +172,8 @@
              What's New or dismissing. Patch updates never show it. -->
         <div id="whats-new-notice" class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5">
             <p class="text-sm text-indigo-200">
-                ✨ RespectASO was updated to <strong class="text-white">v{{ VERSION }}</strong> —
-                <a href="{% url 'aso:whats_new' %}" class="text-indigo-300 underline decoration-indigo-400/40 hover:text-white transition-colors">see what's new</a>
+                ✨ RespectASO was updated to <strong class="text-white">v{{ VERSION }}</strong>.
+                <a href="{% url 'aso:whats_new' %}" class="text-indigo-300 underline decoration-indigo-400/40 hover:text-white transition-colors">See what's new</a>
             </p>
             <button type="button" aria-label="Dismiss"
                     onclick="fetch('{% url 'aso:whats_new_seen' %}', {method: 'POST', headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}}); this.parentElement.remove();"
@@ -436,7 +436,7 @@
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank') return;
         e.preventDefault();
-        showConfirm('A search is currently running. Leaving will cancel it — any results collected so far will be saved.\n\nLeave anyway?', {type: 'alert', title: 'Search in Progress', confirmLabel: 'Leave', confirmStyle: 'danger'}).then(function(ok) {
+        showConfirm('A search is currently running. Leaving will cancel it. Any results collected so far will be saved.\n\nLeave anyway?', {type: 'alert', title: 'Search in Progress', confirmLabel: 'Leave', confirmStyle: 'danger'}).then(function(ok) {
             if (ok) {
                 if (typeof window.cancelSearch === 'function') {
                     window.cancelSearch();

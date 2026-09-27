@@ -1,0 +1,12 @@
+{% extends "error_standalone.html" %}
+{% block title %}Something went wrong{% endblock %}
+{% block code %}Error 500{% endblock %}
+{% block heading %}Something went wrong{% endblock %}
+{% block message %}
+<p>RespectASO hit an unexpected error while loading this page. Try again, and if it keeps happening, restart the app.</p>
+<p>If restarting doesn't help, contact us and say what you were doing when it happened.</p>
+{% endblock %}
+{% block more_actions %}
+<button class="button secondary" type="button" onclick="location.reload()">Try again</button>
+<a class="button secondary" href="mailto:respectaso@loheden.com">Contact us</a>
+{% endblock %}

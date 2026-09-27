@@ -326,7 +326,7 @@ class PopularityCellPopoverTest(StorageTestBase):
         html = self._render(self._result(internal=70, apple=None, genre="GAMES"))
         self.assertIn(">55<", html)                 # capped effective value
         self.assertIn("EST*", html)
-        self.assertIn("Not in Apple&#x27;s top terms - capped", html)
+        self.assertIn("Not in Apple&#x27;s top terms: capped", html)
         self.assertIn("the Games category", html)
         self.assertIn("lowest reported value there (56)", html)
         self.assertIn("estimate of 70 is scored as 55", html)

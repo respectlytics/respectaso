@@ -21,6 +21,7 @@ app that does not exist yet has no "now" (the owner, 2026-09-23).
 OPPORTUNITY_SUBJECTS = {
     "new_app": "for a new app",
     "app": "for this app",
+    "picked": "for the app you picked",
     "tracked": "for the app under each keyword",
     "finder": "for a new app",
 }
@@ -42,6 +43,12 @@ OPPORTUNITY_TIPS = {
         "ratings, average stars and age in this storefront: its real rank when it "
         "already ranks well, otherwise where apps as strong land with the keyword in "
         "their title." + _HOVER + _UPSIDE + _OPPORTUNITY_SCALE
+    ),
+    "picked": (
+        "What each keyword is worth to the app you picked, judged by its "
+        "ratings, average stars and age in this storefront: where apps as "
+        "strong land with the keyword in their title." + _HOVER + _UPSIDE
+        + _OPPORTUNITY_SCALE
     ),
     "tracked": (
         "The one to act on: what the keyword is worth in this storefront to the app "
@@ -85,11 +92,14 @@ COLUMN_TIPS = {
         "What this keyword pays per day to whichever app holds #1 in the search "
         "results here: the size of the prize, not what a given app would get. "
         "What an app can realistically expect is the Opportunity score, with its "
-        "rank on the line underneath. Hover a cell for #1, #5 and #10."
+        "rank on the line underneath. Hover a cell for #1, #5 and #10. Shown as a "
+        "range from a tenth of the estimate to the estimate: real downloads depend "
+        "on how many people really search the term and on how many who see the app "
+        "install it, which RespectASO cannot measure."
     ),
     "classification": (
         "What to do with the keyword. Low Volume: skip it, because even #1 brings "
-        "under one download a day (the low end of Downloads at #1). Otherwise the "
+        "under one download a day (the estimate at the top of Downloads at #1). Otherwise the "
         "Opportunity score decides: Sweet Spot from 10 downloads a day, Good Target "
         "from 1, Supporting from one every 10 days, and below that Worth Climbing. "
         "Hover a tag for what it means for that row."

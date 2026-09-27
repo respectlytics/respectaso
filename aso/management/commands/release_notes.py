@@ -16,12 +16,14 @@ import re
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from aso.copy_rules import no_dash_in_markup
 from aso.release_notes import latest
 
 
 def _html_to_markdown(text: str) -> str:
-    """Invert the minimal inline HTML the entries carry back to markdown."""
-    s = text
+    """Invert the minimal inline HTML the entries carry back to markdown,
+    with no dash between words (aso/copy_rules.py)."""
+    s = no_dash_in_markup(text)
     s = re.sub(r"<strong>(.*?)</strong>", r"**\1**", s)
     s = re.sub(r"<em>(.*?)</em>", r"*\1*", s)
     s = re.sub(r"<code>(.*?)</code>", r"`\1`", s)
@@ -68,7 +70,7 @@ class Command(BaseCommand):
                     f"Newest release-notes entry is v{entry['version']} but "
                     f"the app VERSION is {settings.VERSION}. Add the new "
                     "release's entry to aso/release_notes.py BEFORE "
-                    "releasing - a release must never ship without notes."
+                    "releasing: a release must never ship without notes."
                 )
             self.stdout.write(
                 f"OK: release notes present for v{entry['version']}."

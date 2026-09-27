@@ -17,9 +17,9 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from aso.context_processors import PRO_INVITE_DOCKER, PRO_INVITE_MAC
+from aso.copy_rules import dash_punctuation_in
 from aso.links import PRICING_URL, PRO_PAGE_URL
 
-DASHES = ("—", "–", " - ")
 PRICE = re.compile(r"[$€£]\s?\d|\d\s?(kr|SEK|USD|EUR)\b")
 
 
@@ -71,8 +71,7 @@ class TheInviteTest(TestCase):
     def test_the_words_carry_no_price_and_no_dash(self):
         for text in (PRO_INVITE_MAC, PRO_INVITE_DOCKER):
             self.assertIsNone(PRICE.search(text), text)
-            for dash in DASHES:
-                self.assertNotIn(dash, text)
+            self.assertEqual(dash_punctuation_in(text), "")
 
 
 class OnePricingAddressTest(TestCase):

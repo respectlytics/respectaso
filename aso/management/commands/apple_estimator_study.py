@@ -76,7 +76,7 @@ class Command(BaseCommand):
         ].get(country)
         if not active:
             raise CommandError(
-                f"No synced Apple dataset for '{country}' - connect Apple "
+                f"No synced Apple dataset for '{country}'. Connect Apple "
                 "Ads and let the weekly sync run first."
             )
         week = dt.date.fromisoformat(active)
@@ -164,7 +164,7 @@ class Command(BaseCommand):
         head = [m for m in measured if m["apple"] is not None]
         tail = [m for m in measured if m["apple"] is None]
         if len(head) < 30:
-            raise CommandError("Too few head samples measured - aborting.")
+            raise CommandError("Too few head samples measured, aborting.")
 
         est_values = [m["est"] for m in head]
         apple_values = [m["apple"] for m in head]

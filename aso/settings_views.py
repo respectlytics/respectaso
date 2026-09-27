@@ -87,7 +87,7 @@ def _handle_select_source(request):
         return "Unknown popularity source.", "error"
     if source == storage.SOURCE_APPLE and not storage.apple_source_ready():
         return (
-            "Apple Ads isn't connected yet - complete the connection "
+            "Apple Ads isn't connected yet. Complete the connection "
             "steps below first.",
             "error",
         )
@@ -114,7 +114,7 @@ def _handle_estimate_opt_out(request):
     storage.save_apple_settings(apple_ads={"estimate_opt_out": opt_out})
     if opt_out:
         return (
-            "Noted - you'll stay on the RespectASO estimate and the "
+            "Noted. You'll stay on the RespectASO estimate and the "
             "recommendation banner is hidden. You can connect Apple Ads "
             "here any time.",
             "success",
@@ -132,7 +132,7 @@ def apple_keys_generate_view(request):
             "ok": False,
             "error": (
                 "A key already exists. Replacing it invalidates the key "
-                "uploaded to Apple - confirm to continue."
+                "uploaded to Apple. Confirm to continue."
             ),
             "needs_confirm": True,
         }, status=409)
@@ -167,7 +167,7 @@ def apple_credentials_view(request):
         if not value:
             return JsonResponse({
                 "ok": False,
-                "error": "All three values are required - Apple shows them "
+                "error": "All three values are required. Apple shows them "
                          "right above the public key field after saving.",
             }, status=400)
         values[field] = value
@@ -255,8 +255,8 @@ def apple_verify_view(request):
         storage.save_apple_settings(apple_ads={"credentials_rejected": True})
         return JsonResponse({
             "ok": False,
-            "error": "Apple rejected the session during the probe - "
-                     "re-check the credentials.",
+            "error": "Apple rejected the session during the probe. "
+                     "Re-check the credentials.",
         }, status=400)
     except apple_api.AppleAdsError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
@@ -317,7 +317,7 @@ def apple_sync_now_view(request):
         return JsonResponse({
             "started": False,
             "error": (
-                "Sync could not start - either one is already running or "
+                "Sync could not start: either one is already running or "
                 "Apple Ads isn't connected yet."
             ),
         })

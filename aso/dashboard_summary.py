@@ -17,6 +17,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from .models import SearchResult
+from .scoring import estimate_range
 
 
 def _safe_estimates(result):
@@ -97,7 +98,6 @@ def _aggregate_country(results):
     """
     total_low = 0.0
     total_high = 0.0
-    potential_low = 0.0
     potential_high = 0.0
     ranks = []
     in_t20 = 0
@@ -108,10 +108,9 @@ def _aggregate_country(results):
 
     for r in results:
         cur_low, cur_high = _current_dl_interval(r)
-        pot_low, pot_high = _potential_dl_interval(r)
+        _, pot_high = _potential_dl_interval(r)
         total_low += cur_low
         total_high += cur_high
-        potential_low += pot_low
         potential_high += pot_high
 
         if r.app_rank is not None:
@@ -139,18 +138,21 @@ def _aggregate_country(results):
         pop = r.effective_popularity
         if gap > biggest_gap_score and pop is not None and pop >= 5:
             biggest_gap_score = gap
+            gap_low, gap_high = estimate_range(max(0.0, gap))
             biggest_gap = {
                 "keyword": r.keyword.keyword,
                 "rank": r.app_rank,
                 "popularity": pop,
-                "headroom_low": max(0.0, pot_low - cur_high),
-                "headroom_high": gap,
+                "headroom_low": gap_low,
+                "headroom_high": gap_high,
             }
 
-    # Headroom for the country = potential - current. Clipped to >= 0 to avoid
-    # weird negative ranges when intervals overlap.
-    headroom_low = max(0.0, potential_low - total_high)
-    headroom_high = max(0.0, potential_high - total_low)
+    # Headroom for the country: the estimate at #1 less the estimate now (the
+    # high ends of the two ranges), shown as the same kind of range as every
+    # other download figure, a tenth of it up to it. Subtracting the ends of
+    # two ranges from each other used to clip the low end to zero and print a
+    # lone high figure that read like a precise one.
+    headroom_low, headroom_high = estimate_range(max(0.0, potential_high - total_high))
 
     return {
         "downloads_low": total_low,
@@ -266,14 +268,14 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
         gap_n = _format_dl_number(biggest_gap_overall["headroom_high"])
         callouts.append(
             f"`{biggest_gap_overall['keyword']}` has the largest rank gap "
-            f"({rank_part}, popularity {biggest_gap_overall['popularity']}) — "
-            f"closing it could add up to ~{gap_n}/day."
+            f"({rank_part}, popularity {biggest_gap_overall['popularity']}). "
+            f"Closing it could add up to ~{gap_n}/day."
         )
 
     # 3) Single-country prompt — descriptive, not prescriptive
     if total_countries == 1 and total_keywords >= 5:
         callouts.append(
-            "You track 1 country. Same keywords in 2–3 storefronts "
+            "You track 1 country. Same keywords in 2-3 storefronts "
             "often add comparable headroom."
         )
 
@@ -285,7 +287,7 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
     if zero_dl_count >= 5 and len(callouts) < 3:
         callouts.append(
             f"{zero_dl_count} tracked keywords contribute ~0 downloads "
-            f"(not ranking) — consider pruning or running AI Researcher to find replacements."
+            f"(not ranking). Consider pruning them, or run AI Researcher to find replacements."
         )
 
     return callouts[:3]
@@ -303,7 +305,7 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
         return {
             "headline": "Expand your keyword coverage",
             "message": (
-                "Most apps need 40–80 keywords to see a representative picture. "
+                "Most apps need 40-80 keywords to see a representative picture. "
                 "Discover new ones with AI Researcher, or mine your existing "
                 "metadata for missed combinations with AI Simulator."
             ),
@@ -336,7 +338,7 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
     )
     if deep_count >= len(country_rows) / 2:
         return {
-            "headline": "Your coverage is wide — try moving the ranks",
+            "headline": "Your coverage is wide: try moving the ranks",
             "message": (
                 "You track plenty of keywords but most aren't ranking. "
                 "AI Simulator lets you test metadata combinations from your "
@@ -352,7 +354,7 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
         "headline": "Looking solid",
         "message": (
             "Use AI Simulator to stress-test metadata changes before shipping "
-            "an update — see how new wording would shift your ranks."
+            "an update, and see how new wording would shift your ranks."
         ),
         "buttons": [
             {"label": "AI Simulator", "url": "simulator", "primary": True},
@@ -379,9 +381,11 @@ def format_interval(low, high):
         return "—"
     lo = _format_dl_number(low)
     hi = _format_dl_number(high)
-    if lo == hi or low <= 0:
+    if lo == hi:
         return f"~{hi}"
-    return f"~{lo}–{hi}"
+    # A low end that rounds to nothing is written as 0, never as a lone high
+    # figure, which would read like a precise one.
+    return f"~{'0' if lo == '0.0' else lo}–{hi}"
 
 
 def compute_app_summary(selected_app, selected_app_name, last_refresh=None):

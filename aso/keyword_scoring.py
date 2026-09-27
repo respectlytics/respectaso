@@ -24,7 +24,7 @@ session) shows exactly what a live one did.
 from __future__ import annotations
 
 from .models import SearchResult
-from .popularity import popularity_fields, resolve_popularity
+from .popularity import popularity_fields, reported_by_apple, resolve_popularity
 from .scoring import calc_opportunity, targeting_payload
 from .services import SearchAPIUnavailableError
 
@@ -56,7 +56,8 @@ def score_country(kw_text, country, *, app=None, itunes_service,
 
     # Popularity from both sources; ``pop.effective`` feeds all math.
     pop = resolve_popularity(competitors, kw_text, country)
-    breakdown["download_estimates"] = download_est.estimate(pop.effective or 0, country=country)
+    breakdown["download_estimates"] = {**download_est.estimate(pop.effective or 0, country=country),
+                                       "searches_reported": reported_by_apple(pop)}
 
     # The app's own profile in this storefront (ratings, stars, age),
     # refreshed at most daily. Every score for this app here reads the same
@@ -143,5 +144,6 @@ def result_payload(search_result, app=None) -> dict:
         "targeting": targeting_payload(
             popularity, search_result.difficulty_score, search_result.country,
             app=search_result.app_profile, app_rank=search_result.app_rank, keyword=search_result.keyword_text,
+            reported=reported_by_apple(search_result.popularity_resolution()),
         ),
     }

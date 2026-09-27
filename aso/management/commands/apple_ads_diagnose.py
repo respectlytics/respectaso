@@ -103,7 +103,7 @@ class Command(BaseCommand):
         acls = api.list_acls(credentials)
         if not acls:
             raise CommandError(
-                "No ad accounts visible to these credentials - check the "
+                "No ad accounts visible to these credentials. Check the "
                 "API user's role in the Apple Ads UI."
             )
         for entry in acls:
@@ -119,7 +119,7 @@ class Command(BaseCommand):
         week = api.latest_available_week()
         country = options["country"].lower()
         self._banner(
-            f"Search term popularity - {country.upper()}, week of {week}"
+            f"Search term popularity: {country.upper()}, week of {week}"
         )
         rows, total_count = api.query_search_term_popularity(
             credentials, ad_account_id,
@@ -174,7 +174,7 @@ class Command(BaseCommand):
     def _require_key(self):
         if not keys.has_private_key():
             raise CommandError(
-                "No private key yet - run with --generate-keys first."
+                "No private key yet. Run with --generate-keys first."
             )
 
     def _credentials(self, options) -> dict:
@@ -208,7 +208,7 @@ class Command(BaseCommand):
         if len(acls) == 1:
             return str(acls[0]["ad_account_id"])
         raise CommandError(
-            "Multiple ad accounts - pick one with --ad-account-id."
+            "Multiple ad accounts. Pick one with --ad-account-id."
         )
 
     # ------------------------------------------------------------------ #
@@ -229,7 +229,7 @@ class Command(BaseCommand):
         self._rate_headers()
 
     def _full_week(self, credentials, ad_account_id, country, week):
-        self._banner(f"Full week download - {country.upper()}, week of {week}")
+        self._banner(f"Full week download: {country.upper()}, week of {week}")
         started = time.monotonic()
         all_rows, requests_made = [], 0
         pager = api.iter_search_term_popularity(
@@ -294,7 +294,7 @@ class Command(BaseCommand):
                 latest_est[term] = est
         if not latest_est:
             self.stdout.write(
-                f"  No tracked keywords for {country} - match rate skipped."
+                f"  No tracked keywords for {country}, match rate skipped."
             )
             return
         matched = [t for t in latest_est if t in apple_terms]
@@ -341,7 +341,7 @@ class Command(BaseCommand):
         week = api.latest_available_week()
         apps = list(App.objects.exclude(track_id__isnull=True))
         if not apps:
-            self.stdout.write("  No tracked apps with a track_id - skipped.")
+            self.stdout.write("  No tracked apps with a track_id, skipped.")
             return
         for app in apps:
             try:

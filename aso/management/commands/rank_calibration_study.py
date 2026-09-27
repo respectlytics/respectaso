@@ -79,6 +79,10 @@ class Command(BaseCommand):
         parser.add_argument("--seed", type=int, default=42)
         parser.add_argument("--cache", required=True,
                             help="JSON file for the raw observations; reused if present.")
+        parser.add_argument("--summary-json",
+                            help="Append one JSON line with this seed's E1 and E2 figures, "
+                                 "for comparing yardsticks over many splits "
+                                 "(READINESS_CLARITY_PLAN.md, D8).")
 
     def handle(self, *args, **options):
         random.seed(options["seed"])
@@ -90,7 +94,11 @@ class Command(BaseCommand):
             searches = self._fetch(options)
             json.dump(searches, open(cache, "w"))
             self.stdout.write(f"Cached {len(searches)} searches to {cache}")
-        self._fit_and_judge(searches, options["seed"])
+        rho, fitted_cal, current_cal = self._fit_and_judge(searches, options["seed"])
+        if options.get("summary_json"):
+            with open(options["summary_json"], "a") as out:
+                out.write(json.dumps({"seed": options["seed"], "e1": rho, "e2": fitted_cal,
+                                      "e2_current": current_cal}) + "\n")
 
     # ── collecting ────────────────────────────────────────────────────────
 
@@ -238,8 +246,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING("\n== Median-rank knots (gap, rank), not shipped =="))
         for gap, log_rank, count in knots:
             self.stdout.write(f"    ({gap:.1f}, {math.exp(log_rank):.2f}),  # n={count}")
-        self._judge_expected(train, test)
+        figures = self._judge_expected(train, test)
         self._typical(obs)
+        return figures
 
     def _typical(self, obs):
         """Where the middle app lands at a gap, and how many reach the top
@@ -294,6 +303,7 @@ class Command(BaseCommand):
         for gap, rank, count in knots:
             self.stdout.write(f"    ({gap:.1f}, {rank:.2f}),  # n={count}")
         self.stdout.write("]")
+        return rho, fitted_cal, current_cal
 
 
 def _fit_knots(train):

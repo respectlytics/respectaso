@@ -124,8 +124,8 @@ def limit_context() -> dict:
 
 def limit_error(count: int, limit: int, is_pro: bool) -> str:
     if is_pro:
-        return (f"That is {fmt(count)} keywords. A search holds up to {fmt(limit)} - "
-                "start a second search for the rest.")
+        return (f"That is {fmt(count)} keywords. A search holds up to {fmt(limit)}. "
+                "Start a second search for the rest.")
     return f"That is {fmt(count)} keywords. The free version runs up to {limit} per search."
 
 
@@ -445,7 +445,7 @@ def remove_from_queue(job) -> bool:
         return bool(deleted)
     updated = KeywordSearchJob.objects.filter(pk=job.pk, status="queued").update(
         status="paused", auto_resume=False, queue_rank=None,
-        progress_message="Paused - removed from the queue. Resume it from the Keyword Research tab.",
+        progress_message="Paused and removed from the queue. Resume it from the Keyword Research tab.",
     )
     return bool(updated)
 
@@ -485,12 +485,12 @@ def _cooldown(pk) -> bool:
 
 def _throttle_message(state, limiter) -> str:
     if state == "slowed_down":
-        return f"Apple is slowing responses - now pacing at {round(limiter.current_delay)} s per keyword."
+        return f"Apple is slowing responses. Now pacing at {round(limiter.current_delay)} s per keyword."
     if state == "paused":
-        return (f"Apple is not answering - {limiter.consecutive_failures} requests failed in a row, "
+        return (f"Apple is not answering: {limiter.consecutive_failures} requests failed in a row, "
                 f"retrying at {round(limiter.current_delay)} s per keyword.")
     if state == "aborted":
-        return "Apple is rejecting requests - cooling down for 2 minutes, then retrying."
+        return "Apple is rejecting requests. Cooling down for 2 minutes, then retrying."
     return "Researching..."
 
 

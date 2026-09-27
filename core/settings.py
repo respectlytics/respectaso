@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "2.27.0"
+VERSION = "2.28.0"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -39,6 +39,9 @@ if env_file.exists():
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "") or "django-insecure-dev-key-change-me-in-production"
 
+# On by default for development. The Mac app (desktop/main.py) and the Docker
+# image (Dockerfile) turn it off, so a user sees RespectASO's own error pages
+# (aso/error_views.py), never Django's debug page with its traceback.
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = [
@@ -115,6 +118,14 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# WhiteNoise also serves straight from STATICFILES_DIRS with DEBUG off, the
+# way it does with DEBUG on, so a stale or missing collectstatic copy can
+# never leave a page unstyled.
+WHITENOISE_USE_FINDERS = True
+
+# A request that fails the CSRF check gets RespectASO's own page, or JSON
+# for the app's scripts (aso/error_views.py).
+CSRF_FAILURE_VIEW = "aso.error_views.csrf_failure"
 
 # CSRF trusted origins for local access
 CSRF_TRUSTED_ORIGINS = [
@@ -157,6 +168,18 @@ if IS_NATIVE_APP:
             },
         },
         "loggers": {
+            # With DEBUG off, Django writes a crash's traceback only through
+            # these: without them it would reach no one.
+            "django.request": {
+                "handlers": ["file"],
+                "level": "ERROR",
+                "propagate": False,
+            },
+            "django.security": {
+                "handlers": ["file"],
+                "level": "WARNING",
+                "propagate": False,
+            },
             "aso": {
                 "handlers": ["file"],
                 "level": "WARNING",
@@ -168,5 +191,20 @@ if IS_NATIVE_APP:
                 "level": "INFO",
                 "propagate": False,
             },
+        },
+    }
+else:
+    # Docker and development: a crash's traceback and security warnings go to
+    # the console (docker compose logs). With DEBUG off, Django's own default
+    # would drop them.
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {"class": "logging.StreamHandler"},
+        },
+        "loggers": {
+            "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+            "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         },
     }

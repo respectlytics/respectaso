@@ -54,7 +54,7 @@ def run_weekly(credentials, ad_account_id, *, spend_request, pace) -> None:
     for index, app in enumerate(apps):
         if not spend_request():
             _save_state(state, status="partial",
-                        error="Request budget reached - resumes next sync.")
+                        error="Request budget reached. It resumes at the next sync.")
             return
         if index:
             pace()

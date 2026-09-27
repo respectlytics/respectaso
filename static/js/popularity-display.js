@@ -72,7 +72,7 @@
                     paragraphs: [
                         'This keyword is outside Apple\'s published top search terms '
                         + 'for this storefront, so RespectASO\'s estimate powers the '
-                        + 'score - calibrated to the same 1-100 scale as Apple\'s values.',
+                        + 'score, calibrated to the same 1-100 scale as Apple\'s values.',
                     ],
                     note: '',
                 };
@@ -97,7 +97,7 @@
             if (hasInternal && internal > cap) {
                 return {
                     badge: BADGES.fallback,
-                    heading: 'Not in Apple\'s top terms - capped',
+                    heading: 'Not in Apple\'s top terms: capped',
                     paragraphs: [
                         absentPara,
                         'It cannot score above Apple\'s lowest reported value there ('
@@ -125,7 +125,7 @@
                 heading: 'Apple Ads popularity',
                 paragraphs: [
                     'Apple\'s official search popularity for this storefront, '
-                    + 'updated weekly - the active source powering your scores.',
+                    + 'updated weekly: the active source powering your scores.',
                 ],
                 note: hasInternal ? 'RespectASO estimate for comparison: ' + internal : '',
             };
@@ -134,14 +134,14 @@
         if (apple !== null && apple !== undefined) {
             note = 'Apple\'s official value for comparison: ' + apple;
         } else if (appleConfigured) {
-            note = 'Not among Apple\'s top terms in this storefront - Apple reports no value.';
+            note = 'Not among Apple\'s top terms in this storefront: Apple reports no value.';
         }
         return {
             badge: BADGES.est,
             heading: 'RespectASO estimate',
             paragraphs: [
                 'RespectASO\'s own estimate, calibrated to Apple\'s official '
-                + '1-100 popularity scale - the active source powering your scores.',
+                + '1-100 popularity scale, the active source powering your scores.',
             ],
             note: note,
         };
@@ -249,7 +249,7 @@
         if (current !== used) {
             var currentLabel = current === 'apple' ? 'Apple Ads popularity' : 'the RespectASO estimate';
             html += ' <span class="ml-1.5 text-[10px] text-amber-300/90 bg-amber-900/25 border border-amber-500/25 rounded px-1.5 py-px">'
-                + 'differs from your current selection - new runs use ' + currentLabel + '</span>';
+                + 'differs from your current selection. New runs use ' + currentLabel + '</span>';
         }
         return '<p class="text-xs mb-2">' + html + '</p>';
     }
@@ -301,7 +301,7 @@
         if (!opts || typeof opts.altReadiness !== 'number') return '';
         return 'Scored with ' + label + ' instead, this metadata would rate roughly '
             + '<strong class="text-amber-100">' + Math.round(opts.altReadiness) + '/100</strong>. '
-            + 'Neither figure is more true - they measure differently.';
+            + 'Neither figure is more true: they measure differently.';
     }
 
     /**
@@ -325,15 +325,15 @@
                     + 'terms.</strong> Apple publishes each category\'s 500 most-searched terms '
                     + 'per storefront; keywords outside that group are scored with '
                     + 'RespectASO\'s estimate, calibrated against Apple\'s official values and '
-                    + 'aligned to the same 1-100 scale - one consistent ruler across the '
+                    + 'aligned to the same 1-100 scale: one consistent ruler across the '
                     + 'whole analysis.',
                 'A modest aggregate score under the Apple source therefore reflects where '
-                    + 'these keywords sit against Apple\'s reporting bar - not necessarily '
+                    + 'these keywords sit against Apple\'s reporting bar, not necessarily '
                     + 'misaligned metadata.',
             ];
             var altA = altReadinessSentence(opts, 'the RespectASO estimate');
             if (altA) paras.push(altA);
-            paras.push('To analyze under the estimate, switch the source in Settings - new runs '
+            paras.push('To analyze under the estimate, switch the source in Settings. New runs '
                 + 'and re-simulations use your current selection.');
             return advisoryHtml(paras);
         }
@@ -352,12 +352,12 @@
                 + ' keywords with Apple data in this analysis.</strong> '
                 + 'Under the Apple Ads source, opportunity and aggregate scores would '
                 + 'look different. Hover a keyword\'s source badge to see both values; where they '
-                + 'disagree strongly, neither is automatically right - such keywords are worth '
+                + 'disagree strongly, neither is automatically right. Such keywords are worth '
                 + 'checking by hand.',
         ];
         var altB = altReadinessSentence(opts, 'Apple Ads popularity');
         if (altB) parasB.push(altB);
-        parasB.push('To analyze under Apple Ads popularity, switch the source in Settings - new '
+        parasB.push('To analyze under Apple Ads popularity, switch the source in Settings. New '
             + 'runs and re-simulations use your current selection.');
         return advisoryHtml(parasB);
     }

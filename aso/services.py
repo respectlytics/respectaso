@@ -1118,10 +1118,10 @@ class DownloadEstimator:
       2. Position → tap-through rate (TTR) — percentage of searchers who
          tap on the result at each position.  Follows a well-documented
          power-law decay curve.
-      3. Conversion rate — percentage of taps that become installs.
-         Varies by category/listing quality; 5–20 % range used.
+      3. Conversion rate: the share of taps that become installs, 5%.
 
-    All numbers are rough estimates shown as ranges (low–high).
+    Every figure is shown as a range from a tenth of the estimate to the
+    estimate (RANGE_LOW_SHARE below).
     """
 
     # Popularity → estimated daily searches: the canonical curve lives
@@ -1188,12 +1188,21 @@ class DownloadEstimator:
         20: 0.0007,
     }
 
-    # Conversion rate (tap → install): range for free apps.
-    #
-    # Low end (5 %): unknown indie app, weak listing, few ratings.
-    # High end (20 %): category leader, strong brand, 100 K+ ratings.
+    # Install rate (tap to install) behind every estimate: 5%, the low end of
+    # what published studies report for free apps (an unknown app with a weak
+    # listing). Every score and tag is built on it.
     _CVR_LOW = 0.05
-    _CVR_HIGH = 0.20
+
+    # Every download range runs from a tenth of the estimate to the estimate.
+    # Two things RespectASO cannot know move real downloads that much: how
+    # many people search terms Apple does not report (its dataset only says
+    # they are below its reporting floor), and how many of the people who see
+    # the app install it. Checked on 2026-09-27 against one app's App Store
+    # Connect figures (Options Trading AI, US, June 28 to September 25): about
+    # 14 search downloads a day estimated, about 2 a day real from every
+    # source. It replaced a 5% to 20% install range, whose high end sat four
+    # times further from that app than the estimate.
+    RANGE_LOW_SHARE = 0.1
 
     # Market size scales search volumes relative to the US App Store, which
     # is what POP_TO_SEARCHES is calibrated for. The factor per storefront
@@ -1270,9 +1279,8 @@ class DownloadEstimator:
 
         if not popularity or popularity <= 0 or rank < 1:
             return 0.0, 0.0
-        searches = daily_searches(popularity, country or "us")
-        return (self._downloads(searches, rank, self._CVR_LOW),
-                self._downloads(searches, rank, self._CVR_HIGH))
+        estimate = self._downloads(daily_searches(popularity, country or "us"), rank, self._CVR_LOW)
+        return estimate * self.RANGE_LOW_SHARE, estimate
 
     def estimate(
         self,
@@ -1301,8 +1309,8 @@ class DownloadEstimator:
         positions = []
         for pos in range(1, 21):
             ttr = self._TTR.get(pos, 0.001)
-            dl_low = self._downloads(searches, pos, self._CVR_LOW)
-            dl_high = self._downloads(searches, pos, self._CVR_HIGH)
+            dl_high = self._downloads(searches, pos, self._CVR_LOW)
+            dl_low = dl_high * self.RANGE_LOW_SHARE
             positions.append({
                 "pos": pos,
                 "ttr": round(ttr * 100, 2),
@@ -1388,6 +1396,25 @@ def small_result_cap(result_count: int) -> int | None:
     if 1 <= result_count <= 9:
         return 10 * result_count
     return None
+
+
+# The fields of a difficulty breakdown that hold an App Store name, and the
+# bracketed names its sentences quote: "The #1 app (Brand - Tagline) has".
+_BREAKDOWN_NAME_KEYS = ("weakest_app", "brand_name")
+_NAME_IN_BRACKETS = re.compile(r"\([^()]*\)")
+
+
+def readable_breakdown(breakdown: dict | None) -> dict:
+    """A difficulty breakdown stored by an older version, with its sentences
+    read by today's dash rule (aso/copy_rules.py). App names are App Store
+    data and stay exactly as written. Search History and the Opportunity
+    Finder were rewritten once (DIFFICULTY_VERSION 3); an AI run's rows are
+    a snapshot, so they are read through this (aso_pro/explained_rows.py)."""
+    from .copy_rules import no_dash_punctuation_keeping, walk_prose
+
+    return walk_prose(breakdown or {},
+                      lambda text: no_dash_punctuation_keeping(text, _NAME_IN_BRACKETS),
+                      keep=_BREAKDOWN_NAME_KEYS)
 
 
 class DifficultyCalculator:
@@ -1752,7 +1779,7 @@ class DifficultyCalculator:
                     "icon": "🏷️",
                     "type": "info",
                     "text": (
-                        f"Brand keyword - '{kw_lower}' matches publisher "
+                        f"Brand keyword: '{kw_lower}' matches publisher "
                         f"{brand_name}. The #1 app ({leader_name}) has few "
                         f"ratings because it's a brand companion app, not "
                         f"because the keyword is easy. Difficulty reflects "
@@ -1767,7 +1794,7 @@ class DifficultyCalculator:
                 override_text = (
                     f"Score adjusted from {raw_total} → {total}. "
                     f"Only {n} app{'s' if n > 1 else ''} found for this "
-                    f"keyword - very little competition exists."
+                    f"keyword: very little competition exists."
                 )
             else:
                 leader_name = competitors[0].get("trackName", "#1 app")
@@ -1780,7 +1807,7 @@ class DifficultyCalculator:
                         f"{leader_reviews:,} "
                         f"rating{'s' if leader_reviews != 1 else ''}, "
                         f"but {title_match_count} of {n} competitors "
-                        f"target this keyword - real competition exists."
+                        f"target this keyword: real competition exists."
                     )
                 else:
                     override_text = (
@@ -1789,7 +1816,7 @@ class DifficultyCalculator:
                         f"{leader_reviews:,} "
                         f"rating{'s' if leader_reviews != 1 else ''}. "
                         f"The remaining results are generic backfill "
-                        f"from broader search terms - not real "
+                        f"from broader search terms, not real "
                         f"competition for this specific keyword."
                     )
 
@@ -1963,7 +1990,7 @@ class DifficultyCalculator:
                     "total_apps": 0,
                     "tier_score": 0,
                     "label": "Easy",
-                    "highlights": ["No competitors found - wide open."],
+                    "highlights": ["No competitors found: wide open."],
                 }
                 continue
 
@@ -2132,8 +2159,8 @@ class DifficultyCalculator:
         if n < tier_size:
             open_spots = tier_size - n
             highlights.append(
-                f"Only {n} app{'s' if n != 1 else ''} rank here "
-                f"- {open_spots} open spot{'s' if open_spots != 1 else ''}."
+                f"Only {n} app{'s' if n != 1 else ''} rank here, "
+                f"so {open_spots} spot{'s are' if open_spots != 1 else ' is'} open."
             )
             return highlights
 
@@ -2153,16 +2180,16 @@ class DifficultyCalculator:
             )
         else:
             highlights.append(
-                f"Requires ~{min_reviews:,}+ ratings - established market."
+                f"Requires ~{min_reviews:,}+ ratings: an established market."
             )
 
         # Weak spots
         if weak > 0:
             highlights.append(
-                f"{weak} of {n} apps have under 1K ratings - beatable."
+                f"{weak} of {n} apps have under 1K ratings: beatable."
             )
         else:
-            highlights.append("Every app here has 1K+ ratings - no easy targets.")
+            highlights.append("Every app here has 1K+ ratings: no easy targets.")
 
         # Fresh entrants
         if fresh > 0:
@@ -2174,7 +2201,7 @@ class DifficultyCalculator:
         # Title keyword usage
         if title_opt == 0:
             highlights.append(
-                "No app uses this exact keyword in its title - ASO opportunity!"
+                "No app uses this exact keyword in its title: an ASO opportunity!"
             )
         elif title_opt < n // 2:
             highlights.append(
@@ -2212,7 +2239,7 @@ class DifficultyCalculator:
                     "type": "barrier",
                     "text": (
                         f"{ultra} app{'s' if ultra > 1 else ''} with 1M+ "
-                        "ratings - dominated by major brands"
+                        "ratings: dominated by major brands"
                     ),
                 }
             )
@@ -2223,7 +2250,7 @@ class DifficultyCalculator:
                     "type": "barrier",
                     "text": (
                         f"{mega} app{'s' if mega > 1 else ''} with 100K+ "
-                        "ratings - strong incumbents"
+                        "ratings: strong incumbents"
                     ),
                 }
             )
@@ -2235,7 +2262,7 @@ class DifficultyCalculator:
                     "icon": "📊",
                     "type": "info",
                     "text": (
-                        f"Rating distribution is skewed - median "
+                        f"Rating distribution is skewed: the median "
                         f"({median:,.0f}) is much lower than mean "
                         f"({avg:,.0f}). A few giants inflate the average."
                     ),
@@ -2250,7 +2277,7 @@ class DifficultyCalculator:
                     "type": "opportunity",
                     "text": (
                         "No competitors have this exact keyword in their "
-                        "title - potential title optimization gap"
+                        "title: a possible title optimization gap"
                     ),
                 }
             )
@@ -2284,7 +2311,7 @@ class DifficultyCalculator:
                     "icon": "⭐",
                     "type": "barrier",
                     "text": (
-                        f"High quality bar - avg rating is "
+                        f"High quality bar: the average rating is "
                         f"{avg_quality:.1f} stars. Users expect excellence."
                     ),
                 }
@@ -2299,7 +2326,7 @@ class DifficultyCalculator:
                     "type": "opportunity",
                     "text": (
                         f"{weak_count} of {n} competitors have <1,000 "
-                        "ratings - beatable with a quality app"
+                        "ratings: beatable with a quality app"
                     ),
                 }
             )
@@ -2364,7 +2391,7 @@ class DifficultyCalculator:
                         f"{len(weak_apps)} of {n} apps have <1,000 ratings."
                         f" The weakest ({weakest.get('trackName', 'Unknown')})"
                         f" has only "
-                        f"{weakest.get('userRatingCount', 0):,} ratings - "
+                        f"{weakest.get('userRatingCount', 0):,} ratings: "
                         "these positions are displaceable."
                     ),
                 }
@@ -2394,7 +2421,7 @@ class DifficultyCalculator:
                     "detail": (
                         f"{len(fresh_apps)} "
                         f"app{'s' if len(fresh_apps) > 1 else ''} launched "
-                        "in the last 12 months - this market is still "
+                        "in the last 12 months: this market is still "
                         "attracting new entrants."
                     ),
                 }
@@ -2417,7 +2444,7 @@ class DifficultyCalculator:
                     "detail": (
                         f"Results span {len(genres)} genres "
                         f"({genre_list}{suffix}). The keyword isn't locked "
-                        "to one category — a well-positioned app in any "
+                        "to one category: a well-positioned app in any "
                         "genre could rank."
                     ),
                 }

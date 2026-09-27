@@ -1,14 +1,14 @@
 {% extends "aso/base.html" %}
 {% load aso_tags %}
 
-{% block title %}Popularity Source - RespectASO{% endblock %}
+{% block title %}Popularity Source · RespectASO{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
 
     <!-- Header -->
     <div class="mb-6">
-        <h1 class="text-2xl font-bold text-white mb-1">Settings - Popularity Source</h1>
+        <h1 class="text-2xl font-bold text-white mb-1">Settings: Popularity Source</h1>
         <p class="text-sm text-slate-400">Choose where your keyword popularity numbers come from.</p>
     </div>
 
@@ -64,7 +64,7 @@
             <span class="text-purple-400">📊</span> Your Popularity Source
         </h2>
         <p class="text-xs text-slate-500 mb-4">
-            This one choice decides which popularity value powers <span class="text-slate-300">all</span> your scores -
+            This one choice decides which popularity value powers <span class="text-slate-300">all</span> your scores:
             opportunity, keyword insights, and download estimates, on every tab.
             Click a card to select it. Switching is instant and fully reversible.
         </p>
@@ -94,7 +94,7 @@
                         {% if popularity_source == 'internal' %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-purple-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                            Active - powering all your scores
+                            Active: powering all your scores
                         </span>
                         {% else %}
                         <span class="mt-2 inline-block text-[11px] text-slate-500 group-hover:text-purple-300 transition-colors">
@@ -127,12 +127,12 @@
                         {% if popularity_source == 'apple' and not apple_ready %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/></svg>
-                            Active, but disconnected - reconnect below or switch source
+                            Active but disconnected: reconnect below or switch source
                         </span>
                         {% elif popularity_source == 'apple' %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-sky-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                            Active - powering all your scores
+                            Active: powering all your scores
                         </span>
                         {% elif apple_ready %}
                         <span class="mt-2 inline-block text-[11px] text-slate-500 group-hover:text-sky-300 transition-colors">
@@ -141,7 +141,7 @@
                         {% else %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            Locked - connect Apple Ads below first (one time, about 5 minutes)
+                            Locked: connect Apple Ads below first (one time, about 5 minutes)
                         </span>
                         {% endif %}
                     </span>
@@ -149,8 +149,8 @@
             </div>
 
             <p class="text-[11px] text-slate-500 mt-3">
-                Whichever you choose, <span class="text-slate-400">both values stay visible side by side</span> everywhere popularity appears -
-                only the math changes. Selecting recalculates every score immediately.
+                Whichever you choose, <span class="text-slate-400">both values stay visible side by side</span> everywhere popularity appears.
+                Only the math changes. Selecting recalculates every score immediately.
             </p>
 
             <details class="mt-3 group">
@@ -159,11 +159,11 @@
                     What exactly changes when I switch?
                 </summary>
                 <ul class="mt-2 text-[11px] text-slate-500 space-y-1 pl-4">
-                    <li><span class="text-slate-400">Changes instantly, including your full history and trends:</span> popularity, opportunity, insight labels, and download estimates - everywhere in the app.</li>
+                    <li><span class="text-slate-400">Changes instantly, including your full history and trends:</span> popularity, opportunity, insight labels, and download estimates, everywhere in the app.</li>
                     <li><span class="text-slate-400">Never changes:</span> difficulty. It measures your competition, not search volume.</li>
-                    <li><span class="text-slate-400">Keywords outside Apple's top terms stay consistent:</span> under the Apple source, keywords not among Apple's top 500 per category are scored with the calibrated estimate, aligned to Apple's 1-100 scale and marked <span class="text-slate-300 font-medium">EST*</span> - one consistent ruler across all your keywords.</li>
+                    <li><span class="text-slate-400">Keywords outside Apple's top terms stay consistent:</span> under the Apple source, keywords not among Apple's top 500 per category are scored with the calibrated estimate, aligned to Apple's 1-100 scale and marked <span class="text-slate-300 font-medium">EST*</span>: one consistent ruler across all your keywords.</li>
                     <li><span class="text-slate-400">Saved AI analyses keep their numbers:</span> each report states which source it used, so it always matches the AI's written strategy. New and refined runs use your current selection.</li>
-                    <li><span class="text-slate-400">AI aggregate scores follow the source:</span> scores computed from popularity (for example the Simulator's ASO Readiness) can differ noticeably between sources - the result page tells you when the other source would paint a different picture.</li>
+                    <li><span class="text-slate-400">AI aggregate scores follow the source:</span> scores computed from popularity (for example the Simulator's ASO Readiness) can differ noticeably between sources, and the result page tells you when the other source would paint a different picture.</li>
                     <li><span class="text-slate-400">Nothing is lost:</span> both values keep being recorded, so switching back restores exactly what you had.</li>
                 </ul>
             </details>
@@ -205,7 +205,7 @@
             We recommend <span class="text-slate-200 font-medium">Apple Ads</span>: where Apple publishes data, it is
             Apple's own measurement, and where it does not, that absence is itself real information about search volume.
             The <span class="text-slate-200 font-medium">RespectASO estimate</span> remains a full-coverage,
-            open-methodology alternative - and it always stays visible beside Apple's numbers.
+            open-methodology alternative, and it always stays visible beside Apple's numbers.
         </p>
         <div class="grid md:grid-cols-2 gap-4">
             <div>
@@ -215,9 +215,9 @@
                 </p>
                 <ul class="text-xs text-slate-400 space-y-1.5">
                     <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Works instantly for every keyword, in all {% storefront_count %} storefronts</span></li>
-                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Open methodology - see exactly how the score is built</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Open methodology: see exactly how the score is built</span></li>
                     <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No account or setup needed</span></li>
-                    <li class="flex gap-2"><span class="text-red-400">−</span><span>An estimate from observable App Store signals, not Apple's own measurement - on high-volume keywords it can disagree with Apple's data noticeably</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>An estimate from observable App Store signals, not Apple's own measurement: on high-volume keywords it can disagree with Apple's data noticeably</span></li>
                 </ul>
                 <a href="{% url 'aso:methodology' %}" class="inline-block mt-2 text-xs text-purple-400 hover:text-purple-300">How the estimate works →</a>
             </div>
@@ -228,11 +228,11 @@
                 </p>
                 <ul class="text-xs text-slate-400 space-y-1.5">
                     <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Popularity as Apple itself measures it, via Apple's official Apple Ads Platform API</span></li>
-                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Granular 1-100 values plus each keyword's category rank - refreshed weekly, automatically</span></li>
-                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No ads or spend required - a free Apple Ads account with a one-time API key setup</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Granular 1-100 values plus each keyword's category rank, refreshed weekly, automatically</span></li>
+                    <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No ads or spend required: a free Apple Ads account with a one-time API key setup</span></li>
                     <li class="flex gap-2"><span class="text-red-400">−</span><span>Apple only reports each category's top 500 search terms per storefront. Keywords outside them are scored with the calibrated estimate, aligned to the same scale and marked <span class="text-slate-300 font-medium">EST*</span>.</span></li>
                     <li class="flex gap-2"><span class="text-red-400">−</span><span>Weekly snapshots, not real-time (Apple publishes each completed week on Mondays)</span></li>
-                    <li class="flex gap-2"><span class="text-red-400">−</span><span>No data for storefronts where Apple Ads does not operate (for example Russia) - those use the estimate</span></li>
+                    <li class="flex gap-2"><span class="text-red-400">−</span><span>No data for storefronts where Apple Ads does not operate (for example Russia), which use the estimate</span></li>
                 </ul>
                 <a href="{% url 'aso:apple_ads_setup' %}" class="inline-block mt-2 text-xs text-sky-400 hover:text-sky-300">Step-by-step setup guide →</a>
             </div>
@@ -258,7 +258,7 @@
             </dl>
             <p class="text-[11px] text-slate-500 mt-2">
                 This is a one-time setup: the key does not expire. Popularity refreshes automatically every week
-                (Apple publishes each completed week on Mondays) - no clicks needed, just keep RespectASO running.
+                (Apple publishes each completed week on Mondays). No clicks needed: just keep RespectASO running.
             </p>
         </div>
         <button type="button" onclick="disconnectApple()"
@@ -272,14 +272,14 @@
             <p class="text-xs text-slate-400 mt-1">
                 The key may have been revoked or replaced in the Apple Ads UI, or an id was mistyped.
                 Check the three values below against Account Settings → API at
-                <span class="text-slate-300">ads.apple.com</span>, then verify again - or generate a fresh key pair.
+                <span class="text-slate-300">ads.apple.com</span>, then verify again, or generate a fresh key pair.
             </p>
         </div>
         {% include "aso/partials/apple_wizard_credentials.html" %}
 
         {% elif wizard_state == 'unverified' %}
         <div class="rounded-lg bg-amber-900/20 border border-amber-500/30 px-4 py-3 mb-3">
-            <p class="text-sm text-amber-300 font-medium">One step left - verify the connection.</p>
+            <p class="text-sm text-amber-300 font-medium">One step left: verify the connection.</p>
             <p class="text-xs text-slate-400 mt-1">
                 Your key and credentials are saved. Verification makes a real API call and activates syncing.
             </p>
@@ -303,18 +303,18 @@
             </button>
         </div>
         <p class="text-xs text-slate-400 mb-2">
-            <span class="text-slate-200 font-medium">Step 3 of 3:</span> Apple now shows three values above the key field - paste them here:
+            <span class="text-slate-200 font-medium">Step 3 of 3:</span> Apple now shows three values above the key field. Paste them here:
         </p>
         {% include "aso/partials/apple_wizard_credentials.html" %}
         <p class="text-[11px] text-slate-500 mt-3">
-            The private key stays in your local data folder (owner-only permissions) and never leaves this computer -
+            The private key stays in your local data folder (owner-only permissions) and never leaves this computer.
             Apple only ever receives the public key and signed requests.
         </p>
 
         {% else %}
         <!-- no_credentials -->
         <p class="text-xs text-slate-400 mb-3">
-            Connect once and Apple's official search popularity powers your research - free, read-only,
+            Connect once and Apple's official search popularity powers your research: free, read-only,
             no ads or spend required. About 5 minutes, never again.
         </p>
         <ol class="text-xs text-slate-500 space-y-1 mb-4 list-decimal pl-4">
@@ -324,7 +324,7 @@
         </ol>
         <button type="button" onclick="generateKeys(false)" id="generate-keys-btn"
                 class="text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-lg px-4 py-2 transition-colors">
-            Start - generate my key pair
+            Generate my key pair
         </button>
         <p class="text-[11px] text-slate-500 mt-3">
             Requirements: a free <a href="https://ads.apple.com" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300">Apple Ads account</a>
@@ -370,7 +370,7 @@
         <p class="text-[11px] text-slate-500 mb-3">
             Everything here is automatic: each new week is picked up right after Apple publishes it, and up to
             65 weeks of history backfill in the background for keyword trends. Keywords not in Apple's top terms
-            are outside their category's top 500 - that bounds their popularity, it is not an error.
+            are outside their category's top 500. That bounds their popularity and is not an error.
         </p>
         <button type="button" onclick="runSyncNow()" id="sync-now-btn"
                 class="text-xs font-medium text-sky-300 bg-sky-900/40 hover:bg-sky-900/70 border border-sky-500/30 rounded-lg px-3 py-1.5 transition-colors">
@@ -420,7 +420,7 @@
                     window.generateKeys(true); return;
                 }
                 if (!data.needs_confirm) showError(data.error);
-                if (btn) { btn.disabled = false; btn.textContent = 'Start - generate my key pair'; }
+                if (btn) { btn.disabled = false; btn.textContent = 'Generate my key pair'; }
             });
     };
 
@@ -486,7 +486,7 @@
     function renderAccountPicker(accounts) {
         var host = document.getElementById('account-picker');
         if (!host) return;
-        var html = '<p class="text-xs text-slate-300 mb-2 mt-3">Your credentials can access several ad accounts - pick the one to use:</p>';
+        var html = '<p class="text-xs text-slate-300 mb-2 mt-3">Your credentials can access several ad accounts. Pick the one to use:</p>';
         accounts.forEach(function (account) {
             html += '<button type="button" onclick="verifyWithAccount(\'' + account.id + '\')" '
                 + 'class="block w-full text-left text-xs text-slate-300 bg-slate-800/60 hover:bg-slate-700/60 border border-white/10 rounded-lg px-3 py-2 mb-1.5 transition-colors">'
@@ -516,7 +516,7 @@
     window.startOverApple = function () {
         var warning = 'Start over from step 1?\n\n'
             + 'This deletes the key pair generated on this computer. If you already '
-            + 'pasted its public key at Apple, that key entry stops working - you can '
+            + 'pasted its public key at Apple, that key entry stops working. You can '
             + 'remove it at ads.apple.com and add a new one when you retry.';
         if (!confirm(warning)) return;
         post('{% url "aso:apple_disconnect" %}').then(function () {

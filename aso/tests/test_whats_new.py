@@ -141,4 +141,4 @@ class UpdateNoticeTest(TestCase):
         release_notes.mark_seen("1.0.0")
         response = self.client.get(reverse("aso:methodology"))
         self.assertContains(response, "whats-new-notice")
-        self.assertContains(response, "see what")
+        self.assertContains(response, "See what")

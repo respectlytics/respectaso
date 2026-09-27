@@ -77,7 +77,7 @@ def load_private_key_pem() -> str:
     path = _key_path()
     if not path.exists():
         raise AppleKeyError(
-            "No Apple Ads private key found - generate or import one first."
+            "No Apple Ads private key found. Generate or import one first."
         )
     return path.read_text(encoding="ascii")
 
@@ -133,6 +133,6 @@ def _load_key_object(pem: str):
         )
     except (ValueError, TypeError, UnicodeEncodeError) as e:
         raise AppleKeyError(
-            "Could not read the private key - it may be corrupted, "
+            "Could not read the private key. It may be corrupted, "
             "password-protected, or not PEM-encoded."
         ) from e

@@ -33,7 +33,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-INTERRUPTED_MESSAGE = ("Interrupted - RespectASO was closed while this run was "
+INTERRUPTED_MESSAGE = ("Interrupted: RespectASO was closed while this run was "
                        "in progress. Retry to run it again.")
 YIELDED_MESSAGE = "Paused for a moment while another run goes first"
 
@@ -423,7 +423,7 @@ def _worker(feature, pk):
     except Exception:                     # execute() handles its own errors; this is the backstop
         logger.exception("Run %s/%s crashed", feature.key, pk)
         feature.model.objects.filter(pk=pk, status="running").update(
-            status="failed", error_message="Unexpected error - see the app log.",
+            status="failed", error_message="Unexpected error. See the app log.",
             progress_message="Error",
         )
     finally:

@@ -84,10 +84,14 @@ def whats_new_view(request):
     Opening the page counts as having seen the current version's notes,
     which clears the one-time update notice.
     """
+    from .copy_rules import no_dash_in_markup, walk_prose
     from .release_notes import RELEASES, mark_seen
 
     mark_seen()
-    return render(request, "aso/whats_new.html", {"releases": RELEASES})
+    # The notes are the release history, written once and never rewritten;
+    # the page still reads without a dash between words (aso/copy_rules.py).
+    releases = walk_prose(RELEASES, no_dash_in_markup, keep=("version", "date", "kind", "notice"))
+    return render(request, "aso/whats_new.html", {"releases": releases})
 
 
 @require_POST
@@ -825,7 +829,7 @@ def queue_remove_view(request):
     if not exists:
         return JsonResponse({"error": "Unknown run."}, status=404)
     return JsonResponse(
-        {"error": "This run already started - cancel it from its tab instead."},
+        {"error": "This run already started. Cancel it from its tab instead."},
         status=400,
     )
 
@@ -1376,7 +1380,7 @@ def export_history_csv_view(request):
 
     # Respectlytics attribution row
     writer.writerow([])
-    writer.writerow(["Privacy-first mobile analytics - https://respectlytics.com"])
+    writer.writerow(["Privacy-first mobile analytics: https://respectlytics.com"])
 
     return response
 

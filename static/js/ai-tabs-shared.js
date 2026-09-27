@@ -115,7 +115,7 @@
         // Competitor-specific
         'implied': "Keywords from the app's description: features, use cases, and themes users search for",
         'implied_component': "A component word from a multi-word implied phrase, scored separately so you can evaluate its long-tail value.",
-        'inferred': "Broader market keywords — what users looking for this type of app would search",
+        'inferred': "Broader market keywords: what users looking for this type of app would search",
         'inferred_component': "A component word from a multi-word inferred phrase, scored separately so you can evaluate its long-tail value.",
         'ai_discovered': "AI-discovered keywords relevant to this app's niche, beyond what is in its visible metadata",
         'ai_discovered_component': "A component word from a multi-word AI-discovered phrase, scored separately so you can evaluate its long-tail value.",
@@ -356,6 +356,42 @@
             .catch(function () { showCopyToast(btn, 'Copy failed', false); });
     });
 
+    // Whose score a run's tables show, as the server composed it: the sentence
+    // above each table, the words under each Opportunity heading and that
+    // heading's hover text. One copy for the three AI tabs
+    // (READINESS_CLARITY_PLAN.md, D7).
+    function applyWhoseScore(data) {
+        if (data.scored_for) {
+            document.querySelectorAll('.scored-for-note').forEach(function (el) {
+                el.textContent = data.scored_for;
+                el.classList.remove('hidden');
+            });
+        }
+        if (data.opportunity_subline) {
+            document.querySelectorAll('.opp-subline').forEach(function (el) {
+                el.textContent = data.opportunity_subline;
+            });
+        }
+        if (data.opportunity_tip) {
+            document.querySelectorAll('svg[data-column="opportunity"]').forEach(function (el) {
+                el.setAttribute('data-tip', data.opportunity_tip);
+            });
+        }
+    }
+
+    // The sentence a failed request carries: the server's own "error" when it
+    // answered with JSON (every endpoint and aso/error_views.py do), a plain
+    // sentence otherwise, never the raw body.
+    function errorFrom(response) {
+        return response.text().then(function (text) {
+            try {
+                var data = JSON.parse(text);
+                if (data && data.error) { return data.error; }
+            } catch (e) { /* not JSON: fall through */ }
+            return 'RespectASO could not load this (error ' + response.status + '). Try again.';
+        });
+    }
+
     // Expose under a namespace AND as bare globals so existing inline template
     // code that calls e.g. formatSourceBadge() / fmt() / escapeHtml() keeps working
     // without any rename.
@@ -374,6 +410,8 @@
         formatRunFailure: formatRunFailure,
         wrapFailedRun: wrapFailedRun,
         presentRunFailure: presentRunFailure,
+        applyWhoseScore: applyWhoseScore,
+        errorFrom: errorFrom,
     };
     window.escapeHtml = escapeHtml;
     window.formatSourceLabel = formatSourceLabel;

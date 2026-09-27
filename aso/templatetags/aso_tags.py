@@ -125,9 +125,9 @@ def column_info(column, subject="new_app"):
 
     return format_html(
         '<svg class="{}" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="{}" '
-        'onclick="event.stopPropagation()"><path stroke-linecap="round" stroke-linejoin="round" '
-        'stroke-width="2" d="{}"/></svg>',
-        INFO_ICON_CLASS, column_tip(column, subject), INFO_ICON_PATH,
+        'data-column="{}" onclick="event.stopPropagation()"><path stroke-linecap="round" '
+        'stroke-linejoin="round" stroke-width="2" d="{}"/></svg>',
+        INFO_ICON_CLASS, column_tip(column, subject), column, INFO_ICON_PATH,
     )
 
 
@@ -293,7 +293,7 @@ def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
         )
         if internal is not None and internal > cap:
             return _badge_popover(
-                _BADGE_EST_CLS, "EST*", "Not in Apple's top terms - capped",
+                _BADGE_EST_CLS, "EST*", "Not in Apple's top terms: capped",
                 [absent_para,
                  "It cannot score above Apple's lowest reported value "
                  f"there ({cap + 1}), so RespectASO's estimate of "
@@ -317,20 +317,20 @@ def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
         return _badge_popover(
             _BADGE_ASA_CLS, "ASA", "Apple Ads popularity",
             ["Apple's official search popularity for this storefront, "
-             "updated weekly - the active source powering your scores."],
+             "updated weekly: the active source powering your scores."],
             note=note, idx=idx, total=total,
         )
     if apple is not None:
         note = f"Apple's official value for comparison: {apple}"
     elif apple_configured:
-        note = ("Not among Apple's top terms in this storefront - Apple "
+        note = ("Not among Apple's top terms in this storefront: Apple "
                 "reports no value.")
     else:
         note = ""
     return _badge_popover(
         _BADGE_EST_CLS, "EST", "RespectASO estimate",
         ["RespectASO's own estimate, calibrated to Apple's official 1-100 "
-         "popularity scale - the active source powering your scores."],
+         "popularity scale, the active source powering your scores."],
         note=note, idx=idx, total=total,
     )
 

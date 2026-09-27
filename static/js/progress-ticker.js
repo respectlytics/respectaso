@@ -258,16 +258,16 @@
             var msg = '';
             var secs = (isLocal && lg && lg.running) ? lg.secs : 0;
             if (secs >= 1200) {            // 20+ minutes on one local step
-                msg = 'This step has been running over 20 minutes. It hasn’t frozen — local generation is just slow for this demanding workload. You can keep waiting, or cancel and use a cloud provider for a quick result.';
+                msg = 'This step has been running over 20 minutes. It hasn’t frozen: local generation is just slow for this demanding workload. You can keep waiting, or cancel and use a cloud provider for a quick result.';
             } else if (secs >= 480) {      // 8+ minutes on one local step
-                msg = 'Still working — local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
+                msg = 'Still working: local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
             } else if (!isLocal && thinkSecs >= 900) {   // 15+ minutes waiting on a cloud model
-                msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + ' — this model appears heavily '
+                msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + '. This model appears heavily '
                     + 'queued right now. RespectASO gives up after ' + deadlineMin + ' minutes '
                     + '(your AI response deadline). You can keep waiting, or cancel and pick a '
                     + 'faster model in Settings → AI Configuration.';
             } else if (!isLocal && thinkSecs >= 180) {   // 3+ minutes waiting on a cloud model
-                msg = 'The model is responding unusually slowly. Nothing is frozen — RespectASO '
+                msg = 'The model is responding unusually slowly. Nothing is frozen: RespectASO '
                     + 'is still waiting, and gives up after ' + deadlineMin + ' minutes '
                     + '(your AI response deadline).';
             }

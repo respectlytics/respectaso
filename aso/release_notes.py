@@ -38,7 +38,59 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '2.27.0',
+RELEASES = [{'version': '2.28.0',
+  'date': '2026-09-27',
+  'title': 'A Simulator score that explains itself, AI tabs that score for your app, and honest download ranges',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'The ASO Score Simulator explains its score',
+       'intro': ['The score now says what your keywords can bring your app, and a card under it '
+                 'says why it is where it is and how far it can go.'],
+       'items': [
+           'When your app has few ratings, the card says so: what the same metadata would score '
+           'with 100 ratings, and that collecting ratings is the next step.',
+           'Every run shows its ceiling: what that version would score, and bring in, at #1 for '
+           'every keyword it targets.',
+           'Refined versions say how their search downloads compare with your current metadata '
+           'and with the previous version, for example about twice as many.',
+           'Every number uses your app\'s ratings as they are today, so older runs and new ones '
+           'compare fairly.',
+           'The AI compares keywords by the downloads they can bring your app, and says when a '
+           'suggestion drops your app\'s name from the title.',
+           'Fixed: refining a simulation from an AI assistant through MCP stopped with an error.',
+       ]},
+      {'heading': 'The AI Researcher and AI Competitor score keywords for your app',
+       'intro': ['Pick one of your apps under the country, and every keyword is scored for it, '
+                 'from its ratings and the ranks your Dashboard measured. Keep "A brand new app" '
+                 'to size up a niche you are not in yet.'],
+       'items': [
+           'History cards name the app a run was scored for.',
+           'The MCP tools can score for your app too.',
+       ]},
+      {'heading': 'Download figures are honest ranges',
+       'intro': ['Every download figure is now a range, from a tenth of the estimate up to the '
+                 'estimate. Real downloads depend on how many people search a term and on how '
+                 'many of the people who see your app install it, which no tool can measure. '
+                 'App Store Connect shows your real figures.'],
+       'items': [
+           'The Dashboard, keyword tables and charts, the Opportunity Finder, the AI tabs and '
+           'exports all show the same range.',
+           'For terms Apple does not report, search volumes read "up to", because the real '
+           'volume can be far lower.',
+           'Opportunity scores and keyword tags stay as they were.',
+       ]},
+      {'heading': 'Smaller improvements',
+       'intro': [],
+       'items': [
+           'A wrong address or an unexpected error now shows a RespectASO page with a way back, '
+           'instead of a technical error page.',
+           'Opening a run that was deleted says so in plain words.',
+           'The version comparison treats a word and its plural as one word, as the App Store '
+           'does.',
+           'The progress strip at the bottom of the page no longer covers the footer.',
+       ]},
+  ]},
+ {'version': '2.27.0',
   'date': '2026-09-23',
   'title': 'Every App Store country, an Opportunity score you can act on, and 3-month licenses',
   'kind': 'feature',

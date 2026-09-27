@@ -202,7 +202,7 @@ class SettingsPageTest(PopularityViewTestBase):
     def test_wizard_states_render(self):
         # no_credentials
         response = self.client.get(reverse("aso:settings_popularity"))
-        self.assertContains(response, "generate my key pair")
+        self.assertContains(response, "Generate my key pair")
         # keys_generated
         apple_keys.generate_key_pair()
         response = self.client.get(reverse("aso:settings_popularity"))
@@ -240,7 +240,7 @@ class SettingsPageTest(PopularityViewTestBase):
         self.client.post(reverse("aso:apple_disconnect"))
         self.assertFalse(apple_keys.has_private_key())
         response = self.client.get(reverse("aso:settings_popularity"))
-        self.assertContains(response, "generate my key pair")
+        self.assertContains(response, "Generate my key pair")
         self.assertNotContains(response, "BEGIN PUBLIC KEY")
 
 

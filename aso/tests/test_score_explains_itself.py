@@ -20,6 +20,7 @@ import io
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
+from aso.copy_rules import dash_punctuation_in
 from aso.models import App, Keyword, SearchResult
 from aso.scoring import (
     WORST_POSITION,
@@ -32,8 +33,6 @@ from aso.scoring import (
     scoring_guide,
     typical_landing,
 )
-
-DASHES = ("—", "–")
 
 
 class ReachSaysWhoseRankAndWhyTest(SimpleTestCase):
@@ -116,9 +115,8 @@ class ReachSaysWhoseRankAndWhyTest(SimpleTestCase):
         for pop, diff, code in ((48, 38, "ar"), (97, 84, "us"), (43, 31, "ag"),
                                 (63, 74, "us"), (80, 20, "us")):
             reach = opportunity_reach(pop, diff, code)
-            for dash in DASHES:
-                self.assertNotIn(dash, reach["label"])
-                self.assertNotIn(dash, reach["explanation"])
+            self.assertEqual(dash_punctuation_in(reach["label"]), "")
+            self.assertEqual(dash_punctuation_in(reach["explanation"]), "")
 
 
 class ScoringGuideComesFromTheCodeTest(SimpleTestCase):
@@ -146,8 +144,10 @@ class ScoringGuideComesFromTheCodeTest(SimpleTestCase):
 
     def test_the_opportunity_scale_reads_as_downloads(self):
         rows = {row["range"]: row["meaning"] for row in scoring_guide()["opportunity"]}
-        self.assertEqual(rows["50"], "About one download a day")
-        self.assertIn("every 10 days", rows["30"])
+        # A range from a tenth of the estimate to the estimate, like every
+        # download figure (DownloadEstimator.RANGE_LOW_SHARE).
+        self.assertEqual(rows["50"], "0.1 to 1 downloads a day")
+        self.assertEqual(rows["30"], "At most one download every 10 days")
 
 
 class DashboardShowsTheWorkingTest(TestCase):
@@ -345,8 +345,7 @@ class DifficultyFactorsComeFromTheScoreTest(TestCase):
         )
         for factor in legend:
             self.assertIn(factor["key"], breakdown, factor["key"])
-            for dash in DASHES:
-                self.assertNotIn(dash, factor["tip"])
+            self.assertEqual(dash_punctuation_in(factor["tip"]), "")
 
     def test_every_page_publishes_it_once(self):
         html = self.client.get(reverse("aso:dashboard")).content.decode()

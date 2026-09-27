@@ -36,7 +36,7 @@ from . import countries, run_queue, throttle
 from .column_tips import opportunity_subline
 from .keyword_scoring import score_country
 from .models import App, OpportunityScan, OpportunityScanResult, SearchResult
-from .popularity import popularity_fields, prefetch_apple_values
+from .popularity import popularity_fields, prefetch_apple_values, reported_by_apple
 from .scoring import (
     calc_opportunity,
     classify_keyword,
@@ -279,9 +279,10 @@ def country_payload(row, *, heavy=False) -> dict:
     # differs from storefront to storefront, and its real rank there; a
     # brand new app without one.
     app = row.app_profile
+    reported = reported_by_apple(resolution)
     reach = opportunity_reach(
         popularity or 0, row.difficulty_score, row.country,
-        app=app, app_rank=row.app_rank, keyword=row.keyword_text,
+        app=app, app_rank=row.app_rank, keyword=row.keyword_text, reported=reported,
     )
     label = classify_keyword(
         popularity or 0, row.difficulty_score, row.country,
@@ -327,14 +328,21 @@ def country_payload(row, *, heavy=False) -> dict:
         "top_ratings": row.top_ratings,
     }
     if heavy:
-        data["difficulty_breakdown"] = row.difficulty_breakdown
+        # The chart's estimates are worked out again from today's popularity,
+        # as the Dashboard's are, so a scan stored before a change to the
+        # estimate draws today's range (DownloadEstimator.RANGE_LOW_SHARE).
+        data["difficulty_breakdown"] = {
+            **(row.difficulty_breakdown or {}),
+            "download_estimates": {**DownloadEstimator().estimate(popularity or 0, country=row.country),
+                                   "searches_reported": reported},
+        }
         data["competitors"] = row.competitors_data
         # Only the expanded row shows the badge, and its sentence is about
         # ninety bytes. On 175 light rows every three seconds that is a poll
         # twice the size for something nobody is looking at.
         data["targeting"] = targeting_payload(
             popularity or 0, row.difficulty_score, row.country,
-            app=app, app_rank=row.app_rank, keyword=row.keyword_text,
+            app=app, app_rank=row.app_rank, keyword=row.keyword_text, reported=reported,
         )
     return data
 
@@ -557,7 +565,7 @@ def _throttle_message(state, limiter) -> str:
         return (f"Apple is not answering, {limiter.consecutive_failures} requests failed in a row, "
                 f"retrying at {round(limiter.current_delay)} s per country.")
     if state == "aborted":
-        return "Apple is rejecting requests, cooling down for 2 minutes, then retrying."
+        return "Apple is rejecting requests. Cooling down for 2 minutes, then retrying."
     return "Scanning..."
 
 

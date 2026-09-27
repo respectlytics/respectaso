@@ -40,6 +40,9 @@
     const positions = estimates.positions;
     const maxDl = Math.max(...positions.map(p => p.downloads_high), 1);
     const dailySearches = estimates.daily_searches || 0;
+    // "up to" unless the popularity is Apple's own reported value: for a term
+    // Apple does not report, search volume is the least certain figure here.
+    const searchesPrefix = estimates.searches_reported ? '\u2248' : 'up to \u2248';
 
     const W = 680, H = 220, PAD_L = 55, PAD_R = 15, PAD_T = 25, PAD_B = 35;
     const chartW = W - PAD_L - PAD_R;
@@ -80,11 +83,11 @@
         else if (p.pos <= 10) { barColor = 'rgb(59,130,246)'; solidOpacity = isAppPos ? 1 : 0.7; rangeOpacity = isAppPos ? 0.3 : 0.18; }
         else { barColor = 'rgb(100,116,139)'; solidOpacity = isAppPos ? 0.9 : 0.5; rangeOpacity = isAppPos ? 0.25 : 0.12; }
 
-        // Optimistic range segment (downloads_low → downloads_high) — lighter top portion
+        // The range above the low end (downloads_low to downloads_high, the estimate): lighter top portion
         if (hRange > 0.5) {
             bars += `<rect x="${x}" y="${yHigh}" width="${barW}" height="${hRange}" fill="${barColor}" opacity="${rangeOpacity}" rx="2"/>`;
         }
-        // Conservative base segment (0 → downloads_low) — solid bottom portion
+        // Up to the low end (a tenth of the estimate): solid bottom portion
         if (hLow > 0.5) {
             bars += `<rect x="${x}" y="${yLow}" width="${barW}" height="${hLow}" fill="${barColor}" opacity="${solidOpacity}" rx="2"/>`;
         }
@@ -152,12 +155,12 @@
                 <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Estimated Downloads by Position</h4>
                 <span class="relative group/dlinfo">
                     <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on \u2248${fmt(dailySearches)} estimated daily searches for this keyword. Solid bars show the low end (5% CVR — unknown indie app), lighter extensions show the high end (20% CVR — established category leader). Where your app falls in this range depends on your ratings, screenshots, icon, and brand recognition.</span>
+                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on ${searchesPrefix}${fmt(dailySearches)} estimated daily searches for this keyword. Each bar runs from a tenth of the estimate (solid) up to the estimate (lighter). Real downloads depend on how many people search this term, which Apple reports only for its most searched terms, and on how many of the people who see your app install it (your conversion rate), which RespectASO cannot measure. App Store Connect shows your real impressions and conversion rate.</span>
                 </span>
             </div>
             <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3 overflow-x-auto">
                 <div class="mb-2 text-[10px] text-slate-500">
-                    <span>Estimated daily searches: <span class="text-slate-300 font-medium">\u2248${fmt(dailySearches)}</span></span>
+                    <span>Estimated daily searches: <span class="text-slate-300 font-medium">${searchesPrefix}${fmt(dailySearches)}</span></span>
                 </div>
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:500px;max-width:700px">
                     ${zones}
@@ -168,8 +171,8 @@
                     ${axisLabels}
                 </svg>
                 <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
-                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> Conservative</span>
-                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Optimistic</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> A tenth of the estimate</span>
+                    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Up to the estimate</span>
                     <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-2 rounded-sm" style="border:1px dashed rgb(250,204,21);"></span> Your Position</span>
                 </div>
                 <p class="mt-2 text-[10px] text-slate-500">
