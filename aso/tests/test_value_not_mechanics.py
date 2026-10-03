@@ -31,6 +31,8 @@ from aso.tests.surfaces import (
     INFO_TIP,
     PROTECT,
     SCRIPT,
+    flat_text,
+    on_a_screen,
     python_strings,
     relative,
     script_strings,
@@ -54,20 +56,6 @@ LONG_FORM = {
     "aso/templates/aso/whats_new.html",
 }
 
-# Modules whose strings no person reads on a screen: what the AI model or
-# the AI assistant reads, and the command line tools of the people who
-# build RespectASO.
-NOT_ON_A_SCREEN = (
-    "aso_pro/prompts.py",
-    "aso_pro/schemas.py",
-    "aso_pro/mcp/",
-    "aso/management/",
-    "aso_pro/management/",
-    "scripts/",
-    "core/settings.py",
-    "_public_overrides/core/settings.py",
-)
-
 # (file, the words that matched): why they stay.
 ALLOWED = {
     ("aso/templates/aso/setup.html", "cache"): "the command the reader types: docker compose build --no-cache",
@@ -79,21 +67,10 @@ ALLOWED = {
     ("aso_pro/keyword_pipeline.py", "quota"): "prompt text the AI model reads, never a screen",
 }
 
-_INLINE = re.compile(r"</?(?:strong|b|em|i|code|a|span|abbr|kbd|br)\b[^>]*>", re.IGNORECASE)
-
-
-def _flat(text: str) -> str:
-    """A piece of markup as a person reads it: inline tags gone, block tags
-    a break no phrase is read across."""
-    text = _INLINE.sub(" ", text)
-    text = re.sub(r"<[^>]+>", " ¦ ", text)
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
-
-
 def _mechanics(where: str, texts) -> list[str]:
     found = []
     for text in texts:
-        flat = _flat(text)
+        flat = flat_text(text)
         if " " not in flat:          # a key or a code, never a sentence
             continue
         for pattern in MECHANICS:
@@ -101,11 +78,6 @@ def _mechanics(where: str, texts) -> list[str]:
                 if (where, m.group().lower()) not in ALLOWED:
                     found.append(f"{m.group()!r} in {flat[:120]!r}")
     return found
-
-
-def _on_a_screen(path: Path) -> bool:
-    rel = relative(path)
-    return not rel.startswith(NOT_ON_A_SCREEN)
 
 
 _BRANCH = re.compile(r"{%\s*(?:else|elif\b[^%]*|empty)\s*%}")
@@ -212,7 +184,7 @@ class NoMechanicsTest(SimpleTestCase):
         whole history). Log lines are read by the people who run the app."""
         hits = {}
         for path in sources(".py"):
-            if not _on_a_screen(path):
+            if not on_a_screen(path):
                 continue
             texts = python_strings(path.read_text(encoding="utf-8"), skip_logs=True, join=True)
             if found := _mechanics(relative(path), texts):
@@ -260,7 +232,7 @@ class HelpTextIsShortTest(SimpleTestCase):
         for path in sources(".html"):
             if relative(path) in LONG_FORM:
                 continue
-            long = [f"{_shown_length(t)}: {_flat(t)[:90]}" for t in _leads(path.read_text(encoding="utf-8"))
+            long = [f"{_shown_length(t)}: {flat_text(t)[:90]}" for t in _leads(path.read_text(encoding="utf-8"))
                     if _shown_length(t) > LEAD_LIMIT]
             if long:
                 hits[relative(path)] = long

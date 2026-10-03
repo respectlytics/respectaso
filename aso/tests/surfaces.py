@@ -256,3 +256,33 @@ def python_strings(src: str, *, skip_logs: bool = False, join: bool = False):
         last = end
     if sentence is not None:
         yield sentence
+
+
+# Modules whose strings no person reads on a screen: what the AI model or
+# the AI assistant reads, and the command line tools of the people who
+# build RespectASO.
+NOT_ON_A_SCREEN = (
+    "aso_pro/prompts.py",
+    "aso_pro/schemas.py",
+    "aso_pro/mcp/",
+    "aso/management/",
+    "aso_pro/management/",
+    "scripts/",
+    "core/settings.py",
+    "_public_overrides/core/settings.py",
+)
+
+INLINE_TAG = re.compile(r"</?(?:strong|b|em|i|code|a|span|abbr|kbd|br)\b[^>]*>", re.IGNORECASE)
+
+
+def flat_text(text: str) -> str:
+    """A piece of markup as a person reads it: inline tags gone, block tags
+    a break no phrase is read across."""
+    text = INLINE_TAG.sub(" ", text)
+    text = re.sub(r"<[^>]+>", " ¦ ", text)
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def on_a_screen(path: Path) -> bool:
+    rel = relative(path)
+    return not rel.startswith(NOT_ON_A_SCREEN)

@@ -492,7 +492,7 @@ RELEASES = [{'version': '3.0.0',
        'intro': [("The Apple Ads popularity source has been rebuilt on Apple's new official "
                   'Apple Ads Platform API. The sign-in window is gone: connecting is a '
                   'one-time, five-minute API key setup - no campaigns, no spend, no payment '
-                  'method - and your key never leaves your computer.')],
+                  'method - and your key stays on your computer.')],
        'items': [
            ("<strong>Official weekly data.</strong> RespectASO syncs Apple's official top "
             'search terms per storefront and category every week, automatically. Keywords '
@@ -587,8 +587,7 @@ RELEASES = [{'version': '3.0.0',
                            'value for a keyword, the estimate steps in and is clearly marked, '
                            'so your scores never go missing.'),
                           ('<strong>Free for everyone</strong>, with a built-in step-by-step '
-                           'setup guide. No campaigns or ad spend required, and your keyword '
-                           'data never leaves your Mac.')]},
+                           'setup guide. No campaigns or ad spend required.')]},
                {'heading': 'Smarter, more honest AI analyses',
                 'items': [('Every AI report now states which popularity source it used, both in '
                            'the report and in your saved-runs list.'),
@@ -842,8 +841,8 @@ RELEASES = [{'version': '3.0.0',
                            'prioritize them immediately.')]},
                {'heading': 'A clearer, smoother Dashboard',
                 'intro': ['---',
-                          ('<em>RespectASO runs entirely on your Mac. No accounts, no API keys, '
-                           'no data leaves your machine.</em>')],
+                          ('<em>RespectASO runs on your Mac. No accounts and no API keys, and your '
+                           'research is stored only on your Mac.</em>')],
                 'items': [('Friendlier labels and helpful explanations throughout, so every '
                            'number is easy to understand'),
                           'Tidier hover details that appear right where you expect them',
@@ -1223,7 +1222,7 @@ RELEASES = [{'version': '3.0.0',
                           ('<strong>Clearer refinement process</strong>: The Refine panel now '
                            'explains that it writes new suggestions and keeps the keyword '
                            'scores you have, so you know what to expect.')]},
-               {'heading': 'More Accurate Ranking Effectiveness Score',
+               {'heading': 'Ranking Effectiveness Scores Only the Keywords You Rank For',
                 'items': [('<strong>Honest scoring for unranked keywords</strong> — The ranking '
                            'effectiveness score no longer gives free points for keywords you '
                            "don't rank on. Previously, an app with zero rankings on hard "

@@ -275,3 +275,64 @@ def mechanics_in(text: str) -> str:
         if found := pattern.search(flat):
             return found.group()
     return ""
+
+
+# Never promise what the terms disclaim (the owner's rule, 2026-10-02). The
+# terms (respectaso.com/terms/, section 10) give no warranty that keyword
+# data, rankings, scores or AI-generated content are accurate, reliable or
+# complete, none that the Service will improve an app's rankings or
+# downloads, and none that it runs uninterrupted or error free; Apple alone
+# decides App Review and ranking; and what leaves a Mac (App Store searches,
+# the AI provider a user picks) is the privacy policy's to state, so nothing
+# says "nothing leaves". Each entry is the shape of a sentence someone could
+# quote back as a promise, named by what it promises. ``overclaim_in`` finds
+# the first; the claims guards (aso/tests/test_claims.py, and
+# core/test_claims.py on respectaso.com, which keeps a copy of this list)
+# read every surface through it. Whether a sentence is something we can stand
+# behind stays a person's reading against the terms at every copy change; the
+# guards make the known shapes impossible to ship again. The same list as
+# respectaso.com's core/copy_rules.py; change both together.
+OVERCLAIMS = {
+    "says the numbers or the AI are right": re.compile(
+        r"\b(?:100%|always|perfectly|completely|fully|guaranteed to be) "
+        r"(?:accurate|correct|right|precise|reliable|exact)\b"
+        r"|(?<!no )(?<!not )(?<!share )(?<!publish )(?<!publishes )(?<!know )(?<!knows )\b(?:exact|precise) (?:search volumes?|download (?:counts|numbers))\b"
+        r"|\baccurate (?:keyword data|data|downloads?|download (?:estimates|numbers)|search volumes?|"
+        r"popularity|rankings?|ranks|scores?|estimates?|metadata|results?)\b"
+        r"|\bnever (?:wrong|inaccurate|hallucinates?|makes (?:anything|things|facts) up)\b"
+        r"|\b(?:error|hallucination|mistake)[ -]free\b|\bfact[ -]?checked\b",
+        re.IGNORECASE),
+    "promises more downloads or higher ranks": re.compile(
+        r"\b(?:boosts?|increases?|doubles?|triples?|skyrockets?) (?:your )?(?:app'?s? )?"
+        r"(?:downloads|installs|rankings?|ranks|visibility|revenue|organic traffic)\b"
+        r"|\b(?:will|guaranteed to) (?:rank|reach #?1|get (?:you )?to #?1)\b"
+        r"|\bget (?:you |your app )?(?:to )?#1\b",
+        re.IGNORECASE),
+    "promises a guarantee": re.compile(r"\bguarantee(?:s|d|ing)?\b|\bwarrant(?:y|ies)\b", re.IGNORECASE),
+    "promises nothing is missed": re.compile(
+        r"\bnever miss(?:es|ed|ing)?\b|\bnothing (?:slips|gets) (?:through|past)\b|\bmiss(?:es)? nothing\b"
+        r"|\bevery (?:keyword|opportunity) (?:that matters|there is)\b|\bcomplete (?:keyword )?coverage\b",
+        re.IGNORECASE),
+    "speaks for Apple's review": re.compile(
+        r"\bapple[ -]approved\b|\bapproved by apple\b|\b(?:pass|passes|passing) (?:app )?review\b"
+        r"|\bapp store[ -]compliant\b|\bcompliant with (?:the )?app store\b|\bnever (?:be )?rejected\b",
+        re.IGNORECASE),
+    "says nothing leaves the Mac": re.compile(
+        r"\b100% (?:private|local|offline)\b|\bnothing (?:ever )?leaves your (?:mac|machine|device|computer)\b"
+        r"|\b(?:no|zero) data (?:ever )?leav(?:es|ing)\b|\bnever leaves your (?:mac|machine|device|computer)\b"
+        r"|\bcompletely (?:private|offline)\b",
+        re.IGNORECASE),
+    "promises a time saving nothing measures": re.compile(
+        r"\bsav(?:e|es|ing) (?:you )?(?:\d+ )?(?:hours|days|weeks|minutes)\b|\b\d+x faster\b|\bhours? saved\b",
+        re.IGNORECASE),
+}
+
+
+def overclaim_in(text: str) -> str:
+    """The first promise the terms take back in ``text``, as "what it
+    promises: the words that matched", or an empty string."""
+    flat = re.sub(r"\s+", " ", text or "")
+    for name, pattern in OVERCLAIMS.items():
+        if found := pattern.search(flat):
+            return f"{name}: {found.group()}"
+    return ""
