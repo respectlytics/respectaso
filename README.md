@@ -7,10 +7,13 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-Download_.dmg-purple?logo=apple&logoColor=white)](https://github.com/respectlytics/respectaso/releases/latest)
 [![Version](https://img.shields.io/github/v/release/respectlytics/respectaso?color=purple&label=version)](https://github.com/respectlytics/respectaso/releases/latest)
+[![Website](https://img.shields.io/badge/Website-respectaso.com-purple)](https://respectaso.com)
 
 **Free, open-source ASO keyword research tool for macOS. No API keys. No accounts. No data leaves your machine.**
 
 RespectASO helps iOS developers research App Store keywords privately. Download the `.dmg`, drag to Applications, and get keyword popularity scores, difficulty analysis, competitor breakdowns, and download estimates, all without sending your research data to third-party services.
+
+**Website:** [respectaso.com](https://respectaso.com) has the docs, the scoring methodology and RespectASO Pro.
 
 ---
 
