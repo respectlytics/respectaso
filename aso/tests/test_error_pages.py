@@ -101,7 +101,7 @@ class WiredInTest(SimpleTestCase):
             or (isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") in wanted)
         ]
         spec = {"BASE_DIR": base}
-        exec(compile(ast.Module(body=body, type_ignores=[]), str(spec_file), "exec"), spec)
+        exec(compile(ast.Module(body=body, type_ignores=[]), str(spec_file), "exec"), spec)  # noqa: S102 (a .spec file cannot be imported)
 
         self.assertLessEqual({p.parent.name for p in base.glob("*/__init__.py")}, set(spec["FIRST_PARTY"]))
         shipped = set(spec["OWN_MODULES"])
@@ -135,7 +135,7 @@ class PagesTest(TestCase):
 
     def test_404_in_the_app_shell(self):
         html = self.assertOurPage(self.client.get("/no-such-page/", **PAGE), 404, "This page doesn't exist")
-        self.assertIn("ASO Simulator", html)            # the navigation is there to carry on from
+        self.assertIn("data-top-sections", html)        # the top bar is there to carry on from
         self.assertIn("Go back", html)
 
     def test_404_for_a_script_is_json(self):
@@ -148,7 +148,14 @@ class PagesTest(TestCase):
             html = self.assertOurPage(self.client.get("/test-errors/crash/", **PAGE), 500, "Something went wrong")
         self.assertIn("RuntimeError: boom", "\n".join(logs.output))   # the log keeps what the page hides
         self.assertIn("<style>", html)
-        self.assertNotIn("/static/", html)
+        # It never needs the stylesheet: no link, no script, and the only
+        # addresses under /static/ are the font files its own @font-face
+        # names, which fall back to system fonts when they cannot load.
+        self.assertNotIn("<link", html)
+        self.assertNotIn("<script", html)
+        self.assertEqual(re.findall(r"/static/[^\"')]+", html), [
+            "/static/fonts/inter/Inter-Regular.woff2", "/static/fonts/inter/Inter-Medium.woff2",
+            "/static/fonts/inter/Inter-SemiBold.woff2"])
         self.assertIn("mailto:respectaso@loheden.com", html)
 
     def test_500_for_a_script_is_json(self):
@@ -203,7 +210,7 @@ class StandaloneTemplatesTest(SimpleTestCase):
         base = Path(settings.BASE_DIR) / "aso" / "templates"
         for name in ("error_standalone.html", "400.html", "500.html"):
             src = re.sub(r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}", "",
-                         (base / name).read_text(encoding="utf-8"), flags=re.S)
+                         (base / name).read_text(encoding="utf-8"), flags=re.DOTALL)
             for forbidden in ("{% url", "{% static", "{% load", "{% include", "aso/base.html", "request.", "<link"):
                 self.assertNotIn(forbidden, src, f"{name}: {forbidden}")
 

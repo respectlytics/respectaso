@@ -19,16 +19,27 @@ that was refused fails as itself, in whichever process ran it. A worker
 also sends each failure's traceback as text: a traceback object cannot be
 pickled, so one failing test used to end the whole parallel run with
 "cannot pickle 'traceback' object" instead of naming the test.
+
+Each parallel worker also gets a data folder of its own. Linux starts the
+workers by forking the main process, so they all inherited the one folder
+core/settings.py made for the run, and tests that write a file there (the
+time zone in ui_state.json, settings.json) raced each other: on 2026-10-01
+the first Linux run of the suite (the CI's) failed six local day tests that
+pass on macOS, where every worker imports the settings afresh.
 """
 
 import socket
+import tempfile
 import traceback
+from pathlib import Path
 
+from django.conf import settings
 from django.test.runner import (
     DiscoverRunner,
     ParallelTestSuite,
     RemoteTestResult,
     RemoteTestRunner,
+    _init_worker as django_init_worker,
 )
 
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", ""}
@@ -153,7 +164,18 @@ class _WorkerRunner(RemoteTestRunner):
     resultclass = _WorkerResult
 
 
+def _init_worker(*args, **kwargs):
+    """Django's start of a parallel worker, then a data folder of its own.
+
+    Django runs ``process_setup`` only in spawned workers, so the folder is
+    made here, where forked workers pass too.
+    """
+    django_init_worker(*args, **kwargs)
+    settings.DATA_DIR = Path(tempfile.mkdtemp(prefix="respectaso-test-data-"))
+
+
 class NoNetworkParallelTestSuite(ParallelTestSuite):
+    init_worker = _init_worker
     process_setup = install_guard
     runner_class = _WorkerRunner
 

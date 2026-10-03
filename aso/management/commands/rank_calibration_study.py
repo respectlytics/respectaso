@@ -46,12 +46,14 @@ observations, so a refit never refetches.
 """
 
 import datetime as dt
+import itertools
 import json
 import math
 import os
 import random
 import time
 import zlib
+from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -88,11 +90,11 @@ class Command(BaseCommand):
         random.seed(options["seed"])
         cache = options["cache"]
         if os.path.exists(cache):
-            searches = json.load(open(cache))
+            searches = json.loads(Path(cache).read_text())
             self.stdout.write(f"Using {len(searches)} cached searches from {cache}")
         else:
             searches = self._fetch(options)
-            json.dump(searches, open(cache, "w"))
+            Path(cache).write_text(json.dumps(searches))
             self.stdout.write(f"Cached {len(searches)} searches to {cache}")
         rho, fitted_cal, current_cal = self._fit_and_judge(searches, options["seed"])
         if options.get("summary_json"):
@@ -428,7 +430,7 @@ def _predict(knots, gap):
         return math.exp(knots[0][1])
     if gap >= knots[-1][0]:
         return math.exp(knots[-1][1])
-    for (g0, r0, _), (g1, r1, _) in zip(knots, knots[1:]):
+    for (g0, r0, _), (g1, r1, _) in itertools.pairwise(knots):
         if g0 <= gap <= g1:
             t = (gap - g0) / (g1 - g0) if g1 > g0 else 0.0
             return math.exp(r0 + t * (r1 - r0))

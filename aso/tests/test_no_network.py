@@ -73,6 +73,32 @@ class ParallelWorkersAreGuardedTest(SimpleTestCase):
         self.assertIs(suite.process_setup, test_runner.install_guard)
         self.assertTrue(issubclass(suite.runner_class.resultclass, test_runner.RefusalsFailTheTest))
 
+    def test_every_worker_gets_a_data_folder_of_its_own(self):
+        """Forked workers (Linux) inherit the main process's data folder; each
+        must write its files where no other worker does. The test calls the
+        worker start with Django's part replaced, since that part switches
+        this process's databases."""
+        from unittest import mock
+
+        from django.conf import settings
+
+        suite = test_runner.NoNetworkTestRunner.parallel_test_suite
+        self.assertIs(suite.init_worker, test_runner._init_worker)
+        before = settings.DATA_DIR
+        try:
+            with mock.patch("core.test_runner.django_init_worker") as django_part:
+                test_runner._init_worker("counter", initial_settings=None)
+                first = settings.DATA_DIR
+                test_runner._init_worker("counter")
+                second = settings.DATA_DIR
+        finally:
+            settings.DATA_DIR = before
+        django_part.assert_called_with("counter")
+        self.assertNotEqual(first, before)
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.is_dir())
+        self.assertEqual(list(first.iterdir()), [])
+
     def test_a_worker_failure_can_be_sent_back(self):
         import pickle
         try:

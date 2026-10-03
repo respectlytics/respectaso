@@ -1,5 +1,6 @@
 """View tests: banner matrix v2, settings wizard, CSV dual columns."""
 
+import re
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -7,9 +8,7 @@ from unittest import mock
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from aso.apple_ads import api as apple_api
-from aso.apple_ads import keys as apple_keys
-from aso.apple_ads import storage
+from aso.apple_ads import api as apple_api, keys as apple_keys, storage
 from aso.models import App, Keyword, SearchResult
 
 
@@ -46,10 +45,14 @@ class PopularityViewTestBase(TestCase):
 class BannerMatrixTest(PopularityViewTestBase):
     """The six-state signal matrix v2 (apple-ads.instructions.md)."""
 
-    def test_recommend_banner_for_fresh_install(self):
+    def test_fresh_install_recommends_apple_in_the_checklist_not_a_banner(self):
+        from aso.models import App
+
+        App.objects.create(name="Moonpond")   # with nothing at all, the first run card shows instead
         response = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(response, "apple-recommend-banner")
-        self.assertContains(response, "Recommended: connect Apple Ads")
+        self.assertNotContains(response, "apple-recommend-banner")
+        self.assertContains(response, 'data-setup-step="apple"')
+        self.assertContains(response, "Use Apple&#x27;s own popularity numbers")
 
     def test_recommend_banner_hidden_after_opt_out(self):
         storage.save_apple_settings(apple_ads={"estimate_opt_out": True})
@@ -68,7 +71,7 @@ class BannerMatrixTest(PopularityViewTestBase):
         )
         response = self.client.get(reverse("aso:dashboard"))
         self.assertContains(response, "apple-upgrade-banner")
-        self.assertContains(response, "official API")
+        self.assertContains(response, "Reconnect Apple Ads once")
         self.assertNotContains(response, "apple-recommend-banner")
 
     def test_not_connected_banner_when_apple_active_without_credentials(self):
@@ -107,9 +110,51 @@ class BannerMatrixTest(PopularityViewTestBase):
         self._connect(source="internal")
         storage.mark_credentials_rejected()
         response = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(response, "apple-stale-banner")
-        self.assertContains(response, "data-expired-at")
+        # Drawn visible by the server; it used to start hidden and wait for
+        # the browser's storage to say whether it was dismissed.
+        self.assertContains(response, '<div id="apple-stale-banner" class="bg-amber-900/30')
+        self.assertNotContains(response, "data-expired-at")
         self.assertNotContains(response, "apple-rejected-banner")
+
+    def test_stale_notice_dismissal_survives_and_resets(self):
+        """Dismissed per rejection and per install (aso.ui_state): it stays
+        dismissed for every visitor and after a restart, and a new rejection
+        shows it again."""
+        import datetime as dt
+        import json
+
+        from django.conf import settings
+        from django.test import Client
+
+        from aso import ui_state
+
+        self._connect(source="internal")
+        storage.mark_credentials_rejected()
+        first = storage.load_apple_settings()["apple_ads"]["credentials_rejected_at"]
+        response = self.client.post(reverse("aso:apple_stale_banner_dismiss"))
+        self.assertEqual(response.json(), {"ok": True})
+        self.assertNotContains(self.client.get(reverse("aso:dashboard")), "apple-stale-banner")
+        self.assertNotContains(self.client.get(reverse("aso:popularity_banner")), "apple-stale-banner")
+        self.assertNotContains(Client().get(reverse("aso:dashboard")), "apple-stale-banner")
+        stored = json.loads((Path(settings.DATA_DIR) / "ui_state.json").read_text())
+        self.assertTrue(stored["dismissed"][ui_state.apple_stale_banner_key(first)])
+
+        later = dt.datetime(2031, 1, 1, tzinfo=dt.UTC)
+        with mock.patch("django.utils.timezone.now", return_value=later):
+            storage.mark_credentials_rejected()
+        self.assertNotEqual(storage.load_apple_settings()["apple_ads"]["credentials_rejected_at"], first)
+        self.assertContains(self.client.get(reverse("aso:dashboard")), "apple-stale-banner")
+
+    def test_a_malformed_dismissal_file_never_breaks_a_page(self):
+        from django.conf import settings
+
+        self._connect(source="internal")
+        storage.mark_credentials_rejected()
+        (Path(settings.DATA_DIR) / "ui_state.json").write_text('{"dismissed": [], "snoozed": 3}')
+        self.assertContains(self.client.get(reverse("aso:dashboard")), "apple-stale-banner")
+
+    def test_stale_notice_dismiss_needs_post(self):
+        self.assertEqual(self.client.get(reverse("aso:apple_stale_banner_dismiss")).status_code, 405)
 
     def test_silence_when_internal_and_healthy(self):
         self._connect(source="internal")
@@ -121,9 +166,11 @@ class BannerMatrixTest(PopularityViewTestBase):
             self.assertNotContains(response, banner_id)
 
     def test_banner_endpoint_serves_live_region(self):
+        self._connect(source="apple", tested_ok=False)
         response = self.client.get(reverse("aso:popularity_banner"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "apple-recommend-banner")
+        self.assertContains(response, "Verify connection")
+        self.assertNotContains(response, "apple-recommend-banner")
 
     def test_banner_partial_stays_script_free(self):
         """Swapped innerHTML never executes scripts - the partial must not
@@ -221,6 +268,33 @@ class SettingsPageTest(PopularityViewTestBase):
         response = self.client.get(reverse("aso:settings_popularity"))
         self.assertContains(response, "Connected to Apple")
         self.assertContains(response, "My Org")
+
+    def test_connection_is_the_first_card_and_which_numbers_the_second(self):
+        """UI_REDESIGN_PLAN.md 10.2."""
+        html = self.client.get(reverse("aso:settings_popularity")).content.decode()
+        titles = [part.split("</h2>")[0] for part in html.split('<h2 class="card-title mb-1">')[1:]]
+        self.assertEqual(titles[:2], ["Connection", "Which numbers to use"])
+        self.assertIn('id="apple-connection"', html.split("Which numbers to use")[0])
+        # Both explanations are folded, the MCP line and the banner talk are gone.
+        for summary in ("Which should I choose?", "What exactly changes when I switch?"):
+            self.assertRegex(html, r"<details[^>]*>\s*<summary[^>]*>\s*<svg[^>]*>.*?</svg>\s*" + re.escape(summary))
+        self.assertNotIn("from your AI assistant", html)
+        self.assertNotIn("hide the recommendation banner", html)
+        self.assertNotIn("reversible here any time", html)
+        self.assertIn("Stay on the estimate</button>", html)
+        self.assertIn("You can switch back any time.", html)
+
+    def test_connected_the_sync_facts_join_the_connection(self):
+        self._connect(source="internal")
+        html = self.client.get(reverse("aso:settings_popularity")).content.decode()
+        connection = html.split('id="apple-connection"')[1].split("</section>")[0]
+        for part in ("Connected to Apple", 'id="sync-facts"', 'id="sync-now-btn"', "Disconnect and delete the key"):
+            self.assertIn(part, connection)
+        self.assertNotIn("Apple Data Sync", html)
+
+    def test_the_setup_guide_links_back(self):
+        html = self.client.get(reverse("aso:apple_ads_setup")).content.decode()
+        self.assertIn("Back to Apple Ads settings", html)
 
     def test_mid_wizard_states_offer_start_over(self):
         """Regression: a user who generated keys by accident (or wants the

@@ -4,57 +4,57 @@
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
+    {% include "aso/partials/back_link.html" %}
 
     <!-- Header -->
-    <div class="mb-8">
-        <h1 class="text-2xl font-bold text-white mb-2">Our Methodology</h1>
-        <p class="text-slate-400 text-sm leading-relaxed">
-            How RespectASO analyzes keywords, estimates difficulty, and projects download potential, and why we built it this way.
+    <div class="mb-5">
+        <h1 class="page-title mb-2">Our Methodology</h1>
+        <p class="page-lead">
+            How RespectASO scores keywords and estimates downloads, and why it works this way.
         </p>
     </div>
 
     <!-- Philosophy -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">💡</span> Why This Tool Exists
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Why This Tool Exists
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                App Store Optimization shouldn't require expensive subscriptions. The core data (search results and app metadata)
-                is publicly available through Apple's iTunes Search API. What's been missing is a good way to
-                interpret that data and turn it into actionable decisions.
+                App Store Optimization shouldn't need an expensive subscription. Its data, App Store search
+                results and app details, is public and comes straight from Apple. What was missing was a clear
+                way to turn it into decisions.
             </p>
             <p>
-                RespectASO is an open-source tool that does exactly that. The core keyword research, difficulty scoring,
-                and rank tracking are completely free. Optional Pro features add AI-powered analysis for those who want
-                deeper automation. Everything runs locally on your Mac, queries Apple's iTunes Search API directly, and gives you
-                the same kind of competitive analysis that paid tools charge for, without sending your research data anywhere.
+                RespectASO does exactly that, and it is open source. Keyword research, difficulty scores and rank
+                tracking are free; Pro adds AI analysis. The free features run on your computer and take their
+                data straight from Apple, so your research goes nowhere else.
             </p>
             <p>
-                Apple's ranking algorithm is private, and no tool knows exactly how it works. So RespectASO measures
-                instead of guessing: its popularity estimate is fitted to Apple's own popularity data, its ranks come
-                from where apps actually land in real App Store searches, and every score shows the working behind it.
+                Apple's ranking algorithm is private, so RespectASO measures instead of guessing: its popularity
+                estimate is fitted to Apple's own popularity data, its ranks are where apps actually land in
+                App Store results, and every score shows the working behind it.
             </p>
         </div>
     </section>
 
     <!-- Popularity -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📊</span> Popularity Score
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Popularity Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
                 RespectASO gives you <span class="text-white font-medium">two popularity sources</span> and lets you choose
                 which one powers your scores in
-                <a href="{% url 'aso:settings_popularity' %}" class="text-purple-400 hover:text-purple-300">Settings → Popularity Source</a>:
+                <a href="{% url 'aso:settings_popularity' %}" class="link">Settings → Apple Ads</a>:
                 the <span class="text-white font-medium">RespectASO estimate</span> (built-in, works everywhere) and
                 <span class="text-white font-medium">Apple Ads popularity</span> (Apple's own measurement, connected through your
                 Apple Ads account). Every popularity value shows which source produced it, and the other source's
                 value is always one hover away on its badge; exactly one, your selected
                 source, feeds opportunity, classification, and download estimates.
             </p>
-            <h3 class="text-white font-medium text-sm">The RespectASO estimate</h3>
+            <h3 class="section-label">The RespectASO estimate</h3>
             <p>
                 The estimate (1–100) is derived from the competitive landscape of each keyword.
                 Since Apple doesn't publish exact search volumes, we read observable signals:
@@ -62,31 +62,31 @@
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Result count</span><span class="text-slate-500">: More apps competing for a keyword signals higher demand.</span></div>
+                    <div><span class="text-white font-medium">Result count</span><span class="text-slate-400">: More apps competing for a keyword signals higher demand.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Leader strength</span><span class="text-slate-500">: Big apps don't bother ranking for obscure keywords. Strong leaders indicate high search volume.</span></div>
+                    <div><span class="text-white font-medium">Leader strength</span><span class="text-slate-400">: Big apps don't bother ranking for obscure keywords. Strong leaders indicate high search volume.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Title match density</span><span class="text-slate-500">: If many apps put this keyword in their title, developers clearly think it's worth targeting.</span></div>
+                    <div><span class="text-white font-medium">Title match density</span><span class="text-slate-400">: If many apps put this keyword in their title, developers clearly think it's worth targeting.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Market depth</span><span class="text-slate-500">: When top results have substantial rating counts, it indicates sustained search interest.</span></div>
+                    <div><span class="text-white font-medium">Market depth</span><span class="text-slate-400">: When top results have substantial rating counts, it indicates sustained search interest.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Specificity penalty</span><span class="text-slate-500">: Long multi-word phrases are naturally searched less often.</span></div>
+                    <div><span class="text-white font-medium">Specificity penalty</span><span class="text-slate-400">: Long multi-word phrases are naturally searched less often.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Exact phrase bonus</span><span class="text-slate-500">: If many apps match the exact phrase in their title, the keyword likely has meaningful search volume.</span></div>
+                    <div><span class="text-white font-medium">Exact phrase bonus</span><span class="text-slate-400">: If many apps match the exact phrase in their title, the keyword likely has meaningful search volume.</span></div>
                 </div>
             </div>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Calibrated against Apple's official data</h3>
+                <h3 class="section-label">Calibrated against Apple's official data</h3>
                 <p class="text-slate-400">
                     The signals are weighted by fitting them to thousands of Apple's official popularity values
                     across several countries, and to search terms that fall below Apple's list. So the estimate speaks
@@ -98,7 +98,7 @@
                 A popularity of 60 is not 60 searches a day. It says how sought after a keyword is compared with
                 others, and the Opportunity score turns it into searches and downloads for each storefront.
             </p>
-            <h3 class="text-white font-medium text-sm">Apple Ads popularity (official API)</h3>
+            <h3 class="section-label">Apple Ads popularity (official API)</h3>
             <p>
                 When you connect Apple Ads (a free, one-time API key setup, no ads or spend required),
                 RespectASO syncs Apple's official <strong class="text-white">top search terms dataset</strong> from the
@@ -124,7 +124,7 @@
                 keyword's source badge.
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Why RespectASO offers both</h3>
+                <h3 class="section-label">Why RespectASO offers both</h3>
                 <p class="text-slate-400">
                     Apple's popularity is Apple's own measurement, published through an official API. It covers only the
                     top of the market (the most-searched terms in each category), it is updated once a week, and Apple
@@ -140,7 +140,7 @@
                 <p>
                     <a href="https://respectaso.com/blog/apple-search-ads-popularity-unreliable-aso-keyword-data/"
                        target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors text-xs">
+                       class="link inline-flex items-center gap-1 text-xs">
                         Full write-up: How Apple's popularity metric broke, and what we do about it
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
@@ -152,9 +152,9 @@
     </section>
 
     <!-- Difficulty -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🎯</span> Difficulty Score
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Difficulty Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -166,36 +166,36 @@
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Rating volume</span><span class="text-slate-500">: How many ratings do the top apps have? Apps with hundreds of thousands of ratings are nearly impossible to displace.</span></div>
+                    <div><span class="text-white font-medium">Rating volume</span><span class="text-slate-400">: How many ratings do the top apps have? Apps with hundreds of thousands of ratings are nearly impossible to displace.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Dominant players</span><span class="text-slate-500">: If one or two apps hold the majority of ratings, they're extremely hard to outrank.</span></div>
+                    <div><span class="text-white font-medium">Dominant players</span><span class="text-slate-400">: If one or two apps hold the majority of ratings, they're extremely hard to outrank.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Rating velocity</span><span class="text-slate-500">: How fast are competitors gaining new ratings? Fast-growing apps are actively maintained and harder to overtake.</span></div>
+                    <div><span class="text-white font-medium">Rating velocity</span><span class="text-slate-400">: How fast are competitors gaining new ratings? Fast-growing apps are actively maintained and harder to overtake.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Keyword in titles</span><span class="text-slate-500">: How many competitors use this keyword in their app title? More title usage means more intentional targeting. Run-together spellings count too: "ScrollLess" targets "scroll less".</span></div>
+                    <div><span class="text-white font-medium">Keyword in titles</span><span class="text-slate-400">: How many competitors use this keyword in their app title? More title usage means more intentional targeting. Run-together spellings count too: "ScrollLess" targets "scroll less".</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Star ratings</span><span class="text-slate-500">: Average rating of competitors. Users prefer higher-rated apps, making it harder to compete against 4.8★ apps.</span></div>
+                    <div><span class="text-white font-medium">Star ratings</span><span class="text-slate-400">: Average rating of competitors. Users prefer higher-rated apps, making it harder to compete against 4.8★ apps.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Market maturity</span><span class="text-slate-500">: How long have the top apps been on the store? Older apps have accumulated downloads and authority over years.</span></div>
+                    <div><span class="text-white font-medium">Market maturity</span><span class="text-slate-400">: How long have the top apps been on the store? Older apps have accumulated downloads and authority over years.</span></div>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="text-purple-400 mt-1">•</span>
-                    <div><span class="text-white font-medium">Publisher diversity</span><span class="text-slate-500">: Is the top 10 dominated by two publishers, or are there many different companies? More diversity means a healthier, more open market.</span></div>
+                    <div><span class="text-white font-medium">Publisher diversity</span><span class="text-slate-400">: Is the top 10 dominated by two publishers, or are there many different companies? More diversity means a healthier, more open market.</span></div>
                 </div>
             </div>
             <p>The algorithm also applies corrections. For example, if very few apps rank for the keyword, difficulty is capped downward regardless of individual competitor strength.</p>
             <div class="bg-slate-800/80 rounded-lg p-4 mt-2">
-                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">🏷️ Brand keyword detection</h3>
+                <h3 class="section-label mb-2">Brand keyword detection</h3>
                 <p class="text-xs text-slate-400">
                     When the keyword matches the #1 app's publisher name (e.g. "nasdaq" → Nasdaq, Inc.) and that app has few ratings
                     while positions #2–5 are held by major apps, RespectASO detects a <strong class="text-purple-300">brand keyword</strong>.
@@ -208,12 +208,12 @@
     </section>
 
     <!-- Difficulty Tiers -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🏷️</span> Difficulty Tiers
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Difficulty Tiers
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
-            <p>The final score maps to 6 color-coded tiers. The right-hand figure is where a brand new app with the keyword in its title typically lands in each tier, measured on real App Store searches; an app with ratings of its own does better.</p>
+            <p>The final score maps to 6 color-coded tiers. The right-hand figure is where a brand new app with the keyword in its title typically lands in each tier, measured in real App Store results; an app with ratings of its own does better.</p>
             {% with d=scoring_guide.difficulty %}
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2 text-xs">
                 <div class="grid grid-cols-[8rem_1fr_auto] gap-3"><span class="text-green-400 font-medium">1-15: Very Easy</span><span class="text-slate-400">Almost no competition. Rank quickly with basic metadata.</span><span class="text-slate-300 whitespace-nowrap">{{ d.0.where }}</span></div>
@@ -228,9 +228,9 @@
     </section>
 
     <!-- Tiered Difficulty -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📐</span> Ranking Tiers: Top 5 / Top 10 / Top 20
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Ranking Tiers: Top 5 / Top 10 / Top 20
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -238,7 +238,7 @@
                 The difference between position #1 and #10 is enormous.
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4">
-                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-2">Why position matters</h3>
+                <h3 class="section-label mb-2">Why position matters</h3>
                 <div class="space-y-2 text-xs text-slate-400">
                     <p><strong class="text-purple-300">Positions 1–5</strong>: These apps get the majority of taps. Most users don't scroll past the first few results. If you rank here, you're in the premium real estate.</p>
                     <p><strong class="text-blue-300">Positions 6–10</strong>: Still visible without scrolling far, but tap-through rates drop significantly. You'll get meaningful downloads, but a fraction of what the top 5 gets.</p>
@@ -254,9 +254,9 @@
     </section>
 
     <!-- Download Estimates -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📈</span> Estimated Downloads
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Estimated Downloads
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -292,9 +292,9 @@
     </section>
 
     <!-- Country coverage: generated from aso/countries.py, never hand written -->
-    <section id="country-coverage" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🌍</span> Country coverage
+    <section id="country-coverage" class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Country coverage
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -304,7 +304,7 @@
             </p>
 
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Where Apple reports popularity</h3>
+                <h3 class="section-label">Where Apple reports popularity</h3>
                 {% if coverage_apple_known %}
                 <p class="text-slate-400">
                     Apple Ads, the source of official search popularity, operates in
@@ -324,17 +324,17 @@
             </div>
 
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">What the badges mean</h3>
+                <h3 class="section-label">What the badges mean</h3>
                 <div class="flex items-start gap-3">
-                    <span class="text-slate-500">•</span>
+                    <span class="text-slate-400">•</span>
                     <span><strong class="text-white">EST</strong>: RespectASO's estimate, the active source powering your scores.</span>
                 </div>
                 <div class="flex items-start gap-3">
-                    <span class="text-slate-500">•</span>
+                    <span class="text-slate-400">•</span>
                     <span><strong class="text-white">ASA</strong>: Apple Ads popularity, Apple's own value for that keyword and week.</span>
                 </div>
                 <div class="flex items-start gap-3">
-                    <span class="text-slate-500">•</span>
+                    <span class="text-slate-400">•</span>
                     <span><strong class="text-white">EST*</strong>: the estimate standing in where Apple reports nothing for that keyword,
                     either because the keyword is not among its category's most-searched terms or because Apple publishes
                     no data for that storefront at all. Hovering the badge gives the numbers behind that row.</span>
@@ -342,7 +342,7 @@
             </div>
 
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Listing languages</h3>
+                <h3 class="section-label">Listing languages</h3>
                 <p class="text-slate-400">
                     Apple offers an App Store listing language for
                     <strong class="text-white">{{ coverage_language_count }}</strong> of these storefronts.
@@ -356,7 +356,7 @@
             </div>
 
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Popularity is relative, not a number of searches</h3>
+                <h3 class="section-label">Popularity is relative, not a number of searches</h3>
                 <p class="text-slate-400">
                     A popularity of 43 means the same thing in every storefront: this keyword is sought after
                     compared with other keywords. It does not mean 43 searches, and it does not mean the same
@@ -372,7 +372,7 @@
             </div>
 
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
-                <h3 class="text-white font-medium text-sm">Market size</h3>
+                <h3 class="section-label">Market size</h3>
                 <p class="text-slate-400">
                     Download estimates are scaled by how large a storefront is relative to the US.
                     <strong class="text-white">{{ coverage_measured_count }}</strong> of these factors were measured against
@@ -386,13 +386,13 @@
             </div>
 
             <details class="bg-slate-800/80 rounded-lg p-4">
-                <summary class="text-white font-medium text-sm cursor-pointer hover:text-purple-300 transition-colors">
+                <summary class="disclosure font-medium text-sm">
                     Show all {{ coverage_total }} storefronts
                 </summary>
                 <div class="mt-3 overflow-x-auto">
                     <table class="w-full text-xs">
                         <thead>
-                            <tr class="border-b border-white/10 text-slate-500">
+                            <tr class="border-b border-white/10 text-slate-400">
                                 <th class="text-left py-1.5 pr-3 font-medium">Country</th>
                                 <th class="text-left py-1.5 pr-3 font-medium">Region</th>
                                 <th class="text-left py-1.5 pr-3 font-medium">Apple data</th>
@@ -405,7 +405,7 @@
                                 {% for c in entries %}
                                 <tr class="border-b border-white/5">
                                     <td class="py-1.5 pr-3 text-slate-200 whitespace-nowrap">{{ c.flag }} {{ c.name }}</td>
-                                    <td class="py-1.5 pr-3 text-slate-500">{{ region }}</td>
+                                    <td class="py-1.5 pr-3 text-slate-400">{{ region }}</td>
                                     <td class="py-1.5 pr-3 text-slate-400">
                                         {% if not coverage_apple_known %}not checked yet
                                         {% elif c.code in coverage_apple_codes %}Apple reports it
@@ -426,9 +426,9 @@
     </section>
 
     <!-- ASO Targeting -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🧭</span> Insight Tags
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Insight Tags
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -451,7 +451,7 @@
             </p>
             {% regroup classification_legend by decision as decisions %}
             {% for group in decisions %}
-            <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide">{{ group.grouper }}</h3>
+            <h3 class="section-label">{{ group.grouper }}</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {% for item in group.list %}
                 <div class="{{ item.css }} border rounded-lg p-3">
@@ -463,17 +463,15 @@
             {% endfor %}
             <p class="text-xs text-slate-400">
                 When your app already has the keyword in its title and RespectASO knows where it ranks, that real rank is
-                what the score uses, better or worse than where apps like it typically land. Every explanation behind a low
-                score ends with what holding #1 would bring, so a keyword that is not worth much today still shows what it
-                could be worth.
+                what the score uses, better or worse than where apps like it typically land.
             </p>
         </div>
     </section>
 
     <!-- Opportunity Score -->
-    <section id="opportunity" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🌍</span> Opportunity Score
+    <section id="opportunity" class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Opportunity Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -520,9 +518,8 @@
             </p>
             <p>
                 Every table shows one Opportunity number per keyword, and says above the column whose it is: a brand new
-                app, the app being simulated, or on the Dashboard the app named under each keyword. Hover a score for the
-                reasoning: the app's ratings, stars and age in that storefront, where apps like it land, the rank it already
-                holds when that is known, and what that averages in downloads.
+                app, the app being simulated, or on the Keywords page the app named under each keyword. Hover a score for what
+                it means for that app, in downloads a day.
             </p>
             <p>
                 What the keyword would bring whoever holds #1 is the Downloads at #1 column beside it, so a low score never
@@ -530,17 +527,16 @@
                 a day or more at #1.
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2 text-xs text-slate-400">
-                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide">The same keyword for two of your apps</h3>
+                <h3 class="section-label">The same keyword for two of your apps</h3>
                 <p>
                     It can score differently for each, and should: the stronger app in that storefront ranks higher, so
-                    the keyword is worth more to it. Each row names its app, and the tooltip says what a brand new app
-                    would get for comparison. Each app's ratings, stars and release date are read from the App Store at
-                    most once a day per storefront, because they differ from country to country.
+                    the keyword is worth more to it. Each row names its app. Each app's ratings, stars and release date
+                    are taken from the App Store in each storefront, because they differ from country to country.
                 </p>
                 <p>
                     Keywords not tied to one of your apps score for a brand new app. The AI Researcher and the AI
                     Competitor tab ask whose chances to score: a new app, starting from zero, or one of your apps,
-                    from its ratings and the ranks the Dashboard measured. The choice does not change how keywords
+                    from its ratings and the ranks the Keywords page measured. The choice does not change how keywords
                     are found; it changes their scores, and with them the keywords the AI recommends. Each run's header says whose scores
                     it shows. The App Store ranks apps for keywords that match what they do, so when your app sits in
                     another App Store category than the niche, the results say so, and the Competitor form warns before
@@ -551,9 +547,9 @@
     </section>
 
     <!-- Scoring Principles -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">⚖️</span> Scoring Principles
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Scoring Principles
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -571,9 +567,9 @@
     </section>
 
     <!-- Practical Strategy -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🛠️</span> Practical Strategy
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Practical Strategy
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -591,9 +587,9 @@
     </section>
 
     <!-- Pro: ASO Readiness Score -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🎯</span> Pro: ASO Readiness Score
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Pro: ASO Readiness Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -618,7 +614,7 @@
             <p>
                 If any metadata fields are left empty, you will see a warning, but the score itself is based purely on keyword quality, not on whether you filled in the form.
             </p>
-            <h3 class="text-sm font-semibold text-white">What the Score Means</h3>
+            <h3 class="section-label">What the score means</h3>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2 text-xs">
                 <div class="flex justify-between"><span class="text-purple-400 font-medium">70 and above: Excellent</span><span class="text-slate-400">These keywords can bring your app strong search traffic. Rare outside big niches.</span></div>
                 <div class="flex justify-between"><span class="text-green-400 font-medium">50 to 69: Good</span><span class="text-slate-400">Steady search traffic in reach. Fine tuning can add more.</span></div>
@@ -630,9 +626,9 @@
     </section>
 
     <!-- Pro: Ranking Effectiveness Score -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📊</span> Pro: Ranking Effectiveness Score
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Pro: Ranking Effectiveness Score
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -653,15 +649,15 @@
     </section>
 
     <!-- Good to know -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📌</span> Good to Know
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Good to Know
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <ul class="list-disc list-inside space-y-1.5 text-slate-400">
-                <li>Apple's search returns up to 200 apps per keyword, and RespectASO finds your app's rank anywhere among them</li>
+                <li>A rank is an app's place among the top 200 App Store results for the keyword, and the top 25 of those apps are the competitors every score is based on, so ranks always match the competitor list</li>
                 <li>Apple publishes no exact search volumes, for any tool. RespectASO uses Apple's own popularity wherever Apple publishes it, and its calibrated estimate everywhere else</li>
-                <li>Rankings move during the day, so each score is a snapshot, and tracked keywords refresh automatically</li>
+                <li>Rankings move during the day, so each score is a snapshot of that day's results. Tracked keywords refresh by themselves every day, and Refresh brings a keyword up to date at once</li>
                 <li>Every country has its own keyword landscape, so check each market you target</li>
                 <li>Download figures are estimates, since Apple publishes no tap or install data</li>
             </ul>
@@ -669,26 +665,33 @@
     </section>
 
     <!-- Data Source -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-8">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🔗</span> Data Sources
+    <section class="card p-4 mb-5">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Data Sources
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
                 Keyword research data comes from Apple's public <strong class="text-white">iTunes Search API</strong>,
                 plus, when you choose to connect it, the official <strong class="text-white">Apple Ads Platform API</strong>
                 using your own Apple Ads API credentials.
-                RespectASO does not use private APIs, scraping, or any data source that violates Apple's terms of service.
+                If Apple's search API fails, RespectASO reads the same search on Apple's public
+                <strong class="text-white">App Store search page</strong> (apps.apple.com) instead, so the keyword still gets its results.
+                From that page it takes only the list of apps, in the order Apple shows them, and it looks up each app's
+                details through the iTunes Search API as usual.
+                Nothing else is read from the page.
+                With Pro, the Rival Tracker also reads your rivals' newest reviews from Apple's public review feed, about
+                50 per app and country.
+                RespectASO uses no private Apple APIs and no paid data services.
                 The free features run entirely on your machine: no data is sent to third-party servers, and your Apple
                 Ads key never leaves your computer.
             </p>
             <p>
-                Pro AI features (AI Niche Researcher, AI Competitor Analyzer, ASO Score Simulator) send your keyword and metadata inputs to the AI provider you choose: OpenAI, Anthropic, Google Gemini, or OpenRouter (using your own API key), any OpenAI-compatible service you connect as a custom endpoint, or a local AI model you run yourself. With OpenRouter, your request is routed onward to the host of the model you select. With a custom endpoint, your request goes to the service whose address you entered. No data is sent anywhere else.
+                Pro AI features (AI Niche Researcher, AI Competitor Analyzer, ASO Score Simulator) send your keyword and metadata inputs to the AI provider you choose: OpenAI, Anthropic, Google Gemini, or OpenRouter (using your own API key), any OpenAI-compatible service you connect as a custom endpoint, or a local AI model you run yourself. The Rival Tracker uses the same provider for its keyword suggestions (your app's title, subtitle and keyword field) and for its summary of what your rivals' users complain about (their public reviews). With OpenRouter, your request is routed onward to the host of the model you select. With a custom endpoint, your request goes to the service whose address you entered. No data is sent anywhere else.
             </p>
             <p>
                 The scoring algorithm and its tests are
                 <a href="https://github.com/respectlytics/respectaso" target="_blank" rel="noopener"
-                   class="text-purple-400 hover:text-purple-300 transition-colors underline decoration-purple-400/30 hover:decoration-purple-300">
+                   class="link">
                     open-source on GitHub</a>.
                 You can inspect, audit, and contribute to the scoring methodology.
             </p>
@@ -696,12 +699,12 @@
     </section>
 
     <!-- The Creator Behind -->
-    <section class="border-l-2 border-red-500/40 bg-slate-800/60 rounded-r-xl pl-5 pr-5 py-4 mb-8">
+    <section class="border-l-2 border-red-500/40 bg-slate-800/60 rounded-r-xl pl-5 pr-5 py-4 mb-5">
         <div class="flex items-center gap-3">
             <svg class="w-6 h-6 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M23.498 6.186a2.997 2.997 0 00-2.11-2.12C19.507 3.56 12 3.56 12 3.56s-7.507 0-9.388.506a2.997 2.997 0 00-2.11 2.12A31.427 31.427 0 000 12a31.427 31.427 0 00.502 5.814 2.997 2.997 0 002.11 2.12c1.881.506 9.388.506 9.388.506s7.507 0 9.388-.506a2.997 2.997 0 002.11-2.12A31.427 31.427 0 0024 12a31.427 31.427 0 00-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
             <div class="text-sm text-slate-300 leading-relaxed">
-                Built in public by a solo developer. Product development, market insights, and the solo entrepreneur journey
-                &mdash; follow along on
+                Built in public by a solo developer. Product development, market insights, and the solo entrepreneur journey:
+                follow along on
                 <a href="https://www.youtube.com/@TheCreatorBehind"
                    target="_blank" rel="noopener"
                    class="text-red-300 hover:text-red-200 transition-colors underline decoration-red-400/30 hover:decoration-red-300">The Creator Behind</a>.
@@ -710,7 +713,7 @@
     </section>
 
     <!-- Built by Respectlytics -->
-    <section class="bg-purple-900/15 border border-purple-500/20 rounded-xl p-5 mb-8">
+    <section class="bg-purple-900/15 border border-purple-500/20 rounded-xl p-4 mb-5">
         <div class="flex items-start gap-4">
             <span class="text-2xl">📱</span>
             <div class="text-sm text-slate-300 leading-relaxed">
@@ -719,7 +722,7 @@
                     RespectASO is brought to you by
                     <a href="https://respectlytics.com/?utm_source=respectaso&utm_medium=methodology&utm_campaign=oss"
                        target="_blank" rel="noopener"
-                       class="text-purple-400 hover:text-purple-300 transition-colors underline decoration-purple-400/30 hover:decoration-purple-300">Respectlytics</a>,
+                       class="link">Respectlytics</a>,
                     privacy-focused mobile analytics for iOS and Android.
                     If you care about collecting analytics data in a respectful way without the compliance headaches,
                     check us out.
@@ -728,14 +731,8 @@
         </div>
     </section>
 
-    <!-- Back to Dashboard -->
-    <div class="text-center mb-8">
-        <a href="{% url 'aso:dashboard' %}"
-           class="text-sm text-purple-400 hover:text-purple-300 transition-colors inline-flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-            Back to Dashboard
-        </a>
-    </div>
+    <!-- The same way back at the end of a long page -->
+    <div class="mb-5 text-center">{% include "aso/partials/back_link.html" with back_class="" %}</div>
 
 </div>
 {% endblock %}

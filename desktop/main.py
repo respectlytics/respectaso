@@ -4,14 +4,22 @@ RespectASO — Native macOS App Entry Point
 Launches the Django server in a background thread and opens a native
 WebKit window via pywebview. Data is stored in
 ~/Library/Application Support/RespectASO/.
+
+Closing the window hides it and RespectASO keeps running in the menu bar;
+desktop/mac_integration.py holds that native side.
 """
 
 import os
-import sys
 import socket
+import sys
 import threading
 import time
 from pathlib import Path
+
+INSTANCE_LOCK = ".instance.lock"
+
+# The open lock file of acquire_instance_lock(), held until the process ends.
+_held: dict = {}
 
 
 def get_base_dir():
@@ -30,6 +38,54 @@ def get_data_dir():
     data_dir = Path.home() / "Library" / "Application Support" / "RespectASO"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
+
+
+def acquire_instance_lock(data_dir):
+    """Hold <data dir>/.instance.lock for as long as this process runs, with
+    this process's id written in it.
+
+    One data folder, one running app: two copies of RespectASO (one in
+    Applications and one still on the disk image, or a source run next to
+    the installed app) would both run the daily refresh on one database.
+    Returns the open lock file, or None when another process holds it.
+    """
+    import fcntl
+
+    handle = open(data_dir / INSTANCE_LOCK, "a+")  # noqa: SIM115 (held open for the life of the process)
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    handle.truncate(0)
+    handle.write(str(os.getpid()))
+    handle.flush()
+    return handle
+
+
+def hand_over_to_running_instance(data_dir):
+    """Another RespectASO already runs on this data folder: bring that very
+    process's window forward through LaunchServices (the same reopen a Dock
+    click sends), then stop this one. The holder is found by the process id
+    in the lock file, never by bundle identifier: another copy of the app on
+    another data folder must not be the one that comes forward."""
+    import subprocess
+
+    try:
+        holder = int((data_dir / INSTANCE_LOCK).read_text().strip() or 0)
+    except (OSError, ValueError):
+        holder = 0
+    try:
+        from AppKit import NSRunningApplication  # type: ignore[attr-defined]
+    except ImportError:
+        NSRunningApplication = None
+    running = None
+    if NSRunningApplication is not None and holder:
+        running = NSRunningApplication.runningApplicationWithProcessIdentifier_(holder)
+    if running is not None and running.bundleURL() is not None:
+        subprocess.run(["/usr/bin/open", "-a", running.bundleURL().path()], check=False)
+    print("RespectASO is already running.", file=sys.stderr)
+    sys.exit(0)
 
 
 def ensure_secret_key(data_dir):
@@ -72,7 +128,8 @@ def run_server(port):
     requests (e.g. opportunity search) from blocking page navigation.
     """
     from socketserver import ThreadingMixIn
-    from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, make_server
+    from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
+
     from core.wsgi import application
 
     class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
@@ -117,6 +174,13 @@ def configure_environment(data_dir):
 def main():
     base_dir = get_base_dir()
     data_dir = get_data_dir()
+
+    # Before anything touches the database: a second copy hands over to the
+    # running one and stops.
+    lock = acquire_instance_lock(data_dir)
+    if lock is None:
+        hand_over_to_running_instance(data_dir)
+    _held["instance_lock"] = lock
 
     configure_environment(data_dir)
 
@@ -212,7 +276,7 @@ def main():
             try:
                 webbrowser.open(url)
                 return True
-            except Exception:
+            except Exception:  # noqa: BLE001 (the page gets False and shows its own message)
                 return False
 
         def copy_to_clipboard(self, text):
@@ -226,12 +290,16 @@ def main():
             if not isinstance(text, str):
                 return False
             try:
-                from AppKit import NSPasteboard, NSPasteboardTypeString  # type: ignore[import-not-found]
+                from AppKit import (  # type: ignore[import-not-found]
+                    NSPasteboard,
+                    NSPasteboardTypeString,
+                )
+
                 pb = NSPasteboard.generalPasteboard()
                 pb.clearContents()
                 pb.setString_forType_(text, NSPasteboardTypeString)
                 return True
-            except Exception:
+            except Exception:  # noqa: BLE001 (the page gets False and shows its own message)
                 return False
 
     api = Api()
@@ -242,8 +310,18 @@ def main():
         height=860,
         min_size=(900, 600),
         maximized=True,
+        # Shown by desktop/mac_integration.py once macOS has launched the app,
+        # unless macOS opened it at login: then it stays in the menu bar.
+        hidden=True,
         js_api=api,
     )
+
+    # Close to the menu bar, the menu bar menu, opening at login, catching up
+    # after sleep, and notifications. Imported here and not at the top: the
+    # test suite imports this file on Linux, where AppKit does not exist.
+    from desktop import mac_integration
+
+    mac_integration.install(window)
     webview.start()
 
 

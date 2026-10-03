@@ -209,7 +209,7 @@ class EstimatorV2Test(TestCase):
             for name, weight in estimator.V2_WEIGHTS.items()
             if name != "intercept"
         )
-        expected = int(round(max(1, min(100, expected))))
+        expected = round(max(1, min(100, expected)))
         self.assertEqual(estimator.estimate(competitors, "indeed"), expected)
 
     def test_popular_brand_outranks_unknown_brand(self):
@@ -331,7 +331,7 @@ class PopularityCellPopoverTest(StorageTestBase):
         self.assertIn("lowest reported value there (56)", html)
         self.assertIn("estimate of 70 is scored as 55", html)
         # ONE number per cell: the old secondary line markup is gone.
-        self.assertNotIn("block text-[10px] mt-0.5", html)
+        self.assertNotIn("block text-2xs mt-0.5", html)
 
     def test_below_bar_fallback_popover(self):
         _dataset()  # BUSINESS floor 47 -> cap 46
@@ -353,8 +353,10 @@ class PopularityCellPopoverTest(StorageTestBase):
         _dataset()
         storage.save_apple_settings(popularity_source="apple")
         html = self._render(self._result(internal=70, apple=47))
-        self.assertIn(">47<", html)
-        self.assertIn(">ASA<", html)
+        # The header says Apple Ads, so the row needs no ASA badge: the
+        # number itself opens the popover (KEYWORDS_PAGE_PLAN.md M1.5).
+        self.assertIn('cursor-help">47<', html)
+        self.assertNotIn(">ASA<", html)
         self.assertIn("RespectASO estimate for comparison: 70", html)
 
     def test_est_badge_is_quiet_not_amber(self):

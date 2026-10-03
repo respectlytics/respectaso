@@ -1,0 +1,98 @@
+{% comment %}
+Sample-data preview of the Rival Tracker page (aso/rival_tracker_preview.py).
+
+Mirrors the live page card for card, with invented apps and keywords, and
+every app name and keyword locked. Nothing in it is live: no buttons, forms
+or handlers; the only link is the call to action on the card over the table.
+Column headers come from the shared partials/rival_keywords_head.html.
+Expects `preview` from preview_context().
+{% endcomment %}
+<div class="flex items-center justify-between gap-3 mb-3">
+    <span class="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        Preview with sample data · app names and keywords locked
+    </span>
+    <span class="text-xs text-slate-400">The live page looks like this, with the apps and keywords you choose.</span>
+</div>
+
+<div class="space-y-4 select-none" aria-hidden="true">
+    <section class="card p-4">
+        <h2 class="card-title">Since yesterday</h2>
+        <p class="text-sm text-slate-400 mt-0.5">Top 10 moves, the tracked app falling 5 places or more, rival updates and jumps in ratings.</p>
+        <ul class="mt-4 space-y-2 pointer-events-none">
+            {% for item in preview.since %}
+            <li class="text-sm text-slate-200">{% for piece in item.pieces %}{% if piece.locked %}<span class="preview-term blur-sm">{{ piece.text }}</span>{% else %}{{ piece.text }}{% endif %}{% endfor %}</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="card relative">
+        <div class="p-4 pb-3">
+            <h2 class="card-title">Keywords</h2>
+            <p class="text-sm text-slate-400 mt-0.5">Where each app ranks today on the followed keywords, and how it moved since the day before.</p>
+        </div>
+        <div class="overflow-x-auto pointer-events-none">
+            <table class="w-full">
+                {% include "aso/partials/rival_keywords_head.html" with columns=preview.columns locked=True %}
+                <tbody>
+                    {% for row in preview.rows %}
+                    <tr class="border-b border-white/5">
+                        <td class="px-4 py-2.5 text-sm text-white">
+                            <span class="inline-flex items-center gap-2">{% if row.rivals_ahead %}<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>{% endif %}<span class="preview-term blur-sm">{{ row.keyword }}</span></span>
+                        </td>
+                        <td class="px-3 py-2.5 text-center text-sm text-slate-200 tabular-nums">{{ row.popularity }}</td>
+                        {% for cell in row.cells %}
+                        <td class="px-3 py-2.5 text-center text-sm tabular-nums{% if cell.is_tracked_app %} bg-purple-500/5{% endif %}">
+                            {% if cell.rank %}<span class="{% if cell.is_tracked_app %}text-purple-200 font-medium{% else %}text-slate-200{% endif %}">#{{ cell.rank }}</span>{% else %}<span class="text-slate-500">—</span>{% endif %}
+                            {% if cell.change.text %}<span class="ml-1 text-2xs {{ cell.change.css }}">{{ cell.change.text }}</span>{% endif %}
+                        </td>
+                        {% endfor %}
+                        <td class="px-3 py-2.5 text-right text-xs text-slate-400 whitespace-nowrap">Trend<span class="ml-3">Scores</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="absolute inset-x-0 bottom-0 h-48 rounded-b-xl bg-gradient-to-t from-[#1e293b] via-[#1e293b]/90 to-transparent pointer-events-none"></div>
+        <div class="absolute inset-x-0 bottom-6 flex justify-center px-4">
+            <div class="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 shadow-xl">
+                <p class="text-sm font-medium text-white">{{ preview.cta.table_line }}</p>
+                {% include "aso/partials/preview_buttons.html" with cta=preview.cta %}
+            </div>
+        </div>
+    </section>
+
+    <section class="card p-4">
+        <h2 class="card-title">Ratings</h2>
+        <p class="text-sm text-slate-400 mt-0.5">Each app's ratings. New this week hints at which app is gaining users.</p>
+        <table class="w-full mt-4 pointer-events-none">
+            <thead><tr class="text-left text-2xs uppercase tracking-wide text-slate-400 border-b border-white/5">
+                <th class="py-2 pr-3">App</th><th class="py-2 px-3 text-right">Ratings</th><th class="py-2 px-3 text-right">New this week</th><th class="py-2 pl-3 text-right">Average</th>
+            </tr></thead>
+            <tbody>
+                {% for r in preview.ratings %}
+                <tr class="border-b border-white/5 text-sm">
+                    <td class="py-2 pr-3"><span class="preview-term blur-sm {% if r.is_tracked_app %}text-purple-200{% else %}text-slate-200{% endif %}">{{ r.name }}</span></td>
+                    <td class="py-2 px-3 text-right tabular-nums text-slate-200">{{ r.ratings_text }}</td>
+                    <td class="py-2 px-3 text-right tabular-nums text-emerald-300">{{ r.new_text }}</td>
+                    <td class="py-2 pl-3 text-right tabular-nums text-slate-200">{{ r.average_text }} ★</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card p-4">
+        <h2 class="card-title">What their users complain about</h2>
+        <p class="text-sm text-slate-400 mt-0.5">Each week, the rivals' 1 to 3 star reviews summed up: complaints an app could answer.</p>
+        <ul class="mt-4 space-y-3 pointer-events-none">
+            {% for theme in preview.themes %}
+            <li class="text-sm">
+                <p><span class="item-title">{{ theme.theme }}</span> <span class="text-xs text-slate-400">{{ theme.review_count }} reviews · {% for app in theme.apps %}<span class="preview-term blur-sm">{{ app }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</span></p>
+                <p class="text-slate-300 mt-0.5">{{ theme.detail }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        <p class="takeaway mt-4">{{ preview.opportunity }}</p>
+    </section>
+</div>

@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import countries, job_strip, opportunity_scans, run_queue
+from . import countries, job_strip, opportunity_scans, run_queue, ui_memory
 from .forms import OpportunitySearchForm
 from .models import App, OpportunityScan
 from .pro_access import has_pro_license
@@ -30,9 +30,13 @@ def opportunity_view(request):
     hand over the current scan and the picker."""
     opportunity_scans.reclaim_stale()
     scan = opportunity_scans.latest_scan()
+    # Filled in from a keyword's "Check other countries" (KEYWORDS_PAGE_PLAN.md M2.7).
+    app_query = (request.GET.get("app") or "").strip()
+    app_prefill = int(app_query) if app_query.isdigit() else ui_memory.current_app_id(request)
     return render(request, "aso/opportunity.html", {
+        "app_prefill": app_prefill,
         "apps": App.objects.all(),
-        "form": OpportunitySearchForm(),
+        "form": OpportunitySearchForm(initial={"keyword": (request.GET.get("keyword") or "").strip()[:100]}),
         "scan": opportunity_scans.scan_payload(scan, include_results=True) if scan else None,
         "seconds_per_country": round(opportunity_scans.estimate_seconds(1), 1),
         "total_storefronts": len(countries.CODES),
@@ -62,6 +66,8 @@ def opportunity_start_view(request):
 
     app_id = form.cleaned_data.get("app_id")
     app = App.objects.filter(id=app_id).first() if app_id else None
+    if app is not None:
+        ui_memory.remember_app(request, app.pk)
 
     running = run_queue.running_run()
     queued_behind = None

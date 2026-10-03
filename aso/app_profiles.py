@@ -19,6 +19,10 @@ category, which the AI tabs compare with a niche's (``app_category``):
                             scoring pipeline whenever it scores for an app
     profile_for_track()     the same for a bare track id, for the Simulator,
                             which can run for an app you do not track
+    record_lookup()         store a profile from a lookup another feature
+                            already made, so the app is not read twice a day
+    known_storefronts()     the storefronts the app is known in, for a lookup
+                            that must find its listing (the Apps page refresh)
     backfill_from_history() once, at upgrade, from stored competitor lists
     app_category()          the app's App Store category, as last read
 
@@ -28,7 +32,7 @@ Free-tier module: no aso_pro, licensing or llm_providers import.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from .strength import AppProfile
 
@@ -42,7 +46,7 @@ KNOWN_RANK_MAX_AGE = timedelta(days=7)
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse(stamp: str | None) -> datetime | None:
@@ -85,6 +89,26 @@ def _is_fresh(app, country: str) -> bool:
     return "genre" in entry and checked is not None and _now() - checked < PROFILE_MAX_AGE
 
 
+def known_storefronts(app) -> list[str]:
+    """The storefronts the app is known in, most telling first: the one its
+    App Store link names (where it was added from), then the ones its
+    profile was read in, the most recently read first; ["us"] when none is
+    known. No App Store call. Apple lists many apps in only some
+    storefronts, so a lookup that must find the app's listing asks these,
+    never the United States by default."""
+    from . import countries
+    from .services import ITunesSearchService
+
+    profiles = [
+        (code, entry.get("checked_at") or "")
+        for code, entry in (getattr(app, "store_profiles", None) or {}).items()
+        if isinstance(entry, dict)
+    ]
+    profiles.sort(key=lambda item: item[1], reverse=True)
+    linked = ITunesSearchService.storefront_in_link(getattr(app, "store_url", "") or "")
+    return countries.clean([linked, *(code for code, _checked in profiles)]) or ["us"]
+
+
 def app_category(app) -> str:
     """The app's App Store category ("Productivity"), as last read in any
     storefront; "" when it has not been read. Apple gives an app one primary
@@ -118,12 +142,9 @@ def _store(app, country: str, found: dict, checked_at: datetime | None = None) -
     return any(previous.get(k) != data[code][k] for k in ("count", "average", "released"))
 
 
-def _lookup(track_id: int, country: str, itunes_service) -> dict | None:
-    try:
-        found = itunes_service.lookup_by_id(int(track_id), country=country)
-    except Exception as exc:  # A failed lookup never fails a scoring run.
-        logger.warning("Profile lookup failed for %s in %s: %s", track_id, country, exc)
-        return None
+def _from_result(found) -> dict | None:
+    """A profile from a Lookup API result, raw or parsed (both carry the
+    same keys), or None when it has no rating count."""
     if not isinstance(found, dict):
         return None
     count = found.get("userRatingCount") or 0
@@ -140,6 +161,19 @@ def _lookup(track_id: int, country: str, itunes_service) -> dict | None:
         "name": name if isinstance(name, str) else None,
         "genre": genre if isinstance(genre, str) else "",
     }
+
+
+def _lookup(track_id: int, country: str, itunes_service) -> dict | None:
+    # One call, no retries: a profile lookup sits inside keyword scoring,
+    # which paces its own App Store reads. When Apple cannot be reached or
+    # has no listing here, the last known profile stands and the next
+    # scoring that needs the profile asks again.
+    try:
+        found = itunes_service.lookup_by_id(int(track_id), country=country, retry=False)
+    except Exception as exc:  # noqa: BLE001 (a failed lookup never fails a scoring run)
+        logger.warning("Profile lookup failed for %s in %s: %s", track_id, country, exc)
+        return None
+    return _from_result(found)
 
 
 def profile_in_storefront(app, country: str, *, itunes_service) -> AppProfile | None:
@@ -159,6 +193,23 @@ def profile_in_storefront(app, country: str, *, itunes_service) -> AppProfile | 
     if _store(app, country, found):
         reclassify(app, country)
     return cached_profile(app, country)
+
+
+def record_lookup(app, country: str, found: dict) -> bool:
+    """Store a profile from a Lookup API result another feature already
+    fetched (the Rival Tracker reads every app of a storefront in one call),
+    so the app is not looked up a second time that day. True when anything
+    the score reads changed; the app's rows are then relabelled, as after
+    profile_in_storefront."""
+    if app is None:
+        return False
+    parsed = _from_result(found)
+    if parsed is None:
+        return False
+    changed = _store(app, country, parsed)
+    if changed:
+        reclassify(app, country)
+    return changed
 
 
 def profile_for_track(track_id, country: str, *, itunes_service) -> AppProfile | None:

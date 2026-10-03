@@ -1,0 +1,18 @@
+{% comment %}
+The two buttons of a Pro preview (docs/development/PRO_PREVIEWS_PLAN.md):
+unmistakable, never a text link, at the app's normal button size. cta comes
+from aso.pro_preview_words (or a preview's own Apple states). The primary
+that buys or renews Pro is the app's one Pro button (btn-pro, metallic
+green); sky connects Apple Ads; the secondary is the app's secondary button.
+{% endcomment %}
+<div class="flex flex-wrap items-center gap-2">
+    {% if cta.primary_tone == 'sky' %}
+    <a href="{{ cta.primary_url }}"{% if cta.primary_external %} target="_blank" rel="noopener"{% endif %} data-preview-primary
+       class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500">{{ cta.primary_label }}</a>
+    {% else %}
+    <a href="{{ cta.primary_url }}" target="_blank" rel="noopener" data-preview-primary class="btn-pro">{{ cta.primary_label }}</a>
+    {% endif %}
+    {% if cta.secondary_label %}
+    <a href="{{ cta.secondary_url }}" data-preview-secondary class="btn-secondary">{{ cta.secondary_label }}</a>
+    {% endif %}
+</div>

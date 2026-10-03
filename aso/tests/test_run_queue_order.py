@@ -22,7 +22,7 @@ class QueueOrderTest(TestCase):
         self.addCleanup(run_queue._active.clear)
 
     def job(self, **fields):
-        defaults = dict(keywords=["a", "b"], countries=["us"], status="queued")
+        defaults = {"keywords": ["a", "b"], "countries": ["us"], "status": "queued"}
         defaults.update(fields)
         return KeywordSearchJob.objects.create(**defaults)
 

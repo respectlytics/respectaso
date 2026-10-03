@@ -39,12 +39,12 @@
             + 'Higher means harder competition. This factor is <strong>' + esc(factor.weight)
             + '%</strong> of the difficulty score.';
         return '<div class="bg-slate-800 rounded p-2 group/tip relative cursor-help">'
-            + '<p class="text-slate-500">' + esc(factor.label) + '</p>'
+            + '<p class="text-slate-400">' + esc(factor.label) + '</p>'
             + '<p class="' + text + ' font-semibold mt-0.5">' + level + '</p>'
             + '<div class="w-full bg-slate-700 rounded-full h-1 mt-1">'
             + '<div class="' + bar + ' h-1 rounded-full" style="width:' + Math.min(val, 100) + '%"></div>'
             + '</div>'
-            + '<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-lg">'
+            + '<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-56 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-2xs text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 shadow-lg">'
             + tip + '</div>'
             + '</div>';
     }

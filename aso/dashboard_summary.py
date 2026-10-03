@@ -14,10 +14,11 @@ Design rules (see docs/development/DASHBOARD_APP_SUMMARY_PLAN.md):
 
 from collections import defaultdict
 from datetime import timedelta
+
 from django.utils import timezone
 
 from .models import SearchResult
-from .scoring import estimate_range
+from .scoring import estimate_range, sentence_app_name
 
 
 def _safe_estimates(result):
@@ -272,12 +273,11 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
             f"Closing it could add up to ~{gap_n}/day."
         )
 
-    # 3) Single-country prompt — descriptive, not prescriptive
-    if total_countries == 1 and total_keywords >= 5:
-        callouts.append(
-            "You track 1 country. Same keywords in 2-3 storefronts "
-            "often add comparable headroom."
-        )
+    # 3) Single-country prompt, descriptive, not prescriptive. From 20
+    # keywords the "Try new storefronts" card below says the same, so the
+    # line stays out of its way (one concept, one place).
+    if total_countries == 1 and 5 <= total_keywords < 20:
+        callouts.append("You track one country: the same keywords may pay off in other storefronts.")
 
     # 4) House-cleaning — keywords contributing zero downloads
     zero_dl_count = sum(
@@ -305,13 +305,12 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
         return {
             "headline": "Expand your keyword coverage",
             "message": (
-                "Most apps need 40-80 keywords to see a representative picture. "
-                "Discover new ones with AI Researcher, or mine your existing "
-                "metadata for missed combinations with AI Simulator."
+                "Most apps need 40-80 keywords for a clear picture. "
+                "Find more with AI Researcher or the Simulator."
             ),
             "buttons": [
-                {"label": "AI Researcher", "url": "ai_researcher", "primary": True},
-                {"label": "AI Simulator", "url": "simulator", "primary": False},
+                {"label": "Find keywords with AI", "url": "ai_researcher", "primary": True},
+                {"label": "Test new metadata", "url": "simulator", "primary": False},
             ],
         }
 
@@ -319,19 +318,15 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
         return {
             "headline": "Try new storefronts",
             "message": (
-                "You're tracking one country. AI Researcher's country opportunity "
-                "finder surfaces underserved markets where the same keywords convert."
+                "You track one country. The same keywords can pay off in other "
+                "storefronts too."
             ),
             "buttons": [
-                {"label": "AI Researcher", "url": "ai_researcher", "primary": True},
+                {"label": "Find keywords with AI", "url": "ai_researcher", "primary": True},
             ],
         }
 
     # Flat ranks heuristic — many keywords tracked but most outside Top 50
-    in_t50 = sum(
-        1 for row in country_rows
-        for _ in range(1) if row["ranking_keywords"]  # only meaningful if any rankings
-    )
     deep_count = sum(
         1 for row in country_rows
         if row["total_keywords"] and row["ranking_keywords"] < row["total_keywords"] * 0.4
@@ -340,12 +335,11 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
         return {
             "headline": "Your coverage is wide: try moving the ranks",
             "message": (
-                "You track plenty of keywords but most aren't ranking. "
-                "AI Simulator lets you test metadata combinations from your "
-                "current title, subtitle and keyword field to find what moves the needle."
+                "You track plenty of keywords, but most aren't ranking. "
+                "Test new metadata in the Simulator to see what moves them."
             ),
             "buttons": [
-                {"label": "AI Simulator", "url": "simulator", "primary": True},
+                {"label": "Test new metadata", "url": "simulator", "primary": True},
             ],
         }
 
@@ -353,11 +347,10 @@ def _build_cta(total_keywords, total_countries, country_rows, bucket_dist):
     return {
         "headline": "Looking solid",
         "message": (
-            "Use AI Simulator to stress-test metadata changes before shipping "
-            "an update, and see how new wording would shift your ranks."
+            "Test metadata changes in the Simulator before you ship an update."
         ),
         "buttons": [
-            {"label": "AI Simulator", "url": "simulator", "primary": True},
+            {"label": "Test new metadata", "url": "simulator", "primary": True},
         ],
     }
 
@@ -482,6 +475,7 @@ def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
 
     callouts = _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, results)
     cta = _build_cta(total_keywords, total_countries, country_rows, bucket_dist)
+    glance = _glance(country_rows, is_multi_country)
 
     return {
         "app_name": selected_app_name,
@@ -490,6 +484,9 @@ def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
         "total_keywords": total_keywords,
         "is_multi_country": is_multi_country,
         "headline": headline,
+        # The three tiles at the top of the card (KEYWORDS_PAGE_PLAN.md M2.4)
+        "glance": glance,
+        "app_short_name": sentence_app_name(selected_app_name or ""),
         "country_rows": visible_rows,
         "overflow_count": overflow_count,
         "rank_dist": rank_dist,
@@ -503,6 +500,43 @@ def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
         # Apple only reports terms where the app's own ads served, so the
         # template renders the section only when data exists).
         "impression_share": _impression_share_summary(selected_app),
+    }
+
+
+def _range_words(low, high, more=False):
+    """A downloads range as the glance tiles say it: "0.7 to 7 a day", or
+    "0.7 to 7 more a day"; never "~" or an en dash."""
+    tail = " more a day" if more else " a day"
+    if (low is None or low <= 0) and (high is None or high <= 0):
+        return "Nothing yet"
+    lo = _format_dl_number(low)
+    hi = _format_dl_number(high)
+    if hi in ("0", "0.0"):
+        return f"Under 0.1{tail}"
+    if lo in ("0", "0.0") or lo == hi:
+        return f"Up to {hi}{tail}"
+    return f"{lo} to {hi}{tail}"
+
+
+def _glance(country_rows, is_multi_country):
+    """The glance card's three tiles. With several countries the first two
+    show the country that brings the most today, named under them: the plan
+    of this card never adds storefronts together (DASHBOARD_APP_SUMMARY_PLAN.md,
+    "never sum across countries"). The third is the keyword with the most
+    room above it, anywhere."""
+    if not country_rows:
+        return None
+    lead = country_rows[0]
+    chance = None
+    for row in country_rows:
+        gap = row.get("biggest_gap")
+        if gap and (chance is None or gap["headroom_high"] > chance["headroom_high"]):
+            chance = {**gap, "country": row["country"]}
+    return {
+        "now": _range_words(lead["downloads_low"], lead["downloads_high"]),
+        "more": _range_words(lead["headroom_low"], lead["headroom_high"], more=True),
+        "country": lead["country"] if is_multi_country else "",
+        "chance": chance,
     }
 
 

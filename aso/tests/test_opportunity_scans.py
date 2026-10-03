@@ -20,7 +20,7 @@ from django.utils import timezone
 from aso import opportunity_scans, run_queue
 from aso.models import App, OpportunityScan, OpportunityScanResult, SearchResult
 from aso.services import ITunesRateLimited, SearchAPIUnavailableError
-from aso.tests.helpers import _SyncThread
+from aso.tests.helpers import _SyncThread, ranked_search
 
 
 def fake_competitors(n=10):
@@ -53,11 +53,10 @@ class ScanTestBase(TestCase):
         itunes_patch = mock.patch("aso.opportunity_scans.ITunesSearchService")
         self.itunes = itunes_patch.start().return_value
         self.addCleanup(itunes_patch.stop)
-        self.itunes.search_apps.return_value = fake_competitors()
-        self.itunes.find_app_rank.return_value = None
+        self.itunes.search_ranked.return_value = ranked_search(fake_competitors())
 
     def scan(self, keyword="fitness tracker", countries=("us", "de", "bg"), **fields):
-        defaults = dict(keyword=keyword, countries=list(countries), status="queued")
+        defaults = {"keyword": keyword, "countries": list(countries), "status": "queued"}
         defaults.update(fields)
         return OpportunityScan.objects.create(**defaults)
 
@@ -74,7 +73,7 @@ class ScanTestBase(TestCase):
         return mock.patch("aso.run_queue.kick")
 
     def scanned_countries(self):
-        return [call.kwargs["country"] for call in self.itunes.search_apps.call_args_list]
+        return [call.kwargs["country"] for call in self.itunes.search_ranked.call_args_list]
 
     def start(self, keyword="fitness tracker", countries="us,de", **extra):
         return self.client.post(
@@ -147,10 +146,10 @@ class WorkerTest(ScanTestBase):
         self.assertEqual(SearchResult.objects.count(), 0)
 
     def test_a_failed_country_is_recorded_and_the_scan_continues(self):
-        self.itunes.search_apps.side_effect = [
-            fake_competitors(),
+        self.itunes.search_ranked.side_effect = [
+            ranked_search(fake_competitors()),
             SearchAPIUnavailableError("Apple is not answering"),
-            fake_competitors(),
+            ranked_search(fake_competitors()),
         ]
         scan = self.scan(countries=("us", "de", "bg"), status="running")
         opportunity_scans._execute(scan.pk)
@@ -164,8 +163,8 @@ class WorkerTest(ScanTestBase):
         )
 
     def test_a_rate_limit_counts_as_a_failure_not_a_crash(self):
-        self.itunes.search_apps.side_effect = [
-            ITunesRateLimited("slow down"), fake_competitors(),
+        self.itunes.search_ranked.side_effect = [
+            ITunesRateLimited("slow down"), ranked_search(fake_competitors()),
         ]
         scan = self.scan(countries=("us", "de"), status="running")
         opportunity_scans._execute(scan.pk)
@@ -182,14 +181,15 @@ class WorkerTest(ScanTestBase):
 
     def test_pause_stops_at_the_next_country_boundary(self):
         scan = self.scan(countries=("us", "de", "bg"), status="running")
-        original = self.itunes.search_apps.side_effect
+        original = self.itunes.search_ranked.side_effect
 
         def pause_after_first(*args, **kwargs):
             OpportunityScan.objects.filter(pk=scan.pk).update(status="paused")
-            self.itunes.search_apps.side_effect = original
+            self.itunes.search_ranked.side_effect = original
             return fake_competitors()
 
-        self.itunes.search_apps.side_effect = pause_after_first
+        self.itunes.search_ranked.side_effect = (
+            lambda term, country="us": ranked_search(pause_after_first(term, country=country, limit=25)))
         opportunity_scans._execute(scan.pk)
         scan.refresh_from_db()
         self.assertEqual(scan.status, "paused")
@@ -203,7 +203,9 @@ class WorkerTest(ScanTestBase):
 
     def test_the_app_rank_is_looked_up_when_an_app_is_tracked(self):
         app = App.objects.create(name="My App", track_id=12345)
-        self.itunes.find_app_rank.return_value = 7
+        listed = fake_competitors()
+        listed.insert(6, {"trackId": 12345, "trackName": "My App", "userRatingCount": 10, "sellerName": "Me"})
+        self.itunes.search_ranked.return_value = ranked_search(listed)
         scan = self.scan(countries=("us",), status="running", app=app)
         opportunity_scans._execute(scan.pk)
         self.assertEqual(scan.results.get().app_rank, 7)
@@ -360,6 +362,15 @@ class PayloadTest(ScanTestBase):
 
 
 class EndpointTest(ScanTestBase):
+    def test_the_page_speaks_of_countries(self):
+        """UI_REDESIGN_PLAN.md 7.4: the lead and the hint under the form."""
+        from aso import countries
+
+        html = self.client.get(reverse("aso:opportunity")).content.decode()
+        self.assertIn("Find the countries where a keyword is worth chasing.", html)
+        self.assertIn(f"Any of the {len(countries.CODES)} App Store countries.", html)
+        self.assertNotIn("Covers all", html)
+
     def test_current_returns_the_active_scan(self):
         scan = self.scan(status="running")
         data = self.client.get(reverse("aso:opportunity_current")).json()
@@ -449,7 +460,9 @@ class EndpointTest(ScanTestBase):
         self.assertEqual(opportunity_scans.finished_scan(), newest)
         self.client.post(reverse("aso:opportunity_dismiss", args=[newest.pk]))
         self.assertIsNone(opportunity_scans.finished_scan())
-        self.assertIsNone(opportunity_scans.strip_scan())
+        from aso import job_strip
+
+        self.assertIsNone(job_strip.strip_state())
         current = self.client.get(reverse("aso:opportunity_current")).json()
         self.assertIsNone(current["finished"])
 
@@ -528,7 +541,7 @@ class TheResultsTableSaysOnlyWhatIsTrueTest(SimpleTestCase):
         lead = template.split("Ranked by opportunity</h2>", 1)[1].split("</p>", 1)[0]
         self.assertNotIn("\u2192", lead)
         self.assertNotIn("line under it", lead)
-        self.assertIn("Downloads at #1 is what the top spot pays there", lead)
+        self.assertIn("Read Opportunity", lead)
 
     def test_the_rank_column_needs_an_app(self):
         template = self._read("aso/templates/aso/opportunity.html")

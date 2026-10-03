@@ -185,7 +185,7 @@
         var classEl = document.getElementById('ticker-classification');
         if (classEl) {
             classEl.textContent = data.classification;
-            classEl.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap border ' + style.badge;
+            classEl.className = 'text-2xs px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap border ' + style.badge;
         }
 
         // Metric pills — popularity shows a compact source suffix
@@ -258,14 +258,12 @@
             var msg = '';
             var secs = (isLocal && lg && lg.running) ? lg.secs : 0;
             if (secs >= 1200) {            // 20+ minutes on one local step
-                msg = 'This step has been running over 20 minutes. It hasn’t frozen: local generation is just slow for this demanding workload. You can keep waiting, or cancel and use a cloud provider for a quick result.';
+                msg = 'This step has run over 20 minutes: local generation is slow, but nothing is frozen. Keep waiting, or cancel and use a cloud provider for a quick result.';
             } else if (secs >= 480) {      // 8+ minutes on one local step
                 msg = 'Still working: local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
             } else if (!isLocal && thinkSecs >= 900) {   // 15+ minutes waiting on a cloud model
-                msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + '. This model appears heavily '
-                    + 'queued right now. RespectASO gives up after ' + deadlineMin + ' minutes '
-                    + '(your AI response deadline). You can keep waiting, or cancel and pick a '
-                    + 'faster model in Settings → AI Configuration.';
+                msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + ': the model is very busy right now. '
+                    + 'Keep waiting, or cancel and pick a faster model in Settings → AI.';
             } else if (!isLocal && thinkSecs >= 180) {   // 3+ minutes waiting on a cloud model
                 msg = 'The model is responding unusually slowly. Nothing is frozen: RespectASO '
                     + 'is still waiting, and gives up after ' + deadlineMin + ' minutes '
@@ -361,7 +359,7 @@
             var stats = (data && data.chain_stats) || null;
             if (stats && stats.chain_length > 1 && stats.chain_total_unique > 0) {
                 chainBadge.textContent = stats.chain_total_unique +
-                    ' unique across ' + stats.chain_length + ' iterations';
+                    ' keywords across ' + stats.chain_length + ' runs';
                 chainBadge.classList.remove('hidden');
             } else {
                 chainBadge.classList.add('hidden');

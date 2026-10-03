@@ -66,7 +66,11 @@ LOW_REMAINING_THRESHOLD = 5    # Layer 1 trigger for header-aware pacing
 
 # Capped sleeper for request-path calls (settings verification): keeps
 # retry waits short so the browser/webview fetch never times out.
-FAST_SLEEPER = lambda seconds: time.sleep(min(seconds, 1.0))  # noqa: E731
+def _fast_sleep(seconds):
+    time.sleep(min(seconds, 1.0))
+
+
+FAST_SLEEPER = _fast_sleep
 
 # Weekly datasets are generated Mondays at 07:00 UTC for the preceding
 # Sunday-Saturday week, retained rolling 65 weeks.
@@ -170,7 +174,7 @@ def fetch_access_token(credentials, sleeper=time.sleep) -> tuple[str, float]:
         except requests.RequestException as e:
             last_error = e
             if attempt >= MAX_ATTEMPTS:
-                raise AppleAdsAPIError(f"Network error fetching token: {e}") from e
+                raise AppleAdsAPIError(f"Could not reach Apple Ads ({e}). Check your internet connection.") from e
             sleeper(_retry_delay(0, None, attempt))
             continue
         if response.status_code == 200:
@@ -180,7 +184,7 @@ def fetch_access_token(credentials, sleeper=time.sleep) -> tuple[str, float]:
                 expires_in = float(payload.get("expires_in", 3600))
             except (ValueError, KeyError, TypeError) as e:
                 raise AppleAdsAPIError(
-                    "Apple's token response had an unexpected shape."
+                    "Apple Ads sent an answer RespectASO could not read. Try again later."
                 ) from e
             return token, time.time() + expires_in
         if response.status_code in (400, 401, 403):
@@ -192,10 +196,10 @@ def fetch_access_token(credentials, sleeper=time.sleep) -> tuple[str, float]:
             )
         if attempt >= MAX_ATTEMPTS:
             raise AppleAdsAPIError(
-                f"Token request failed after retries (status {response.status_code})."
+                f"Apple Ads did not answer (status {response.status_code}). Try again later."
             )
         sleeper(_retry_delay(response.status_code, response.headers, attempt))
-    raise AppleAdsAPIError(f"Token request retry loop exhausted ({last_error}).")
+    raise AppleAdsAPIError(f"Could not reach Apple Ads ({last_error}). Try again later.")
 
 
 def _bearer(credentials, sleeper=time.sleep) -> str:
@@ -345,7 +349,7 @@ def _request(
             )
         except requests.RequestException as e:
             if attempt >= MAX_ATTEMPTS:
-                raise AppleAdsAPIError(f"Network error calling {path}: {e}") from e
+                raise AppleAdsAPIError(f"Could not reach Apple Ads ({e}). Check your internet connection.") from e
             sleeper(_retry_delay(0, None, attempt))
             continue
 
@@ -371,7 +375,7 @@ def _request(
             )
         if status in (403, 404):
             raise AppleAdsAccessError(
-                f"Apple denied access to {path} (status {status}: "
+                f"Apple Ads denied access (status {status}: "
                 f"{_error_detail(payload)}). Check the API role and the "
                 "selected ad account."
             )
@@ -379,16 +383,16 @@ def _request(
             if attempt >= MAX_ATTEMPTS:
                 if status == 429:
                     raise AppleAdsRateLimitedError(
-                        "Apple is rate limiting API requests."
+                        "Apple Ads is busy right now. Try again in a few minutes."
                     )
                 raise AppleAdsAPIError(
-                    f"Apple API request to {path} failed after retries "
-                    f"(status {status}, {_error_detail(payload)})."
+                    f"Apple Ads did not answer (status {status}, "
+                    f"{_error_detail(payload)}). Try again later."
                 )
             sleeper(_retry_delay(status, response.headers, attempt))
             continue
         raise AppleAdsAPIError(
-            f"Apple API request to {path} failed (status {status}, "
+            f"Apple Ads returned an error (status {status}, "
             f"{_error_detail(payload)})."
         )
 
@@ -633,15 +637,15 @@ def latest_available_week(now: dt.datetime | None = None) -> dt.date:
     07:00 UTC.
     """
     if now is None:
-        now = dt.datetime.now(dt.timezone.utc)
+        now = dt.datetime.now(dt.UTC)
     elif now.tzinfo is None:
-        now = now.replace(tzinfo=dt.timezone.utc)
+        now = now.replace(tzinfo=dt.UTC)
     today = now.date()
     current_week_start = week_start_sunday(today)
     publication = dt.datetime.combine(
         current_week_start + dt.timedelta(days=1),  # Monday of current week
         dt.time(PUBLICATION_HOUR_UTC, 0),
-        tzinfo=dt.timezone.utc,
+        tzinfo=dt.UTC,
     )
     if now >= publication:
         return current_week_start - dt.timedelta(days=7)

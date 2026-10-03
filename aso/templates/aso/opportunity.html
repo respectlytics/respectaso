@@ -5,15 +5,17 @@
 
 {% block content %}
 {{ scan|json_script:"opp-scan-data" }}
-<div class="space-y-5">
+<div class="space-y-4">
+    {% include "aso/partials/back_link.html" with back_class="-mb-2" %}
+    {% include "aso/partials/section_tabs.html" with section="discover" %}
     <!-- Header -->
     <div>
-        <h1 class="text-xl font-bold text-white">Country Opportunity Finder</h1>
-        <p class="text-slate-400 text-sm mt-0.5">Find the App Store storefronts where a keyword is worth chasing. Pick the countries, start the scan, and carry on with something else.</p>
+        <h1 class="page-title">Country Opportunity Finder</h1>
+        <p class="page-lead">Find the countries where a keyword is worth chasing.</p>
     </div>
 
     <!-- Start a scan -->
-    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
+    <div class="card p-4">
         <form id="opp-form" method="post">
             {% csrf_token %}
             <div class="flex flex-col lg:flex-row lg:items-end gap-3">
@@ -22,26 +24,23 @@
                     {{ form.keyword }}
                 </div>
                 <div class="w-full lg:w-72">
-                    {% include "aso/partials/country_picker.html" with picker_id="scan-countries" label="Countries to scan" storage_key="aso_opportunity_countries" cost_per_country=seconds_per_country %}
+                    {% include "aso/partials/country_picker.html" with picker_id="scan-countries" label="Countries to scan" memory_key="opportunity" cost_per_country=seconds_per_country %}
                 </div>
-                <div class="w-full lg:w-48">
-                    <label class="block text-xs font-medium text-slate-300 mb-1.5" for="opp-app">App (optional)</label>
-                    {% comment %}appearance-none (its chevron comes from static/css/tailwind.source.css),
-                    the same reason as on the dashboard: a native select ignores the vertical
-                    padding and renders shorter than the fields beside it.{% endcomment %}
-                    <div class="relative">
-                        <select id="opp-app"
-                                class="w-full appearance-none bg-slate-700 border border-white/10 rounded-lg pl-3 pr-9 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
-                            <option value="">No app</option>
-                            {% for app in apps %}
-                            <option value="{{ app.id }}">{{ app.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <div class="w-full lg:w-64">
+                    <label class="block text-xs font-medium text-slate-300 mb-1.5" for="opp-app-picker-button">App (optional)</label>
+                    {% comment %}The shared picker over the select, each app with its logo; the
+                    select stays the field static/js/opportunity-scan.js reads.{% endcomment %}
+                    {% include "aso/partials/country_picker.html" with picker_id="opp-app-picker" items_select="opp-app" search_placeholder="Search apps" %}
+                    <select id="opp-app" class="hidden" aria-hidden="true" tabindex="-1">
+                        <option value="" data-glyph="none">No app</option>
+                        {% for app in apps %}
+                        <option value="{{ app.id }}" data-icon="{{ app.icon_url }}"{% if app.id == app_prefill %} selected{% endif %}>{{ app.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div>
                     <button type="submit" id="opp-btn"
-                            class="bg-purple-600 hover:bg-purple-700 border border-transparent text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+                            class="btn-primary gap-2 whitespace-nowrap border border-transparent py-2.5">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
@@ -49,13 +48,13 @@
                     </button>
                 </div>
             </div>
-            <p class="text-slate-500 text-xs mt-2">RespectASO covers all {{ total_storefronts }} App Store storefronts. A scan runs in the background, one country at a time, so you can leave this page or quit the app and it carries on.</p>
+            <p class="text-slate-400 text-xs mt-2">Any of the {{ total_storefronts }} App Store countries.</p>
         </form>
     </div>
 
     <!-- The running scan -->
     <div id="opp-panel" class="hidden">
-        <div class="bg-[#1e293b] border border-white/10 rounded-xl p-5">
+        <div class="card p-4">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3 min-w-0">
                     <div id="osp-spinner" class="hidden animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500 flex-shrink-0"></div>
@@ -69,7 +68,7 @@
                     <button type="button" id="osp-resume" class="hidden text-xs text-purple-300 hover:text-purple-200 border border-purple-500/30 rounded-lg px-3 py-1.5 transition-colors">Resume</button>
                     <button type="button" id="osp-discard" class="hidden text-xs text-red-400 hover:text-red-300 border border-red-500/20 rounded-lg px-3 py-1.5 transition-colors">Discard the rest</button>
                     <button type="button" id="osp-retry" class="hidden text-xs text-amber-300 hover:text-amber-200 border border-amber-500/20 rounded-lg px-3 py-1.5 transition-colors">Scan the failures again</button>
-                    <button type="button" id="osp-dismiss" class="hidden text-xs text-slate-300 hover:text-white border border-white/10 rounded-lg px-3 py-1.5 transition-colors" title="Close this panel. The results below stay.">Close</button>
+                    <button type="button" id="osp-dismiss" class="hidden btn-quiet" title="Close this panel. The results below stay.">Close</button>
                 </div>
             </div>
 
@@ -77,7 +76,7 @@
                 <div class="w-full bg-slate-700/50 rounded-full h-2">
                     <div id="osp-bar" class="h-2 rounded-full bg-purple-500 transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <p class="text-xs text-slate-500 mt-2" id="osp-message"></p>
+                <p class="text-xs text-slate-400 mt-2" id="osp-message"></p>
             </div>
 
             <p class="text-xs text-slate-500/80 mt-2" id="osp-note"></p>
@@ -88,7 +87,7 @@
 
     <!-- Results -->
     <div id="opp-results" class="hidden space-y-4">
-        <div id="opp-best" class="hidden bg-green-900/20 border border-green-500/20 rounded-xl p-5"></div>
+        <div id="opp-best" class="hidden bg-green-900/20 border border-green-500/20 rounded-xl p-4"></div>
 
         <div id="opp-coverage"></div>
 
@@ -98,14 +97,14 @@
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                <span id="add-selected-text">Save selected to history</span>
+                <span id="add-selected-text">Track selected</span>
             </button>
             <button type="button" id="add-all-btn"
                     class="text-xs bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                Save all to history
+                Track all
             </button>
             <button type="button" id="opp-export-btn"
                     class="text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
@@ -121,14 +120,14 @@
             <span id="opp-saved-text"></span>
         </div>
 
-        <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+        <div class="card overflow-hidden">
             <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-sm font-semibold text-white">Ranked by opportunity</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Opportunity is the column to read: what the keyword can be expected to bring in each storefront. Downloads at #1 is what the top spot pays there, and Popularity is a 1 to 100 index, not a number of searches. Click a row for the detail.</p>
+                    <h2 class="card-title">Ranked by opportunity</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Read Opportunity: what the keyword can bring in each storefront. Click a row for details.</p>
                     <p class="text-xs text-cyan-300/80 mt-1 hidden" id="opp-scored-for"></p>
                 </div>
-                <span class="text-xs text-slate-500 whitespace-nowrap" id="opp-count"></span>
+                <span class="text-xs text-slate-400 whitespace-nowrap" id="opp-count"></span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm" id="opp-table">
@@ -137,16 +136,16 @@
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 w-10">
                                 <input type="checkbox" id="opp-select-all" class="rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" title="Select / deselect all">
                             </th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 w-12 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(1,'num',this)"># <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(2,'text',this)">Country <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 w-12 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(1,'num',this)"># <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(2,'text',this)">Country <span class="sort-indicator text-slate-500"></span></th>
                             <th class="text-center text-xs font-semibold text-cyan-300 px-3 py-2 cursor-pointer hover:text-cyan-200 select-none bg-cyan-500/5" onclick="sortOppTable(3,'num',this)">Opportunity {% column_info "opportunity" "finder" %} <span class="sort-indicator text-cyan-500/70"></span>{% opportunity_subline "finder" %}</th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(4,'num',this)">Popularity {% column_info "popularity" %} <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(5,'num',this)">Difficulty {% column_info "difficulty" %} <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap" onclick="sortOppTable(6,'num',this)">Downloads at #1 {% column_info "downloads" %} <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(7,'num',this)">Insight {% column_info "classification" %} <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(8,'num',this)">Competitors <span class="sort-indicator text-slate-600"></span></th>
-                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(9,'text',this)">Top competitor <span class="sort-indicator text-slate-600"></span></th>
-                            <th id="opp-rank-head" class="hidden text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(10,'num',this)">Your rank <span class="sort-indicator text-slate-600"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(4,'num',this)">Popularity {% column_info "popularity" %} <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(5,'num',this)">Difficulty {% column_info "difficulty" %} <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none whitespace-nowrap" onclick="sortOppTable(6,'num',this)">Downloads at #1 {% column_info "downloads" %} <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(7,'num',this)">Insight {% column_info "classification" %} <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(8,'num',this)">Competitors <span class="sort-indicator text-slate-500"></span></th>
+                            <th class="text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(9,'text',this)">Top competitor <span class="sort-indicator text-slate-500"></span></th>
+                            <th id="opp-rank-head" class="hidden text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortOppTable(10,'num',this)">Your rank <span class="sort-indicator text-slate-500"></span></th>
                         </tr>
                     </thead>
                     <tbody id="opp-tbody"></tbody>

@@ -110,9 +110,8 @@ class TokenLifecycleTest(SimpleTestCase):
         for status in (400, 401, 403):
             with mock.patch.object(
                 api.requests, "post", return_value=_response(status, {})
-            ):
-                with self.assertRaises(api.AppleAdsAuthError):
-                    api.fetch_access_token(self.creds)
+            ), self.assertRaises(api.AppleAdsAuthError):
+                api.fetch_access_token(self.creds)
 
     def test_bearer_caches_until_refresh_margin(self):
         responses = [
@@ -138,9 +137,8 @@ class TokenLifecycleTest(SimpleTestCase):
         ]
         with mock.patch.object(api.requests, "post", side_effect=token_responses), \
                 mock.patch.object(api.requests, "request",
-                                  return_value=_response(401, {})) as request:
-            with self.assertRaises(api.AppleAdsAuthError):
-                api._request("GET", "/me", self.creds, sleeper=lambda s: None)
+                                  return_value=_response(401, {})) as request, self.assertRaises(api.AppleAdsAuthError):
+            api._request("GET", "/me", self.creds, sleeper=lambda s: None)
         # One call with the old token, one with the refreshed token.
         self.assertEqual(request.call_count, 2)
         tokens = [c.kwargs["headers"]["Authorization"]
@@ -197,16 +195,14 @@ class RequestPlumbingTest(SimpleTestCase):
             with mock.patch.object(
                 api.requests, "request",
                 return_value=_response(status, {"error": {"code": "X"}}),
-            ):
-                with self.assertRaises(exc):
-                    api._request("GET", "/x", self.creds,
-                                 sleeper=lambda s: None)
+            ), self.assertRaises(exc):
+                api._request("GET", "/x", self.creds,
+                             sleeper=lambda s: None)
 
     def test_429_exhaustion_and_500_transient(self):
         with mock.patch.object(api.requests, "request",
-                               return_value=_response(429, {})):
-            with self.assertRaises(api.AppleAdsRateLimitedError):
-                api._request("GET", "/x", self.creds, sleeper=lambda s: None)
+                               return_value=_response(429, {})), self.assertRaises(api.AppleAdsRateLimitedError):
+            api._request("GET", "/x", self.creds, sleeper=lambda s: None)
         responses = [_response(500, {}), _response(200, {"ok": 1})]
         with mock.patch.object(api.requests, "request", side_effect=responses):
             payload = api._request("GET", "/x", self.creds,
@@ -409,7 +405,7 @@ class ImpressionShareQueryTest(SimpleTestCase):
 
 
 class WeekMathTest(SimpleTestCase):
-    UTC = dt.timezone.utc
+    UTC = dt.UTC
 
     def test_week_start_sunday(self):
         self.assertEqual(api.week_start_sunday(dt.date(2026, 8, 12)),
@@ -438,7 +434,7 @@ class WeekMathTest(SimpleTestCase):
             self.assertEqual(got.weekday(), 6)
 
     def test_naive_datetime_treated_as_utc(self):
-        got = api.latest_available_week(dt.datetime(2026, 8, 13, 12, 0))
+        got = api.latest_available_week(dt.datetime(2026, 8, 13, 12, 0))  # noqa: DTZ001 (the naive case is the test)
         self.assertEqual(got, dt.date(2026, 8, 2))
 
     def test_weeks_back(self):

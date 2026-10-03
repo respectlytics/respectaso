@@ -1,0 +1,75 @@
+{% comment %}
+How to read the Tracked Keywords table (KEYWORDS_PAGE_PLAN.md M1.4): the
+scoring guide and the popularity badges, opened from the table's ⋯ menu.
+It lives outside #history-section, which the page swaps when data changes.
+{% endcomment %}
+<div id="how-to-read" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="how-to-read-title">
+    <div class="card max-h-[85vh] w-full max-w-3xl overflow-y-auto p-4">
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <h2 id="how-to-read-title" class="card-title">How to read this table</h2>
+            <button type="button" onclick="closeHowToRead()" aria-label="Close" class="btn-quiet">Close</button>
+        </div>
+            {% with g=scoring_guide %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+                <div>
+                    <h4 class="section-label mb-1">Opportunity (0-100)</h4>
+                    <p class="text-2xs text-slate-400 mb-2.5">What a keyword is worth to the app named under it, or to a new app, at a rank it can reach.</p>
+                    <div class="space-y-1 text-xs">
+                        {% for row in g.opportunity %}
+                        <div class="grid grid-cols-[3.5rem_1fr] items-baseline gap-3 py-0.5"><span class="text-cyan-300 font-mono text-2xs">{{ row.range }}</span><span class="text-slate-300">{{ row.meaning }}{% if row.tag %}<span class="text-slate-400"> · {{ row.tag }} from here</span>{% endif %}</span></div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div>
+                    <h4 class="section-label mb-1">Difficulty (1-100)</h4>
+                    <p class="text-2xs text-slate-400 mb-2.5">How strong the ranking apps are, and where new apps land in real App Store results.</p>
+                    <div class="space-y-1 text-xs">
+                        {% for row in g.difficulty %}
+                        <div class="grid grid-cols-[3.5rem_5rem_1fr] items-baseline gap-3 py-0.5"><span class="text-slate-400 font-mono text-2xs">{{ row.range }}</span><span class="{{ row.css }} font-medium">{{ row.label }}</span><span class="text-slate-300">{{ row.where }}</span></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-white/5">
+                <h4 class="section-label mb-1">Popularity (1-100)</h4>
+                <p class="text-xs text-slate-400 leading-relaxed">Relative demand, not a search count: compare countries by Opportunity, not by Popularity.</p>
+            </div>
+            {% endwith %}
+            <div class="mt-4 pt-4 border-t border-white/5">
+                <h4 class="section-label mb-1">What to do with a keyword</h4>
+                <p class="text-2xs text-slate-400 mb-2.5">Each tag says what to do with a keyword. Hover one in the table for that row.</p>
+                {% regroup classification_legend by decision as decisions %}
+                <div class="space-y-2.5">
+                    {% for group in decisions %}
+                    <div>
+                        <p class="text-2xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{{ group.grouper }}</p>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+                            {% for item in group.list %}
+                            <div class="{{ item.css }} border rounded-lg px-3 py-2 leading-tight">{{ item.icon }} {{ item.label }}<span class="block text-2xs text-slate-400 mt-0.5 font-normal">{{ item.summary }}</span></div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>        <div class="mt-4 border-t border-white/5 pt-4">
+            <h4 class="section-label mb-1">Popularity sources</h4>
+            <p class="text-sm text-slate-300">EST is RespectASO's estimate, ASA is Apple's own number, EST* the estimate where Apple has none.</p>
+            <p class="mt-1 text-sm text-slate-300">An arrow beside a number shows how it moved since the previous check.</p>
+            <a href="{% url 'aso:methodology' %}" class="link mt-3 inline-block text-sm font-medium">How the scores work</a>
+        </div>
+    </div>
+</div>
+<script>
+function openHowToRead() {
+    const dialog = document.getElementById('how-to-read');
+    dialog.classList.remove('hidden');
+    dialog.classList.add('flex');
+}
+function closeHowToRead() {
+    const dialog = document.getElementById('how-to-read');
+    dialog.classList.add('hidden');
+    dialog.classList.remove('flex');
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeHowToRead(); });
+document.getElementById('how-to-read').addEventListener('click', function (e) { if (e.target === this) closeHowToRead(); });
+</script>

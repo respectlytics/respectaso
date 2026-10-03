@@ -1,15 +1,16 @@
 {% extends "aso/base.html" %}
 
-{% block title %}Setup Guide · RespectASO{% endblock %}
+{% block title %}Install and update · RespectASO{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto">
+    {% include "aso/partials/back_link.html" %}
 
     <!-- Header -->
-    <div class="mb-8">
-        <h1 class="text-2xl font-bold text-white mb-2">Setup Guide</h1>
-        <p class="text-slate-400 text-sm leading-relaxed">
-            Installation, updating, and optional configuration.
+    <div class="mb-5">
+        <h1 class="page-title mb-2">Install and update</h1>
+        <p class="page-lead">
+            Installing, updating and moving your data.
         </p>
     </div>
 
@@ -19,14 +20,14 @@
     <!-- ============================================ -->
 
     <!-- Installation (Native) -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🚀</span> Installation
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Installation
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>You're running the native Mac app, the recommended way to use RespectASO.</p>
             <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
-                <li><a href="{% url 'aso:download_dmg' %}" class="text-purple-400 hover:text-purple-300">Download the latest <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">.dmg</code></a></li>
+                <li><a href="{% url 'aso:download_dmg' %}" class="link">Download the latest <code class="bg-slate-800 px-1.5 py-0.5 rounded text-purple-300">.dmg</code></a></li>
                 <li>Open the <code class="bg-slate-800 px-1.5 py-0.5 rounded">.dmg</code> and drag <strong class="text-white">RespectASO</strong> into <strong class="text-white">Applications</strong></li>
                 <li>Launch from Applications (or Spotlight: <kbd class="bg-slate-800 px-1.5 py-0.5 rounded text-xs">⌘ Space</kbd> → "RespectASO")</li>
             </ol>
@@ -40,13 +41,13 @@
     </section>
 
     <!-- Data Location (Native) -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">💾</span> Data & Persistence
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Data & Persistence
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                Your data (apps, keywords, search history) is stored at:
+                Your data (apps and tracked keywords) is stored at:
             </p>
             <div class="bg-slate-800/80 rounded-lg p-3 font-mono text-xs text-purple-300">
                 ~/Library/Application Support/RespectASO/
@@ -59,20 +60,20 @@
     </section>
 
     <!-- Updating (Native) -->
-    <section id="updating" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🔄</span> Updating to a New Version
+    <section id="updating" class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Updating to a New Version
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                When an update is available, a banner appears on the Dashboard with a <strong class="text-white">Download Update</strong> button and release notes.
+                When an update is available, a banner appears on the Keywords page with a <strong class="text-white">Download Update</strong> button and release notes.
             </p>
             <ol class="list-decimal list-inside space-y-1.5 text-slate-400">
-                <li>Click <strong class="text-white">Download Update</strong> (or <a href="{% url 'aso:download_dmg' %}" class="text-purple-400 hover:text-purple-300">download the latest .dmg</a>)</li>
+                <li>Click <strong class="text-white">Download Update</strong> (or <a href="{% url 'aso:download_dmg' %}" class="link">download the latest .dmg</a>)</li>
                 <li>Open the new <code class="bg-slate-800 px-1.5 py-0.5 rounded">.dmg</code> and drag to Applications (replace the old version)</li>
                 <li>Relaunch RespectASO</li>
             </ol>
-            <p>Database migrations run automatically on launch. Your existing data is preserved.</p>
+            <p>Your apps, keywords and history carry over to the new version.</p>
         </div>
     </section>
 
@@ -82,9 +83,9 @@
     <!-- ============================================ -->
 
     <!-- Native App Recommendation -->
-    <section class="bg-amber-900/20 border border-amber-500/20 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-amber-200 mb-3 flex items-center gap-2">
-            <span>⚡</span> Switch to the Native Mac App
+    <section class="bg-amber-900/20 border border-amber-500/20 rounded-xl p-4 mb-4">
+        <h2 class="card-title text-amber-200 mb-3 flex items-center gap-2">
+            Switch to the Native Mac App
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -93,11 +94,11 @@
             </p>
             <div class="flex items-center gap-3">
                 <a href="{% url 'aso:download_dmg' %}"
-                   class="text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg px-4 py-2 transition-colors">
+                   class="btn-primary">
                     Download .dmg
                 </a>
                 <a href="#migrating-from-docker"
-                   class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                   class="link text-xs">
                     Migration guide ↓
                 </a>
             </div>
@@ -105,9 +106,9 @@
     </section>
 
     <!-- Getting Started (Docker) -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🐳</span> Getting Started (Docker)
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Getting Started (Docker)
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -124,15 +125,15 @@
                 That's it. Open your browser and go to:
             </p>
             <div class="bg-purple-900/20 border border-purple-500/20 rounded-lg p-4 text-center">
-                <a href="http://localhost" class="text-lg text-purple-300 font-mono hover:text-purple-200 transition-colors">http://localhost</a>
+                <a href="http://localhost" class="link text-base font-mono">http://localhost</a>
             </div>
         </div>
     </section>
 
     <!-- Updating (Docker) -->
-    <section id="updating" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🔄</span> Updating to a New Version (Docker)
+    <section id="updating" class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Updating to a New Version (Docker)
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs space-y-1.5">
@@ -143,15 +144,15 @@
                 <p class="text-green-400">docker compose up -d</p>
             </div>
             <p>
-                Database migrations run automatically on container start. Your existing data is preserved.
+                Your apps, keywords and history carry over to the new version.
             </p>
         </div>
     </section>
 
     <!-- Data & Persistence (Docker) -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">💾</span> Data & Persistence (Docker)
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Data & Persistence (Docker)
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -166,17 +167,17 @@
     </section>
 
     <!-- Migrating from Docker -->
-    <section id="migrating-from-docker" class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">📦</span> Migrating from Docker to Native App
+    <section id="migrating-from-docker" class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Migrating from Docker to Native App
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
-            <p>Your existing keywords and search history carry over. Run this one-time migration:</p>
+            <p>Your apps and tracked keywords carry over. Run this one-time migration:</p>
             <div class="bg-slate-800/80 rounded-lg p-4 font-mono text-xs space-y-1.5">
                 <p class="text-slate-400"># Download and run the migration script</p>
                 <p class="text-green-400">curl -fsSL https://raw.githubusercontent.com/respectlytics/respectaso/main/desktop/migrate-from-docker.sh | bash</p>
             </div>
-            <p>This copies your SQLite database from the Docker volume to the native app's data folder.</p>
+            <p>This copies your data from the Docker volume into the native app's data folder.</p>
             <div class="bg-slate-800/80 rounded-lg p-3 text-xs text-slate-400">
                 <p class="text-white font-medium mb-1">After migrating</p>
                 <p>Install the native app, launch it, and verify your data is intact. Once confirmed, you can remove the Docker container:</p>
@@ -193,9 +194,9 @@
 
     {% if not IS_NATIVE_APP %}
     <!-- Custom Domain (Docker only — native app doesn't use a browser) -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-5">
-        <h2 class="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <span class="text-purple-400">🌐</span> Custom Domain Name
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3 flex items-center gap-2">
+            Custom Domain Name
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
@@ -206,7 +207,7 @@
 
             <!-- macOS -->
             <div class="bg-slate-800/80 rounded-lg p-4">
-                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-3">macOS / Linux</h3>
+                <h3 class="section-label mb-3">macOS / Linux</h3>
                 <div class="font-mono text-xs space-y-1.5">
                     <p class="text-slate-400"># Open your hosts file</p>
                     <p class="text-green-400">sudo nano /etc/hosts</p>
@@ -218,7 +219,7 @@
 
             <!-- Windows -->
             <div class="bg-slate-800/80 rounded-lg p-4">
-                <h3 class="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-3">Windows</h3>
+                <h3 class="section-label mb-3">Windows</h3>
                 <div class="font-mono text-xs space-y-1.5">
                     <p class="text-slate-400"># Open Notepad as Administrator, then open this file:</p>
                     <p class="text-green-400">C:\Windows\System32\drivers\etc\hosts</p>
@@ -249,14 +250,8 @@
     </section>
     {% endif %}
 
-    <!-- Back to Dashboard -->
-    <div class="text-center mb-8">
-        <a href="{% url 'aso:dashboard' %}"
-           class="text-sm text-purple-400 hover:text-purple-300 transition-colors inline-flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-            Back to Dashboard
-        </a>
-    </div>
+    <!-- The same way back at the end of a long page -->
+    <div class="mb-5 text-center">{% include "aso/partials/back_link.html" with back_class="" %}</div>
 
 </div>
 {% endblock %}

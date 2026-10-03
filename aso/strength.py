@@ -29,12 +29,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def _utcnow() -> datetime:
     """The one clock every strength calculation reads, so tests can fix it."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _log_bands(value: float, bands: list[tuple[float, float]]) -> float:
@@ -142,11 +142,11 @@ def years_since(released, now: datetime | None = None) -> float | None:
         return None
     if isinstance(released, str):
         try:
-            released = datetime.fromisoformat(released.replace("Z", "+00:00"))
+            released = datetime.fromisoformat(released)
         except ValueError:
             return None
     if released.tzinfo is None:
-        released = released.replace(tzinfo=timezone.utc)
+        released = released.replace(tzinfo=UTC)
     return max(0.0, ((now or _utcnow()) - released).days / 365.25)
 
 
@@ -216,7 +216,7 @@ class AppProfile:
         return sum(WEIGHTS[f] * parts[f] for f in PER_APP_FACTORS) / _PER_APP_TOTAL
 
     @classmethod
-    def from_result(cls, app: dict) -> "AppProfile":
+    def from_result(cls, app: dict) -> AppProfile:
         """From an iTunes search or lookup result."""
         return cls(
             name=app.get("trackName"),

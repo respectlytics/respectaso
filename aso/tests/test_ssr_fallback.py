@@ -4,16 +4,12 @@ Verifies:
 - SSR page parsing and app ID extraction
 - Batch Lookup API hydration
 - Fallback chain: iTunes → SSR → SearchAPIUnavailableError
-- find_app_rank fallback
 - Retry with exponential backoff
-- tokenize_words() Unicode handling
 """
 
-import json
-import unittest
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
-from django.apps import apps as django_apps
 from django.test import TestCase
 
 from aso.services import (
@@ -149,48 +145,6 @@ class SearchAppsFallbackTest(TestCase):
             self.service.search_apps("test", country="us", limit=25)
 
 
-class FindAppRankFallbackTest(TestCase):
-    """Test find_app_rank fallback chain."""
-
-    def setUp(self):
-        self.service = ITunesSearchService()
-
-    @patch.object(ITunesSearchService, "_search_itunes")
-    def test_finds_rank_via_itunes(self, mock_itunes):
-        mock_itunes.return_value = [
-            {"trackId": 100},
-            {"trackId": 200},
-            {"trackId": 300},
-        ]
-        rank = self.service.find_app_rank("test", 200, country="us")
-        self.assertEqual(rank, 2)
-
-    @patch.object(ITunesSearchService, "_search_itunes")
-    def test_returns_none_when_not_found(self, mock_itunes):
-        mock_itunes.return_value = [
-            {"trackId": 100},
-            {"trackId": 200},
-        ]
-        rank = self.service.find_app_rank("test", 999, country="us")
-        self.assertIsNone(rank)
-
-    @patch.object(ITunesSearchService, "_find_rank_in_ssr")
-    @patch.object(ITunesSearchService, "_search_itunes")
-    def test_falls_back_to_ssr_for_rank(self, mock_itunes, mock_ssr_rank):
-        mock_itunes.side_effect = Exception("HTTP 404")
-        mock_ssr_rank.return_value = 5
-        rank = self.service.find_app_rank("test", 200, country="us")
-        self.assertEqual(rank, 5)
-
-    @patch.object(ITunesSearchService, "_find_rank_in_ssr")
-    @patch.object(ITunesSearchService, "_search_itunes")
-    def test_raises_when_both_fail_for_rank(self, mock_itunes, mock_ssr_rank):
-        mock_itunes.side_effect = Exception("HTTP 404")
-        mock_ssr_rank.side_effect = Exception("SSR failed")
-        with self.assertRaises(SearchAPIUnavailableError):
-            self.service.find_app_rank("test", 200, country="us")
-
-
 class BatchLookupTest(TestCase):
     """Test _batch_lookup chunking and error resilience."""
 
@@ -222,7 +176,7 @@ class BatchLookupTest(TestCase):
         def side_effect(*args, **kwargs):
             ids = kwargs.get("params", {}).get("id", "")
             if "111" in ids:
-                raise Exception("Network error")
+                raise RuntimeError("Network error")
             resp = MagicMock()
             resp.json.return_value = {
                 "results": [
@@ -296,78 +250,6 @@ class SSRRetryTest(TestCase):
         self.assertEqual(mock_get.call_count, 1)
 
 
-@unittest.skipUnless(
-    django_apps.is_installed("aso_pro"),
-    "tokenize_words lives in aso_pro (this file syncs to the free repo, which has no aso_pro)",
-)
-class TokenizeWordsTest(TestCase):
-    """Test tokenize_words() Unicode handling and word splitting."""
-
-    def test_basic_lowercase(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words("Fitness"), ["fitness"])
-
-    def test_preserves_accented_chars(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words("Résumé"), ["résumé"])
-        self.assertEqual(tokenize_words("müller"), ["müller"])
-        self.assertEqual(tokenize_words("señor"), ["señor"])
-
-    def test_splits_on_apostrophes(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        # French contractions must split into separate tokens
-        self.assertEqual(tokenize_words("l'app"), ["l", "app"])
-        self.assertEqual(tokenize_words("l'anglais"), ["l", "anglais"])
-        self.assertEqual(tokenize_words("aujourd'hui"), ["aujourd", "hui"])
-
-    def test_splits_on_hyphens(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words("well-being"), ["well", "being"])
-
-    def test_splits_on_underscores(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words("test_word"), ["test", "word"])
-
-    def test_empty_string(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words(""), [])
-
-    def test_cjk_characters(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(tokenize_words("日本語"), ["日本語"])
-
-    def test_min_length_filters_short_tokens(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        # "l'anglais" → ["l", "anglais"], min_length=2 drops "l"
-        self.assertEqual(tokenize_words("l'anglais", min_length=2), ["anglais"])
-        # "L'app pour l'éducation" → drops both "l" fragments
-        self.assertEqual(
-            tokenize_words("L'app pour l'éducation", min_length=2),
-            ["app", "pour", "éducation"]
-        )
-
-    def test_french_sentence(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(
-            tokenize_words("L'anglais pour tous", min_length=2),
-            ["anglais", "pour", "tous"]
-        )
-
-    def test_german_umlauts(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(
-            tokenize_words("Für Gesundheit und Übungen"),
-            ["für", "gesundheit", "und", "übungen"]
-        )
-
-    def test_mixed_punctuation(self):
-        from aso_pro.keyword_pipeline import tokenize_words
-        self.assertEqual(
-            tokenize_words("méditation — bien-être & relaxation"),
-            ["méditation", "bien", "être", "relaxation"]
-        )
-
-
 class ScoringParityTest(TestCase):
     """Task 4.8b — Verify iTunes and SSR paths produce identical scores.
 
@@ -387,7 +269,7 @@ class ScoringParityTest(TestCase):
     # - French with accents (méditation)
     # - Japanese (フィットネス = "fitness")
     # - Short keyword (fit) vs long keyword
-    KEYWORDS_AND_COUNTRIES = [
+    KEYWORDS_AND_COUNTRIES: ClassVar[list[tuple[str, ...]]] = [
         ("fitness", "us"),
         ("workout tracker", "us"),
         ("méditation", "fr"),
@@ -671,7 +553,4 @@ class ExceptionHierarchyTest(TestCase):
 
     def test_can_catch_with_exception(self):
         """SearchAPIUnavailableError should be catchable as Exception."""
-        try:
-            raise SearchAPIUnavailableError("test")
-        except Exception:
-            pass  # Should be caught
+        self.assertTrue(issubclass(SearchAPIUnavailableError, Exception))

@@ -7,8 +7,11 @@ launch. The Mac app now starts it after migrate; every other process (the
 Docker image migrates first, in a separate process) starts it from ready().
 """
 
+import ast
 import inspect
 import os
+import sys
+from pathlib import Path
 from unittest import mock
 
 from django.apps import apps
@@ -17,13 +20,14 @@ from django.test import SimpleTestCase, override_settings
 from aso import popularity
 
 
-def _run_ready(argv):
+def _run_ready(argv, process="app"):
     with mock.patch("sys.argv", argv), \
          mock.patch("aso.apple_ads.storage.migrate_legacy_settings"), \
-         mock.patch("aso.scheduler.start_scheduler"), \
-         mock.patch.dict(os.environ, {"RESPECTASO_DISABLE_SCHEDULER": "1"}), \
+         mock.patch("aso.scheduler.start_scheduler") as scheduler, \
+         mock.patch.dict(os.environ, {"RESPECTASO_DISABLE_SCHEDULER": "1", "RESPECTASO_PROCESS": process}), \
          mock.patch("aso.popularity.start_history_upgrade") as start:
         apps.get_app_config("aso").ready()
+    start.scheduler = scheduler
     return start
 
 
@@ -55,3 +59,34 @@ class StartupOrderTest(SimpleTestCase):
         thread.assert_called_once_with(target=popularity.upgrade_stored_history, daemon=True,
                                        name="history-upgrade")
         thread.return_value.start.assert_called_once_with()
+
+
+class McpProcessTest(SimpleTestCase):
+    """The MCP server is a second process on the same database: it never does
+    the day's background work (aso/apps.py, aso_pro/mcp/bootstrap.py)."""
+
+    @override_settings(IS_NATIVE_APP=False)
+    def test_the_mcp_process_starts_no_background_work(self):
+        start = _run_ready(["respectaso-mcp"], process="mcp")
+        self.assertFalse(start.called)
+        self.assertFalse(start.scheduler.called)
+
+    @override_settings(IS_NATIVE_APP=False)
+    def test_a_server_still_starts_its_scheduler(self):
+        self.assertEqual(_run_ready(["gunicorn"]).scheduler.call_count, 1)
+
+
+class DesktopMainImportTest(SimpleTestCase):
+    """desktop/main.py is imported by this test suite, which also runs in the
+    public Docker image on Linux: its top level may import only the standard
+    library. AppKit, webview and desktop/mac_integration.py load inside main()."""
+
+    def test_the_top_level_imports_only_the_standard_library(self):
+        tree = ast.parse((Path(__file__).resolve().parents[2] / "desktop" / "main.py").read_text())
+        names = set()
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                names |= {alias.name.split(".")[0] for alias in node.names}
+            elif isinstance(node, ast.ImportFrom):
+                names.add((node.module or "").split(".")[0])
+        self.assertEqual(sorted(names - set(sys.stdlib_module_names)), [])

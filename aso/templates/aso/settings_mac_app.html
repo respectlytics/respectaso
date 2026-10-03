@@ -1,0 +1,79 @@
+{% extends "aso/base.html" %}
+
+{% block title %}Mac app · RespectASO{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+
+    {% include "aso/partials/settings_tabs.html" %}
+
+    <!-- Header -->
+    <div class="mb-4">
+        <h1 class="page-title mb-1">Mac app</h1>
+        <p class="page-lead">How RespectASO keeps running on your Mac, so your rankings stay current.</p>
+    </div>
+
+    {% if message %}
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in
+        {% if message_type == 'success' %}bg-emerald-900/30 border border-emerald-500/30 text-emerald-300
+        {% elif message_type == 'error' %}bg-red-900/30 border border-red-500/30 text-red-300
+        {% else %}bg-blue-900/30 border border-blue-500/30 text-blue-300{% endif %}" id="mac-app-message">
+        {{ message }}
+    </div>
+    {% endif %}
+
+    {% comment %}Open at login. The state comes from macOS on every render
+    (aso/desktop_bridge.py login_item_state), so what this card says is
+    always what macOS will do at the next login.{% endcomment %}
+    <section class="card p-4 mb-4" id="login-item" data-state="{{ login_item_state }}">
+        <h2 class="card-title mb-1">Open at login</h2>
+        <p class="text-sm text-slate-400 mb-4">Rankings refresh once a day while RespectASO runs. Open at login so no day is missed.</p>
+
+        {% if login_item_state == "enabled" %}
+        <p class="text-sm text-slate-300 mb-3"><span class="text-emerald-300 font-medium">On.</span> RespectASO opens in the menu bar each time you log in.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="login_off"
+                    class="btn-secondary">
+                Turn off
+            </button>
+        </form>
+        {% elif login_item_state == "disabled" %}
+        <p class="text-sm text-slate-300 mb-3"><span class="text-slate-400 font-medium">Off.</span> Rankings only refresh on days you open RespectASO yourself.</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" name="action" value="login_on"
+                    class="text-xs font-medium text-sky-300 bg-sky-900/40 hover:bg-sky-900/70 border border-sky-500/30 rounded-lg px-3 py-1.5 transition-colors">
+                Turn on
+            </button>
+        </form>
+        {% elif login_item_state == "requires_approval" %}
+        <p class="text-sm text-slate-300 mb-3"><span class="text-amber-300 font-medium">Waiting for your approval.</span> macOS asks you to confirm new login items: turn on RespectASO under Open at Login in System Settings.</p>
+        <form method="post" class="flex items-center gap-2">
+            {% csrf_token %}
+            <button type="submit" name="action" value="open_login_items"
+                    class="text-xs font-medium text-sky-300 bg-sky-900/40 hover:bg-sky-900/70 border border-sky-500/30 rounded-lg px-3 py-1.5 transition-colors">
+                Open Login Items
+            </button>
+            <button type="submit" name="action" value="login_off"
+                    class="btn-secondary">
+                Turn off
+            </button>
+        </form>
+        {% elif login_item_state == "not_in_applications" %}
+        <p class="text-sm text-slate-300"><span class="text-amber-300 font-medium">Not from here.</span> Move RespectASO to your Applications folder and open it from there.</p>
+        {% elif login_item_state == "needs_newer_macos" %}
+        <p class="text-sm text-slate-300"><span class="text-amber-300 font-medium">Needs macOS 13 or later.</span> On this Mac, keep RespectASO open to keep your rankings current.</p>
+        {% else %}
+        <p class="text-sm text-slate-300"><span class="text-slate-400 font-medium">Only in the installed app.</span> This copy runs from source code, which macOS cannot open at login.</p>
+        {% endif %}
+    </section>
+
+    {% if 'aso_pro' in INSTALLED_APPS %}{% include "aso_pro/rival_tracker/_mac_app_card.html" %}{% endif %}
+    <section class="card p-4 mb-4" id="closing-the-window">
+        <h2 class="card-title mb-1">Closing the window</h2>
+        <p class="text-sm text-slate-400">RespectASO keeps refreshing from the menu bar. Click its chart icon there to reopen or quit it.</p>
+    </section>
+
+</div>
+{% endblock %}

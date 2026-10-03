@@ -31,7 +31,7 @@ Open an issue with the "Feature Request" label. Describe:
 
 ## Contributor License Agreement (CLA)
 
-All contributors must sign a Contributor License Agreement (CLA) before their pull request can be merged. This is handled automatically via [cla-assistant.io](https://cla-assistant.io) — you'll be prompted when you open your first PR.
+All contributors must sign a Contributor License Agreement (CLA) before their pull request can be merged. This is handled automatically via [cla-assistant.io](https://cla-assistant.io); you'll be prompted when you open your first PR.
 
 The CLA preserves our ability to offer dual licensing (AGPL-3.0 for open source, commercial for enterprises).
 
@@ -42,7 +42,7 @@ The CLA preserves our ability to offer dual licensing (AGPL-3.0 for open source,
 - Follow Django conventions and PEP 8
 - Use meaningful variable and function names
 - Add docstrings for public functions and classes
-- Keep functions focused — one function, one purpose
+- Keep functions focused: one function, one purpose
 
 ### Templates (HTML)
 
@@ -50,11 +50,11 @@ The CLA preserves our ability to offer dual licensing (AGPL-3.0 for open source,
 - Follow the dark theme design system (`bg-slate-900`, `bg-[#1e293b]`, etc.)
 - Follow existing template patterns in the repository
 - After adding or removing Tailwind class names, run `./scripts/build_css.sh` and commit the updated `static/css/tailwind.css`
-- Always write complete class names - never build them from concatenated fragments (the Tailwind content scanner only sees whole literals)
+- Always write complete class names; never build them from concatenated fragments (the Tailwind content scanner only sees whole literals)
 
 ### JavaScript
 
-- Vanilla JS preferred — no frameworks in templates
+- Vanilla JS preferred, no frameworks in templates
 - Use `const` and `let`, not `var`
 - Use `async/await` for async operations
 

@@ -1,8 +1,24 @@
+/* The app's one typeface, bundled with it (static/fonts/inter/, the SIL OFL
+   beside it) as the authors' own release files: Inter for everything, titles
+   included, so every screen reads in one voice (the owner, 2026-10-02: Source
+   Serif 4 for titles is not used in RespectASO). Only the weights the
+   templates use are shipped, and nothing is loaded from another server, so
+   the app looks the same online, offline and behind any filter.
+   docs/development/SELF_HOSTED_FONTS_PLAN.md, PRO_AND_CLICKABLE_TEXT_PLAN.md 6 */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/inter/Inter-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/inter/Inter-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/inter/Inter-SemiBold.woff2") format("woff2"); }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+    /* No weight is ever drawn by the browser: a bold faked from a lighter
+       face looks smeared. Bold text uses the shipped 600. */
+    html { font-synthesis: style; }
+    b, strong, th { font-weight: 600; }
+
     /* A dropdown styled with appearance-none (so it takes the page's
        padding and height) loses the arrow that says it is a dropdown. One
        chevron for every such select, drawn here, never beside each one. */
@@ -20,6 +36,26 @@
 }
 
 @layer components {
+    /* The activity indicator's "done" signal: a soft glow three times,
+       drawn with box-shadow so the badge never changes size (the nav
+       items beside it stay put). */
+    @keyframes activity-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgb(52 211 153 / 0); }
+        50% { box-shadow: 0 0 0 4px rgb(52 211 153 / 0.35); }
+    }
+    .activity-celebrate {
+        animation: activity-glow 1s ease-in-out 3;
+        border-color: rgb(52 211 153 / 0.5);
+    }
+    .activity-celebrate.activity-stopped {
+        animation-name: activity-glow-amber;
+        border-color: rgb(252 211 77 / 0.5);
+    }
+    @keyframes activity-glow-amber {
+        0%, 100% { box-shadow: 0 0 0 0 rgb(252 211 77 / 0); }
+        50% { box-shadow: 0 0 0 4px rgb(252 211 77 / 0.3); }
+    }
+
     /* The AI's written analysis on the AI tabs. The cards span the page,
        like every other section, but a paragraph that runs 1,400 px wide is
        tiring to read, so text wraps at a reading width; a table in the
@@ -32,4 +68,137 @@
     .ai-prose h4 {
         max-width: 120ch;
     }
+
+    /* What static/js/markdown.js writes, in the app's dark theme. The
+       renderer writes plain tags and every AI container carries .ai-prose,
+       so the look is written here once: headings, bold and bullets as the
+       tabs have always drawn them, and tables like the app's own keyword
+       tables. docs/development/DEDUPE_RENDERERS_PLAN.md */
+    .ai-prose h2 { @apply text-lg font-semibold text-white mt-4 mb-2; }
+    .ai-prose h3 { @apply font-semibold text-white mt-3 mb-1; }
+    .ai-prose p,
+    .ai-prose ul,
+    .ai-prose ol,
+    .ai-prose pre,
+    .ai-prose blockquote,
+    .ai-prose div { @apply mb-3; }
+    .ai-prose > :last-child { @apply mb-0; }
+    .ai-prose ul { @apply list-disc pl-4 space-y-1; }
+    .ai-prose ol { @apply list-decimal pl-5 space-y-1; }
+    .ai-prose li > ul,
+    .ai-prose li > ol { @apply mt-1 mb-0; }
+    .ai-prose strong { @apply text-white; }
+    .ai-prose del { @apply text-slate-500; }
+    .ai-prose code { @apply bg-slate-700/50 px-1 rounded font-mono text-[0.9em] text-slate-200; }
+    .ai-prose pre { @apply bg-slate-900/60 border border-white/10 rounded-lg p-3 overflow-x-auto text-xs; }
+    .ai-prose pre code { @apply bg-transparent p-0 text-slate-300; }
+    .ai-prose blockquote { @apply border-l-2 border-purple-500/40 pl-3 text-slate-400; }
+    .ai-prose hr { @apply border-white/10 my-4; }
+    .ai-prose table { @apply w-full text-sm; }
+    .ai-prose thead tr { @apply border-b border-white/10; }
+    .ai-prose tbody tr { @apply border-b border-white/5; }
+    .ai-prose tbody tr:last-child { @apply border-b-0; }
+    .ai-prose th { @apply text-left py-2 px-3 text-slate-400 font-medium; }
+    .ai-prose td { @apply text-left py-2 px-3 align-top tabular-nums; }
+}
+
+/* The named components, defined once (docs/development/APP_SHELL_PLAN.md,
+   UI_REDESIGN_PLAN.md 12.3). Built only from Tailwind utilities; a new
+   shared component is added here or not at all. */
+@layer components {
+    .page-title { @apply text-xl font-semibold tracking-tight text-white; }
+    .page-lead { @apply text-sm text-slate-400 mt-0.5; }
+    .card { @apply bg-[#1e293b] border border-white/10 rounded-xl; }
+    /* The text hierarchy (docs/development/PRO_AND_CLICKABLE_TEXT_PLAN.md 4, 6):
+       one typeface, each role one clear step from the next in size, weight or
+       colour, and the page title always the largest text on the page.
+         page-title     20 semibold, white       the page
+         run-title      16 semibold, white       the run a results page shows (a research, a simulation)
+         card-title     14 semibold, white       a card, a dialog
+         item-title     13 medium, slate 100     a thing in a list
+         section-label  11 capitals, slate 400   a part of a card
+         body           13, slate 300            what is said about it (text-sm text-slate-300)
+         card-lead      13, slate 400            the line that explains a card; counts and dates too
+         takeaway       the answer a card arrives at, set apart by the brand purple
+       Guarded by aso/tests/test_text_hierarchy.py. */
+    .run-title { @apply text-lg font-semibold text-white; }
+    .card-title { @apply text-base font-semibold text-white; }
+    .card-lead { @apply text-sm text-slate-400 mt-0.5; }
+    .section-label { @apply text-2xs font-semibold uppercase tracking-wider text-slate-400; }
+    .item-title { @apply text-sm font-medium text-slate-100; }
+    /* A part of an opened detail (a keyword's row, a country's row): its own
+       card, raised on the detail's darker panel, its section-label inside
+       (the owner, 2026-10-02: "in its own card so that it looks more elegant
+       and organized"). */
+    .detail-card { @apply rounded-lg border border-white/10 bg-slate-800/60 p-3; }
+    .takeaway { @apply rounded-lg border-l-2 border-purple-400 bg-purple-500/10 px-3 py-2 text-sm text-slate-100; }
+    .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed; }
+    .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white; }
+    .btn-quiet { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-sky-400 transition-colors hover:bg-sky-400/10 hover:text-sky-300; }
+    .chip { @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium; }
+    .section-tab { @apply rounded-lg border border-transparent px-2.5 py-1 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white; }
+    .section-tab-active { @apply rounded-lg border border-purple-500/30 bg-purple-600/20 px-2.5 py-1 text-sm font-medium text-purple-200; }
+    .menu { @apply absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-white/10 bg-[#1e293b] p-1.5 shadow-2xl shadow-black/40; }
+    .menu-item { @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-white/5 hover:text-white; }
+    /* A menu row's icon ({% menu_icon %}): one outline set, muted, lit with
+       its row; a row that deletes keeps its red. A row that opens another
+       site ends in a small arrow. */
+    .menu-icon { @apply h-4 w-4 shrink-0 text-slate-400 transition-colors; }
+    .menu-item:hover .menu-icon { @apply text-slate-200; }
+    .menu-item.text-red-300 .menu-icon,
+    .menu-item.text-red-300:hover .menu-icon { color: currentColor; }
+    .menu-icon-external { @apply ml-auto h-3.5 w-3.5 shrink-0 text-slate-500; }
+
+    /* Clickable text (docs/development/PRO_AND_CLICKABLE_TEXT_PLAN.md): every
+       text link, text button (.btn-quiet) and section that opens on a click
+       shares one colour, so a reader tells at a glance what can be clicked.
+       Ordinary text is never this colour. Guarded by
+       aso/tests/test_clickable_text.py. */
+    .link { @apply text-sky-400 underline decoration-sky-400/40 underline-offset-2 transition-colors hover:text-sky-300 hover:decoration-sky-300; }
+    .disclosure { @apply inline-flex cursor-pointer list-none items-center gap-1.5 text-sky-400 transition-colors hover:text-sky-300; }
+    .disclosure::-webkit-details-marker { display: none; }
+    /* The one exception: text that deletes or stops something stays red. */
+    .link-danger { @apply text-red-400 underline decoration-red-400/40 underline-offset-2 transition-colors hover:text-red-300 hover:decoration-red-300; }
+
+    /* The one button that buys Pro, whatever it says (Get Pro, Get Pro for
+       Mac, Get RespectASO Pro, Renew Pro): metallic green, with the arrow of
+       a page that opens on respectaso.com. Nothing else in the app is this
+       green, so the way to Pro is never hard to find. The colour does the
+       work: no shadow, no glow (the owner, 2026-10-02). Guarded by
+       aso/tests/test_pro_button_style.py. */
+    .btn-pro {
+        @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold transition;
+        color: #022c22;
+        background-image: linear-gradient(180deg, #d1fae5 0%, #6ee7b7 18%, #34d399 50%, #10b981 50%, #059669 100%);
+    }
+    .btn-pro::after {
+        content: "";
+        width: 0.875em;
+        height: 0.875em;
+        flex-shrink: 0;
+        background-color: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17L17 7M8 7h9v9'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 17L17 7M8 7h9v9'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    .btn-pro:hover { filter: brightness(1.07) saturate(1.1); }
+    .btn-pro:active { transform: translateY(0.5px); }
+
+    /* A Pro feature the reader has not unlocked: a small lock after its name,
+       in the Pro green, on the tabs and on the buttons that open it. */
+    .pro-lock::after {
+        content: "";
+        display: inline-block;
+        width: 0.8em;
+        height: 0.8em;
+        margin-left: 0.4em;
+        flex-shrink: 0;
+        background-color: rgb(110 231 183 / 0.85);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+    /* The button that opens a Pro feature for a reader without Pro: tinted
+       in the Pro green, with the lock, so it stands apart from the grey
+       buttons and says what it leads to. With Pro it is a btn-primary. */
+    .btn-locked { @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition-colors hover:border-emerald-300/60 hover:bg-emerald-400/20 hover:text-white; }
+    .chip-pro { @apply inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-2xs font-semibold tracking-wide text-emerald-200; }
 }

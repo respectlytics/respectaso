@@ -1,0 +1,31 @@
+{% comment %}
+The notices under the top bar (UI_REDESIGN_PLAN.md 3.5): a broken popularity
+source, then the Pro license running out or ended. Nothing is ever placed
+above the top bar. The update notice and the one-time What's New notice sit
+at the top of the page content, as before.
+{% endcomment %}
+<div id="popularity-banner-region" data-banner-url="{% url 'aso:popularity_banner' %}"
+     data-stale-dismiss-url="{% url 'aso:apple_stale_banner_dismiss' %}" data-csrf="{{ csrf_token }}">
+    {% include "aso/partials/popularity_banner.html" %}
+</div>
+{% if license_expiring_soon %}
+<div class="border-b border-amber-500/30 bg-amber-900/30 px-4 py-2.5" data-license-notice="expiring">
+    <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
+        <p class="text-sm text-amber-100">
+            <span class="font-semibold">Your Pro license ends in {{ license_days_left }} day{{ license_days_left|pluralize }}.</span>
+            Renew with the same email and the new period starts when this one ends.
+        </p>
+        <a href="{{ renew_url }}" target="_blank" rel="noopener" class="btn-pro py-1.5">Renew Pro</a>
+    </div>
+</div>
+{% elif is_pro_expired %}
+<div class="border-b border-amber-500/30 bg-amber-900/30 px-4 py-2.5" data-license-notice="expired">
+    <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
+        <p class="text-sm text-amber-100">
+            <span class="font-semibold">Your Pro license has ended.</span>
+            Premium features stop working until you renew.
+        </p>
+        <a href="{{ renew_url }}" target="_blank" rel="noopener" class="btn-pro py-1.5">Renew Pro</a>
+    </div>
+</div>
+{% endif %}

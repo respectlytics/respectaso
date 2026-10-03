@@ -2,9 +2,9 @@
 difficulty. The fields are built deterministically from a small table, and
 release dates are relative to a fixed day so the ages never drift."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-FIXED_NOW = datetime(2026, 9, 22, tzinfo=timezone.utc)
+FIXED_NOW = datetime(2026, 9, 22, tzinfo=UTC)
 
 # keyword, per-app (ratings, stars, age in days, keyword in title), publishers
 FIELDS = [

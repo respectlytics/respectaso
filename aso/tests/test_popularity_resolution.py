@@ -7,6 +7,7 @@ internal estimate when Apple has no value.
 
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -81,7 +82,7 @@ class EffectiveFromPairTest(TestCase):
 class ResolvePopularityTest(TempDataDirMixin, TestCase):
     """resolve_popularity() combines estimator + Apple lookup + setting."""
 
-    FAKE_APPS = [
+    FAKE_APPS: ClassVar[list[dict]] = [
         {
             "trackName": f"App {i}",
             "userRatingCount": 1000 * (i + 1),

@@ -1,9 +1,14 @@
+# Every line is bounded: a new major version is tested before a bound moves. certifi stays open so CA updates keep coming.
 Django>=5.1,<5.2
 gunicorn==23.0.0
 whitenoise==6.8.2
 requests==2.32.3
 python-dotenv==1.0.1
 pywebview>=5.0,<6.0
+# The Mac app's login item and notifications (desktop/mac_integration.py).
+# macOS only; pywebview already brings pyobjc-core and the Cocoa wrappers there.
+pyobjc-framework-ServiceManagement>=12.2,<13; sys_platform == "darwin"
+pyobjc-framework-UserNotifications>=12.2,<13; sys_platform == "darwin"
 certifi>=2024.0.0
-PyJWT>=2.9.0
-cryptography>=44.0.0
+PyJWT>=2.9.0,<3.0
+cryptography>=44.0.0,<51.0

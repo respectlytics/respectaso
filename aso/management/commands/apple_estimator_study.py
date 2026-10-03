@@ -22,6 +22,7 @@ import os
 import random
 import time
 import zlib
+from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -117,13 +118,13 @@ class Command(BaseCommand):
         estimator = PopularityEstimator()
         cache = options.get("cache")
         if cache and os.path.exists(cache):
-            raw = json.load(open(cache))
+            raw = json.loads(Path(cache).read_text())
             self.stdout.write(f"Using {len(raw)} cached terms from {cache}")
         else:
             itunes = ITunesSearchService()
             # A partial cache from an interrupted run is resumed, not refetched.
             partial = f"{cache}.partial" if cache else ""
-            raw = json.load(open(partial)) if partial and os.path.exists(partial) else []
+            raw = json.loads(Path(partial).read_text()) if partial and os.path.exists(partial) else []
             done = {item["term"] for item in raw}
             work = ([(r["term"], r["popularity"]) for r in sample]
                     + [(t, None) for t in negatives])
@@ -134,7 +135,7 @@ class Command(BaseCommand):
                 competitors = None
                 for attempt in range(4):
                     try:
-                        competitors = itunes.search_apps(term, country=country, limit=25)
+                        competitors = itunes.search_ranked(term, country=country).apps
                         break
                     except (SearchAPIUnavailableError, ITunesRateLimited):
                         # Apple throttles bursts; back off and try again.
@@ -145,10 +146,10 @@ class Command(BaseCommand):
                 if index and index % 25 == 0:
                     self.stdout.write(f"  ...{index}/{len(work)}")
                     if partial:
-                        json.dump(raw, open(partial, "w"))
+                        Path(partial).write_text(json.dumps(raw))
                 time.sleep(1.6)
             if cache:
-                json.dump(raw, open(cache, "w"))
+                Path(cache).write_text(json.dumps(raw))
                 if os.path.exists(partial):
                     os.remove(partial)
         measured = []
@@ -259,9 +260,10 @@ CENSORED_FIT_ROUNDS = 50
 def _week_floors(countries):
     """The lowest popularity Apple reported in each storefront's active week:
     an unreported term sits below it."""
+    from django.db.models import Min
+
     from aso.apple_ads import storage
     from aso.models import AppleTopTerm
-    from django.db.models import Min
 
     weeks = storage.load_apple_settings()["apple_ads"]["active_weeks"]
     floors = {}
@@ -306,7 +308,7 @@ def judge_second_study(caches, seed, write):
     floors = _week_floors(list(caches))
     measured = []
     for country, path in caches.items():
-        for item in json.load(open(path)):
+        for item in json.loads(Path(path).read_text()):
             components = estimator.signal_components(item["competitors"], item["term"])
             if components is None:
                 continue
@@ -380,7 +382,7 @@ def _estimate_with(weights, components):
     raw = weights["intercept"] + sum(
         w * components[name] for name, w in weights.items() if name != "intercept"
     )
-    return int(round(max(1, min(100, raw))))
+    return round(max(1, min(100, raw)))
 
 
 def _flip_title(competitor, keyword):

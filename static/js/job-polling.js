@@ -26,11 +26,10 @@
         return n === 1 ? one : (many || one + 's');
     }
 
+    // A wait in words, from the one copy every page loads first
+    // (static/js/country-picker.js).
     function durationText(seconds) {
-        if (!seconds || seconds <= 0) { return ''; }
-        if (seconds < 60) { return Math.max(10, Math.round(seconds / 10) * 10) + ' seconds'; }
-        var mins = Math.ceil(seconds / 60);
-        return 'about ' + mins + ' minute' + (mins === 1 ? '' : 's');
+        return window.CountryPicker.durationText(seconds);
     }
 
     function etaText(seconds) {

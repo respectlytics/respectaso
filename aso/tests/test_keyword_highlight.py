@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 import unittest
+from typing import ClassVar
 
 from django.conf import settings
 from django.test import SimpleTestCase
@@ -189,7 +190,6 @@ class SharedHighlighterWiringTest(SimpleTestCase):
     # file on the dashboard; the Opportunity Finder's client moved into its
     # own script when the scan became a background job.
     TEMPLATES = (
-        ("aso/templates/aso/dashboard.html", "aso/templates/aso/dashboard.html"),
         ("aso/templates/aso/opportunity.html", "static/js/opportunity-scan.js"),
     )
 
@@ -216,7 +216,7 @@ class PythonJsParityTest(SimpleTestCase):
     """The server filter and the browser highlighter must emit the same HTML
     for the same title, or a row would change on refresh."""
 
-    CASES = [
+    CASES: ClassVar[list[tuple[str, ...]]] = [
         ("ScrollLess: App Blocker", "scroll less"),
         ("Scrollless - Screen Time Block", "scroll less"),
         ("Scroll Less Block Reels Shorts", "scroll less"),
@@ -230,6 +230,9 @@ class PythonJsParityTest(SimpleTestCase):
         ("C++ Compiler & IDE", "c++ ide"),
         ("Café Ménager", "café ménager"),
         ("ÉCOLE de Ski", "école ski"),
+        # Thai and Hindi vowel marks are part of the word (aso/words.py).
+        ("สวัสดีครับ: แอปลงทุน", "สวัสดี ครับ"),
+        ("शेयरबाजार Live", "शेयर बाजार"),
         ("Scroll Scroll Scroll", "scroll"),
         ("Untitled", ""),
     ]

@@ -25,8 +25,8 @@ This module never imports either at module level - they import this one.
 import logging
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from django.apps import apps as django_apps
 from django.utils import timezone
@@ -51,8 +51,9 @@ class Feature:
     progress: Callable | None = None   # progress(row) -> the dict the feature's page polls
     open_url: str = "/"                # where the feature lives ("Open" links)
     # Called by resume_after_startup() with the queryset of rows left
-    # "running" by a crash or a quit. None = mark them failed (AI runs).
-    # Keyword search re-queues them at the front instead.
+    # "running" by a crash or a quit. None = mark them failed with
+    # INTERRUPTED_MESSAGE. The AI runs do that with the record of why their
+    # Recent lists read; keyword search re-queues them at the front instead.
     interrupted: Callable | None = None
     # Called by remove_queued() / clear_queued() with a queued row. None =
     # delete the row. Returns True when the row left the queue.
@@ -87,8 +88,10 @@ def _ensure_features():
     if _registrars_loaded:
         return
     _registrars_loaded = True
-    from . import search_jobs  # noqa: F401  (keyword search, both editions)
-    from . import opportunity_scans  # noqa: F401  (country scans, both editions)
+    from . import (
+        opportunity_scans,  # noqa: F401  (country scans, both editions)
+        search_jobs,  # noqa: F401  (keyword search, both editions)
+    )
     if django_apps.is_installed("aso_pro"):
         from aso_pro import views  # noqa: F401  (the three AI features)
 

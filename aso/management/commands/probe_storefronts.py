@@ -110,7 +110,7 @@ class Command(BaseCommand):
                 limiter.record_failure()
                 last_error = str(exc)[:60]
                 continue
-            except Exception as exc:  # a storefront Apple does not serve
+            except Exception as exc:  # noqa: BLE001 (a storefront Apple does not serve fails in its own ways)
                 limiter.record_failure()
                 last_error = f"{type(exc).__name__}: {str(exc)[:50]}"
                 continue
@@ -148,7 +148,7 @@ class Command(BaseCommand):
             line += f'"{code}", '
         if line.strip():
             self.stdout.write(line)
-        self.stdout.write(f"\nProbed {dt.date.today().isoformat()}.")
+        self.stdout.write(f"\nProbed {dt.datetime.now().astimezone().date().isoformat()}.")
 
     def _probe_apple_ads(self, codes):
         """Which storefronts Apple Ads publishes search popularity for."""
@@ -165,7 +165,7 @@ class Command(BaseCommand):
             return
 
         self.stdout.write(
-            f"\nAPPLE_ADS_STOREFRONTS, probed {dt.date.today().isoformat()} "
+            f"\nAPPLE_ADS_STOREFRONTS, probed {dt.datetime.now().astimezone().date().isoformat()} "
             f"({len(available)} storefronts):"
         )
         line = "    "

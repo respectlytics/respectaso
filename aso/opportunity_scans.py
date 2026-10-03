@@ -8,7 +8,9 @@ next country boundary whenever the row's status is no longer "running" (Pause,
 Discard, Run now). Because everything it needs is in the row, a scan continues
 after navigating away, after the app was quit and after a crash.
 
-The scan deliberately persists NOTHING to the search history. Results land in
+The scan deliberately persists NOTHING to the search history (it stores only
+the day's read of each storefront, aso/day_reads.py, so a later search of the
+same keyword that day costs Apple nothing). Results land in
 ``OpportunityScanResult`` and only reach ``SearchResult`` when the user saves
 the rows worth keeping. That is the feature's whole point: you scan sixty
 countries to find the two you care about.
@@ -24,6 +26,7 @@ module level (``aso.pro_access`` does the license check).
 from __future__ import annotations
 
 import logging
+import math
 import statistics
 import time
 
@@ -32,16 +35,17 @@ from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 
-from . import countries, run_queue, throttle
+from . import countries, day_reads, run_queue, throttle
 from .column_tips import opportunity_subline
 from .keyword_scoring import score_country
-from .models import App, OpportunityScan, OpportunityScanResult, SearchResult
+from .models import App, OpportunityScan, OpportunityScanResult
 from .popularity import popularity_fields, prefetch_apple_values, reported_by_apple
 from .scoring import (
     calc_opportunity,
     classify_keyword,
     difficulty_color,
     difficulty_label,
+    display_competitors,
     opportunity_css,
     opportunity_reach,
     scored_for,
@@ -55,6 +59,7 @@ from .services import (
     ITunesRateLimited,
     ITunesSearchService,
     SearchAPIUnavailableError,
+    display_snippets,
 )
 from .strength import AppProfile
 from .throttle import AdaptiveITunesRateLimiter, classify_throttle_state
@@ -131,12 +136,6 @@ def latest_scan():
     )
 
 
-def strip_scan():
-    """What the global strip shows: the active scan, else the newest finished
-    one not yet dismissed."""
-    return panel_scan() or finished_scan()
-
-
 def reclaim_stale() -> int:
     """Re-queue scans whose worker process died without finishing.
 
@@ -207,13 +206,28 @@ def estimate_seconds(count: int) -> float:
 
 
 def duration_text(seconds: float) -> str:
-    """Twin of durationText() in static/js/country-picker.js."""
+    """A wait in words: "20 seconds", "about 3 minutes", "about 1 hour 7
+    minutes"; "" when there is none.
+
+    The one Python copy (the Opportunity scan's cost, the keyword cleanup
+    banner, the Rival Tracker's estimate, MCP). Its twin is durationText()
+    in static/js/country-picker.js, which every page's own scripts call;
+    aso/tests/test_duration_text.py runs both. Tens of seconds round half
+    up and minutes round up, the same in both.
+    """
     if not seconds or seconds <= 0:
         return ""
-    if seconds < 60:
-        return f"{max(10, round(seconds / 10) * 10)} seconds"
-    minutes = int(seconds // 60) + (1 if seconds % 60 else 0)
-    return f"about {minutes} minute" + ("" if minutes == 1 else "s")
+    tens = max(10, int(seconds / 10 + 0.5) * 10)
+    if tens < 60:
+        return f"{tens} seconds"
+    minutes = math.ceil(seconds / 60)
+    if minutes < 60:
+        return f"about {minutes} minute" + ("" if minutes == 1 else "s")
+    hours, minutes = divmod(minutes, 60)
+    text = f"about {hours} hour" + ("" if hours == 1 else "s")
+    if minutes:
+        text += f" {minutes} minute" + ("" if minutes == 1 else "s")
+    return text
 
 
 def cost_text(count: int) -> str:
@@ -282,7 +296,7 @@ def country_payload(row, *, heavy=False) -> dict:
     reported = reported_by_apple(resolution)
     reach = opportunity_reach(
         popularity or 0, row.difficulty_score, row.country,
-        app=app, app_rank=row.app_rank, keyword=row.keyword_text, reported=reported,
+        app=app, app_rank=row.app_rank, keyword=row.keyword_text,
     )
     label = classify_keyword(
         popularity or 0, row.difficulty_score, row.country,
@@ -318,10 +332,9 @@ def country_payload(row, *, heavy=False) -> dict:
             label, popularity or 0, row.difficulty_score, row.country, app,
             row.app_rank, row.keyword_text, reach=reach,
         ),
-        # How the score is worked out, shown on hover over it, the same the
-        # Dashboard shows. About 400 bytes a row; on localhost the three
-        # second poll carries 175 of them without trouble.
-        "opportunity_tip": reach["explanation"],
+        # What the score means for the scan's app (or a new app), one short
+        # sentence shown on hover over it, the same the Dashboard shows.
+        "opportunity_tip": reach["tip"],
         "app_rank": row.app_rank,
         "competitor_count": row.competitor_count,
         "top_competitor": row.top_competitor,
@@ -336,13 +349,13 @@ def country_payload(row, *, heavy=False) -> dict:
             "download_estimates": {**DownloadEstimator().estimate(popularity or 0, country=row.country),
                                    "searches_reported": reported},
         }
-        data["competitors"] = row.competitors_data
+        data["competitors"] = display_competitors(row.competitors_data)
         # Only the expanded row shows the badge, and its sentence is about
         # ninety bytes. On 175 light rows every three seconds that is a poll
         # twice the size for something nobody is looking at.
         data["targeting"] = targeting_payload(
             popularity or 0, row.difficulty_score, row.country,
-            app=app, app_rank=row.app_rank, keyword=row.keyword_text, reported=reported,
+            app=app, app_rank=row.app_rank, keyword=row.keyword_text,
         )
     return data
 
@@ -469,18 +482,25 @@ def save_to_history(scan, codes=None) -> int:
     keyword_obj, _ = Keyword.objects.get_or_create(
         keyword=scan.keyword.lower(), app=scan.app,
     )
+    from .keyword_scoring import latest_rank, store_read
+
     saved = 0
     for row in rows:
-        SearchResult.upsert_today(
-            keyword=keyword_obj,
-            country=row.country,
-            popularity_score=row.popularity_score,
-            apple_popularity_score=row.apple_popularity_score,
-            inferred_genre=row.inferred_genre,
-            difficulty_score=row.difficulty_score,
-            difficulty_breakdown=row.difficulty_breakdown,
-            competitors_data=row.competitors_data,
+        # The same keyword tracked here for another app, or for none, gets
+        # the same search; each keeps the rank it last had, since a save
+        # makes no App Store request.
+        store_read(
+            keyword_obj, row.country,
+            {
+                "popularity_score": row.popularity_score,
+                "apple_popularity_score": row.apple_popularity_score,
+                "inferred_genre": row.inferred_genre,
+                "difficulty_score": row.difficulty_score,
+                "difficulty_breakdown": row.difficulty_breakdown,
+                "competitors_data": row.competitors_data,
+            },
             app_rank=row.app_rank,
+            twin_rank=lambda twin, country=row.country: latest_rank(twin, country),
         )
         saved += 1
     if saved:
@@ -514,7 +534,7 @@ def remove_from_queue(scan) -> bool:
         return bool(deleted)
     updated = OpportunityScan.objects.filter(pk=scan.pk, status="queued").update(
         status="paused", auto_resume=False, queue_rank=None,
-        progress_message="Paused, removed from the queue. Resume it from the Opportunity tab.",
+        progress_message="Paused, removed from the queue. Resume it from Countries.",
     )
     return bool(updated)
 
@@ -558,16 +578,6 @@ def _cooldown(pk) -> bool:
     return True
 
 
-def _throttle_message(state, limiter) -> str:
-    if state == "slowed_down":
-        return f"Apple is slowing responses, now pacing at {round(limiter.current_delay)} s per country."
-    if state == "paused":
-        return (f"Apple is not answering, {limiter.consecutive_failures} requests failed in a row, "
-                f"retrying at {round(limiter.current_delay)} s per country.")
-    if state == "aborted":
-        return "Apple is rejecting requests. Cooling down for 2 minutes, then retrying."
-    return "Scanning..."
-
 
 def execute_scan(pk) -> None:
     """The run queue's execute hook. Never raises: any exception outside the
@@ -609,11 +619,12 @@ def _execute(pk) -> None:
     failed_items = list(scan.failed_items)
     attempted = failed = 0          # this run, for the throttle classifier
     cooldowns = 0
-    countries_this_run = 0
     run_started = time.monotonic()
     elapsed_before = scan.elapsed_seconds or 0.0
     seconds_per_country = scan.seconds_per_country
-    first_call = True
+    # Waits on the limiter before real App Store reads only; a keyword read
+    # today in a storefront is scored from that read (aso/day_reads.py).
+    pacer = day_reads.Pacer(wait=lambda: limiter.wait())
 
     OpportunityScan.objects.filter(pk=pk, status="running").update(
         progress_message="Scanning...", error_message="", throttle_state="normal",
@@ -626,7 +637,8 @@ def _execute(pk) -> None:
         if len(failed_items) < FAILED_ITEMS_CAP:
             failed_items.append({"country": country, "error": error[:200]})
 
-    for index in range(start_index, total):
+    # countries_this_run counts the countries this run has finished, this one included.
+    for countries_this_run, index in enumerate(range(start_index, total), start=1):
         status, current_app_id = _status_and_app(pk)
         if status != "running":     # Pause, Discard, Run now, cancel, removed
             return
@@ -635,16 +647,16 @@ def _execute(pk) -> None:
             app = App.objects.filter(pk=app_id).first() if app_id else None
 
         code = codes[index]
-        if not first_call:
-            limiter.wait()
-        first_call = False
-        attempted += 1
+        fetches = pacer.before(scan.keyword, code)
+        if fetches:
+            attempted += 1
         try:
             scored = score_country(
                 scan.keyword, code, app=app, itunes_service=itunes,
                 difficulty_calc=difficulty_calc, download_est=download_est,
             )
-            limiter.record_success()
+            if fetches:
+                limiter.record_success()
             _store(pk, scan.keyword, index, code, scored)
             done += 1
         except ITunesRateLimited as exc:
@@ -659,7 +671,6 @@ def _execute(pk) -> None:
             logger.exception("Country scan %s: unexpected error on %s", pk, code)
             record_failure(code, "Unexpected error")
 
-        countries_this_run += 1
         active_seconds = time.monotonic() - run_started
         if countries_this_run >= ETA_MIN_COUNTRIES:
             seconds_per_country = active_seconds / countries_this_run
@@ -677,7 +688,7 @@ def _execute(pk) -> None:
         OpportunityScan.objects.filter(pk=pk, status="running").update(
             current_country=next_code, heartbeat_at=timezone.now(),
             throttle_state=STATUS_NAME_FOR_THROTTLE.get(state, state),
-            progress_message=_throttle_message(state, limiter),
+            progress_message=throttle.wait_message(state, COOLDOWN_SECONDS) or "Scanning...",
         )
 
         if state == "aborted":
@@ -686,8 +697,7 @@ def _execute(pk) -> None:
                 OpportunityScan.objects.filter(pk=pk, status="running").update(
                     status="paused", throttle_state="paused", auto_resume=False,
                     current_country="",
-                    progress_message=(f"Apple rejected {limiter.consecutive_failures} requests in a row. "
-                                      "Wait a few minutes, then press Resume."),
+                    progress_message=throttle.wait_message("stopped"),
                 )
                 return
             if not _cooldown(pk):
@@ -716,7 +726,7 @@ def _store(pk, keyword, index, code, scored) -> None:
             "inferred_genre": resolution.genre_hint or "",
             "difficulty_score": scored["difficulty_score"],
             "difficulty_breakdown": scored["difficulty_breakdown"],
-            "competitors_data": competitors,
+            "competitors_data": display_snippets(competitors),
             "app_rank": scored["app_rank"],
             "competitor_count": len(competitors),
             "top_competitor": (top.get("trackName") or "")[:255],

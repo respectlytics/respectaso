@@ -1,0 +1,27 @@
+{% extends "aso/base.html" %}
+{% comment %}
+The Rival Tracker tab whenever the live page cannot render: the free
+edition, and a Pro install without a valid license or with an expired one.
+Context comes from aso.rival_tracker_preview.preview_context(state): the
+hero says why it is a preview and what unlocks it; the preview below shows
+the page with sample data.
+{% endcomment %}
+
+{% block title %}Rival Tracker · RespectASO{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <div class="mb-4">
+        <h1 class="page-title mb-1">Rival Tracker</h1>
+        <p class="page-lead max-w-3xl">
+            Follow one of your apps against up to 10 rivals every day: ranks, ratings, updates and complaints.
+        </p>
+    </div>
+
+    {% include "aso/partials/preview_hero.html" with cta=preview.cta %}
+
+    {% include "aso/partials/rival_tracker_preview.html" %}
+
+    {% include "aso/partials/preview_footer.html" with cta=preview.cta %}
+</div>
+{% endblock %}

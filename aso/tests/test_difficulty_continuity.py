@@ -97,8 +97,8 @@ class LeaderCapSweepTest(SimpleTestCase):
         match ratio by a tenth. The old 20% switch made that a big step."""
         for reviews in (50, 300, 900):
             with self.subTest(leader=reviews):
-                scores = [difficulty(field(reviews, matches=m)) for m in range(0, 11)]
-                steps = [abs(b - a) for a, b in zip(scores, scores[1:])]
+                scores = [difficulty(field(reviews, matches=m)) for m in range(11)]
+                steps = [abs(b - a) for a, b in itertools.pairwise(scores)]
                 self.assertLessEqual(max(steps), 10, scores)
 
 
@@ -120,7 +120,7 @@ class ResultCountSweepTest(SimpleTestCase):
         for n in range(1, 26):
             competitors = [app(f"App {i}", 500_000, in_title=True) for i in range(n)]
             scores.append(difficulty(competitors))
-        steps = [b - a for a, b in zip(scores, scores[1:])]
+        steps = [b - a for a, b in itertools.pairwise(scores)]
         self.assertLessEqual(max(steps), 10, scores)
 
 
@@ -148,7 +148,11 @@ class StoredDifficultyRescoreTest(TestCase):
 
     def test_both_kinds_of_row_are_rescored_and_keep_their_downloads(self):
         from aso.models import (
-            App, Keyword, OpportunityScan, OpportunityScanResult, SearchResult,
+            App,
+            Keyword,
+            OpportunityScan,
+            OpportunityScanResult,
+            SearchResult,
         )
         from aso.popularity import recalculate_stored_difficulty
 

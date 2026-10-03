@@ -22,8 +22,7 @@ from django.urls import reverse
 
 from aso.apple_ads.genres import genre_label
 
-from .links import PRICING_URL  # noqa: E402 (the one address)
-RENEW_URL = "https://respectaso.com/license/renew/"
+from . import pro_preview_words
 
 # States the preview page can be in. Each maps to one CTA block.
 STATE_FREE = "free"                    # free edition: Pro feature
@@ -98,7 +97,7 @@ def _sparkline_series(popularity: int, trend: int) -> list[list]:
     completed Sunday-Saturday weeks; the sparkline ignores them, they only
     keep the payload shape identical to the live page's series.
     """
-    today = dt.date.today()
+    today = dt.datetime.now().astimezone().date()
     last_sunday = today - dt.timedelta(days=(today.weekday() + 1) % 7 or 7)
     series = []
     for i in range(SPARKLINE_WEEKS):
@@ -168,77 +167,22 @@ def _cta(state: str, license_url: str | None) -> dict:
     """The state-specific call to action: hero copy, buttons, and the one
     line shown on the card that sits over the blurred table.
 
-    `primary_tone` picks the button colour the rest of the app already
-    uses for that action: purple = buy Pro, amber = renew, sky = Apple
-    Ads connection (the template maps it to whole class literals).
+    `primary_tone` picks the button the rest of the app already uses for
+    that action: pro = buy Pro and renew = renew it (both the one Pro
+    button, btn-pro; renew tints the hero amber), sky = the Apple Ads
+    connection (the template maps it to whole class literals).
     """
     connect_url = reverse("aso:settings_popularity")
     guide_url = reverse("aso:apple_ads_setup")
-    if state == STATE_FREE:
-        return {
-            "eyebrow": "Pro feature",
-            "headline": "This is the page you unlock with RespectASO Pro",
-            "body": (
-                "Below is what this page looks like live, with sample "
-                "data and the search terms locked. RespectASO Pro plus a "
-                "free Apple Ads connection (a one-time API key, about 5 "
-                "minutes, no ads or spend required) unlocks Apple's real "
-                "ranking for your storefronts, refreshed every week."
-            ),
-            "primary_label": "Get RespectASO Pro",
-            "primary_url": PRICING_URL,
-            "primary_external": True,
-            "primary_tone": "purple",
-            "secondary_label": "",
-            "secondary_url": "",
-            "table_line": "Unlock the real terms with RespectASO Pro.",
-        }
-    if state == STATE_UNLICENSED:
-        return {
-            "eyebrow": "Pro feature · license required",
-            "headline": "Activate a Pro license to unlock the real terms",
-            "body": (
-                "Below is what this page looks like live, with sample "
-                "data and the search terms locked. A Pro license plus a "
-                "free Apple Ads connection (a one-time API key, about 5 "
-                "minutes, no ads or spend required) unlocks Apple's real "
-                "ranking for your storefronts, refreshed every week."
-            ),
-            "primary_label": "Get a Pro License",
-            "primary_url": PRICING_URL,
-            "primary_external": True,
-            "primary_tone": "purple",
-            "secondary_label": "Already have a key? Activate it",
-            "secondary_url": license_url or "",
-            "table_line": "Unlock the real terms with a Pro license.",
-        }
-    if state == STATE_EXPIRED:
-        return {
-            "eyebrow": "Pro feature · license expired",
-            "headline": "Your Pro license has expired",
-            "body": (
-                "Renew to unlock Apple's top search terms again. Until "
-                "then this page shows sample data with the search terms "
-                "locked; your Apple Ads connection and synced weeks are "
-                "untouched and pick up right where they left off."
-            ),
-            "primary_label": "Renew License",
-            "primary_url": RENEW_URL,
-            "primary_external": True,
-            "primary_tone": "amber",
-            "secondary_label": "Already renewed? Refresh your key",
-            "secondary_url": license_url or "",
-            "table_line": "Renew your license to unlock the real terms.",
-        }
+    if state in (STATE_FREE, STATE_UNLICENSED, STATE_EXPIRED):
+        return pro_preview_words.cta("top_terms", state, license_url, needs_apple=True)
     if state == STATE_SYNCING:
         return {
             "eyebrow": "Apple Ads connected · first sync pending",
             "headline": "Your first week of Apple data is on its way",
             "body": (
-                "Apple Ads is connected and the first weekly dataset is "
-                "downloading in the background. This page unlocks by "
-                "itself once a week of data has landed; until then it "
-                "shows sample data with the search terms locked."
+                "Apple Ads is connected. This page unlocks by itself when "
+                "Apple's first week of data arrives."
             ),
             "primary_label": "View sync status",
             "primary_url": connect_url + "#apple-connection",
@@ -246,6 +190,7 @@ def _cta(state: str, license_url: str | None) -> dict:
             "primary_tone": "sky",
             "secondary_label": "",
             "secondary_url": "",
+            "video_url": "",
             "table_line": (
                 "The real terms unlock here as soon as the first sync "
                 "finishes."
@@ -255,11 +200,8 @@ def _cta(state: str, license_url: str | None) -> dict:
         "eyebrow": "One step left",
         "headline": "Connect Apple Ads to unlock the real terms",
         "body": (
-            "Your license is active. Below is what this page looks like "
-            "live, with sample data and the search terms locked; a free "
-            "Apple Ads connection (a one-time API key, about 5 minutes, "
-            "no ads or spend required) unlocks Apple's official ranking "
-            "for your storefronts, refreshed every week."
+            "Your license is active. The connection is free, takes about "
+            "5 minutes and needs no ad spend."
         ),
         "primary_label": "Connect Apple Ads",
         "primary_url": connect_url + "#apple-connection",
@@ -267,6 +209,7 @@ def _cta(state: str, license_url: str | None) -> dict:
         "primary_tone": "sky",
         "secondary_label": "Read the setup guide",
         "secondary_url": guide_url,
+        "video_url": "",
         "table_line": "Connect Apple Ads to unlock the real terms.",
     }
 

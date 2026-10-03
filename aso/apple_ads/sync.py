@@ -259,9 +259,9 @@ def _fetch_week(credentials, ad_account_id, country, week, run_state,
     pages = 0
     while True:
         if run_state["requests"] >= MAX_REQUESTS_PER_RUN:
-            raise _CeilingReached("Per-run request ceiling reached")
+            raise _CeilingReached("Per-run request limit reached")
         if _requests_in_last_24h() >= MAX_REQUESTS_PER_DAY:
-            raise _CeilingReached("Daily request ceiling reached")
+            raise _CeilingReached("Daily request limit reached")
         if max_pages is not None and pages >= max_pages:
             raise _CeilingReached("Inline page ceiling reached")
         if pages > 0:
@@ -284,9 +284,9 @@ def _fetch_week(credentials, ad_account_id, country, week, run_state,
 
 def _persist_rows(rows: list[dict], tracked_only_terms=None) -> int:
     """Bulk-upsert ingest dicts into AppleTopTerm. Returns rows written."""
-    from ..models import AppleTopTerm
-
     from django.db import transaction
+
+    from ..models import AppleTopTerm
 
     if tracked_only_terms is not None:
         rows = [row for row in rows if row["term"] in tracked_only_terms]
@@ -403,8 +403,8 @@ def _run_sync(force: bool = False) -> None:
                     outcome = "partial"
                     error_message = (
                         f"Apple's data for {country.upper()} (week of "
-                        f"{week}) looked incomplete ({reason}), so the "
-                        "last good week stays. Retrying automatically."
+                        f"{week}) looked incomplete, so the last good week "
+                        "stays. RespectASO tries again by itself."
                     )
                     logger.warning("Week quarantined: %s", error_message)
                     continue
@@ -415,9 +415,9 @@ def _run_sync(force: bool = False) -> None:
 
         _run_impressions(credentials, ad_account_id, run_state)
         _run_backfill(credentials, ad_account_id, run_state)
-    except _CeilingReached as e:
+    except _CeilingReached:
         outcome, error_message = "partial", (
-            f"{e}. The remaining work resumes on the next automatic sync."
+            "Part of Apple's data is still to come. The next automatic sync brings the rest."
         )
     except AppleAdsAuthError:
         storage.mark_credentials_rejected()
@@ -429,7 +429,7 @@ def _run_sync(force: bool = False) -> None:
     except AppleAdsRateLimitedError:
         run_state["pacing"] = min(MAX_PACING_DELAY, run_state["pacing"] * 2)
         outcome, error_message = "rate_limited", (
-            "Rate limited by Apple. The sync resumes automatically."
+            "Apple Ads is busy right now. The sync carries on by itself."
         )
     except AppleAdsError as e:
         outcome, error_message = "partial", str(e)
@@ -481,7 +481,7 @@ def _run_impressions(credentials, ad_account_id, run_state) -> None:
         )
     except AppleAdsAuthError:
         raise  # Credential problems are never impression-share-specific.
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 (impression share must never mark the dataset sync as failed)
         # Impression share must never mark the dataset sync as failed.
         logger.warning("Impression-share sync failed: %s", e)
         storage.save_apple_settings(apple_ads={"impression_share": {
@@ -561,10 +561,11 @@ def _patch_today_rows() -> None:
 
     save() recomputes the stored classification from the effective value.
     """
+    from ..local_day import today_start as local_today_start
     from ..models import AppleSearchPopularity, SearchResult
     from ..popularity import normalize_term
 
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = local_today_start()
     for result in SearchResult.objects.filter(
         searched_at__gte=today_start
     ).select_related("keyword"):
@@ -654,7 +655,7 @@ def _start_worker(*, force: bool = False, jitter: float = 0.0) -> bool:
             if jitter:
                 time.sleep(jitter)
             _run_sync(force=force)
-        except Exception as e:  # Sync must never take down the scheduler.
+        except Exception as e:  # noqa: BLE001 (the sync must never take down the scheduler)
             logger.error("Apple dataset sync crashed: %s", e)
             _finish("error", str(e))
         finally:
@@ -730,7 +731,7 @@ def ensure_country_dataset(country: str) -> None:
             logger.warning("Inline dataset download failed (%s): %s", country, e)
             _inline_backoff_until = time.monotonic() + INLINE_BACKOFF_SECONDS
             return
-        except Exception as e:  # Never let inline plumbing break scoring.
+        except Exception as e:  # noqa: BLE001 (an inline download must never break scoring)
             logger.warning("Inline dataset download crashed (%s): %s", country, e)
             _inline_backoff_until = time.monotonic() + INLINE_BACKOFF_SECONDS
             return

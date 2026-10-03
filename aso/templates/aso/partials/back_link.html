@@ -1,0 +1,18 @@
+{% comment %}
+"Back to <the page you came from>" (aso/back_link.py,
+docs/development/BACK_LINK_PLAN.md), at the top left of a page the reader
+reached from somewhere else; the Mac app has no browser Back button. Small
+(12 px, the owner, 2026-10-02) so it never competes with the title. When the
+page before is exactly where it leads, the browser's own history takes the
+reader there, so its scroll position and open sections are kept; otherwise
+the link opens it.
+{% endcomment %}
+{% if back_link %}
+<div class="{{ back_class|default:'mb-2' }}">
+<a href="{{ back_link.url }}" data-back-link class="btn-quiet -ml-1.5 gap-1 px-1.5 py-0.5 text-xs"
+   onclick="var r = document.referrer; if (r && history.length > 1) { try { var u = new URL(r); if (u.origin === location.origin && u.pathname + u.search === this.getAttribute('href')) { history.back(); return false; } } catch (e) {} }">
+    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.25" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    Back to {{ back_link.label }}
+</a>
+</div>
+{% endif %}

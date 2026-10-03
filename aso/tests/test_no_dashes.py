@@ -16,23 +16,26 @@ in aso_pro/tests/test_no_dashes_pro.py, since this repository's free edition
 ships without aso_pro.
 """
 
-import html
-import io
 import json
 import re
-import tokenize
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from django.conf import settings
 from django.test import TestCase, override_settings
-from django.urls import URLPattern, URLResolver, get_resolver
 
 from aso.copy_rules import (
     dash_punctuation_in,
     no_dash_in_markup,
     no_dash_in_name,
     no_dash_punctuation,
+)
+from aso.tests.surfaces import (
+    pages,
+    python_strings,
+    relative,
+    script_strings,
+    sources,
+    template_texts,
+    visible_text,
 )
 
 # ---- the rule itself ------------------------------------------------------
@@ -176,7 +179,7 @@ class ReleaseNotesTest(TestCase):
     that shows them reads them through the rule."""
 
     def test_whats_new_page(self):
-        text = _visible_text(self.client.get("/whats-new/").content.decode())
+        text = visible_text(self.client.get("/whats-new/").content.decode())
         self.assertEqual(_line_dashes(text), [])
 
     def test_github_release_body(self):
@@ -201,33 +204,8 @@ class ReleaseNotesTest(TestCase):
 
 # ---- every rendered page ----------------------------------------------------
 
-def _visible_text(markup: str) -> str:
-    """What a person reads on a page: its text and the attributes a browser
-    shows (tooltips, placeholders, labels), without scripts and styles."""
-    body = re.sub(r"<script\b.*?</script>|<style\b.*?</style>|<!--.*?-->|<code\b.*?</code>|<pre\b.*?</pre>",
-                  "\n", markup, flags=re.S)
-    attrs = re.findall(r'(?:title|placeholder|aria-label|alt|data-tip|content)="([^"]*)"', body)
-    return "\n".join([html.unescape(t) for t in re.sub(r"<[^>]+>", "\n", body).split("\n")]
-                     + [html.unescape(a) for a in attrs])
-
-
 def _line_dashes(text: str) -> list[str]:
     return [hit for line in text.split("\n") if (hit := dash_punctuation_in(line.strip()))]
-
-
-def _pages():
-    """Every page the app serves at a fixed address."""
-    def walk(patterns, prefix=""):
-        for p in patterns:
-            if isinstance(p, URLResolver):
-                yield from walk(p.url_patterns, prefix + str(p.pattern))
-            elif isinstance(p, URLPattern):
-                yield prefix + str(p.pattern)
-
-    for route in walk(get_resolver().url_patterns):
-        if "<" in route or "(?P" in route or route.startswith(("admin", "static", "media", "^")):
-            continue
-        yield "/" + route
 
 
 class RenderedPagesTest(TestCase):
@@ -250,12 +228,12 @@ class RenderedPagesTest(TestCase):
     @patch("aso.update_check._fetch_latest_release", return_value={"update_available": False})
     def _scan(self, _github):
         hits = {}
-        urls = list(_pages()) + [f"/?app={self.app.pk}", f"/?app={self.app.pk}&country=us"]
+        urls = list(pages()) + [f"/?app={self.app.pk}", f"/?app={self.app.pk}&country=us"]
         for url in urls:
             response = self.client.get(url)
             if response.status_code != 200 or "text/html" not in response.get("Content-Type", ""):
                 continue
-            found = _line_dashes(_visible_text(response.content.decode()))
+            found = _line_dashes(visible_text(response.content.decode()))
             if found:
                 hits[url] = found
         return hits
@@ -270,84 +248,32 @@ class RenderedPagesTest(TestCase):
 
 # ---- every template, script and string, every branch ------------------------
 
-_SKIP_DIRS = {".venv", "venv", "node_modules", "staticfiles", "data", ".git", "docs", "dist", "build",
-              "tests", "migrations", "vendor", "__pycache__"}
-_PROTECT = re.compile(
-    r"{%\s*comment\s*%}.*?{%\s*endcomment\s*%}|<!--.*?-->|<style\b.*?</style>"
-    r"|<code\b[^>]*>.*?</code>|<pre\b.*?</pre>|{#.*?#}", re.S)
-_SCRIPT = re.compile(r"<script\b[^>]*>(.*?)</script>", re.S)
-_JS_STRING = re.compile(r"""'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`""", re.S)
-_TEMPLATE_EXPR = re.compile(r"\$\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}")
-_HUMAN_ATTR = re.compile(r'(?:title|placeholder|aria-label|alt|data-tip|content)="([^"]*)"')
 # A dash opening or closing a piece of text, with a word on its other side:
 # "</span> — text", or a string ending "… —" before the next piece.
 _EDGE_DASH = re.compile(r"^\s*[—–]\s+\w|\w\s+[—–]\s*$")
+# A hyphen with a space on each side at the edge of a piece that is joined
+# to the text before or after it: "' - a search holds up to '". A list
+# marker opens its line with no space before it, so it is not this.
+_SPACED_HYPHEN_EDGE = re.compile(r"^[ \t]+-[ \t]+\w|\w[ \t]+-[ \t]*$")
 
 
-def _sources(suffix):
-    """This repository's own files of one kind: no dependencies, build
-    output, tests or migrations."""
-    root = Path(settings.BASE_DIR)
-    for path in sorted(root.rglob(f"*{suffix}")):
-        if not _SKIP_DIRS & set(path.relative_to(root).parts):
-            yield path
-
-
-def _text_dashes(text: str) -> list[str]:
+def _text_dashes(text: str, joined: bool = False) -> list[str]:
     """The dashes standing between words in a piece of text, which may
     carry markup: each run of text between two tags is judged on its own,
-    so the lone empty-cell glyph "<span>—</span>" stays."""
+    so the lone empty-cell glyph "<span>—</span>" stays. ``joined`` says the
+    piece is joined to the text around it on the page (a template's text, a
+    script's string), so a spaced hyphen at its edge is a dash too."""
     found = []
     for node in re.split(r"<[^>]+>", text):
-        hit = dash_punctuation_in(node) or (_EDGE_DASH.search(node) and node.strip())
+        edge = _EDGE_DASH.search(node) or (joined and _SPACED_HYPHEN_EDGE.search(node))
+        hit = dash_punctuation_in(node) or (edge and node.strip())
         if hit:
             found.append(hit)
     return found
 
 
-def _script_dashes(code: str) -> list[str]:
-    found = []
-    for line in code.split("\n"):
-        if line.lstrip().startswith(("//", "*", "/*")):
-            continue
-        for literal in _JS_STRING.findall(re.split(r"(?<![:\\'\"])//\s", line)[0]):
-            found += _text_dashes(_TEMPLATE_EXPR.sub(" x ", literal[1:-1]))
-    return found
-
-
-def _python_dashes(src: str) -> list[str]:
-    """The dashes in a module's strings. Docstrings document code for the
-    people who change it, and a raw string is a pattern, so both are left
-    out; an f-string is judged whole, each placeholder standing as a word."""
-    found = []
-    tokens = list(tokenize.generate_tokens(io.StringIO(src).readline))
-    starts = (tokenize.NEWLINE, tokenize.NL, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING)
-    fstring_start = getattr(tokenize, "FSTRING_START", None)
-    i = 0
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok.type == tokenize.STRING:
-            docstring = (i == 0 or tokens[i - 1].type in starts) and tokens[i + 1].type == tokenize.NEWLINE
-            m = re.match(r"^([rbuRBU]*)('\'\'|\"\"\"|'|\")(.*)\2$", tok.string, re.S)
-            if m and not docstring and "r" not in m.group(1).lower():
-                found += _text_dashes(m.group(3))
-        elif tok.type == fstring_start:
-            text, depth = "", 1
-            while depth:
-                i += 1
-                kind = tokens[i].type
-                if kind == fstring_start:
-                    depth += 1
-                elif kind == tokenize.FSTRING_END:
-                    depth -= 1
-                elif kind == tokenize.FSTRING_MIDDLE and depth == 1:
-                    text += tokens[i].string
-                elif kind == tokenize.OP and tokens[i].string == "{" and depth == 1:
-                    text += "x"
-            if "r" not in tok.string.lower():
-                found += _text_dashes(text)
-        i += 1
-    return found
+def _dashes(texts, joined: bool = False) -> list[str]:
+    return [hit for text in texts for hit in _text_dashes(text, joined)]
 
 
 class SourcesTest(TestCase):
@@ -355,25 +281,16 @@ class SourcesTest(TestCase):
 
     def test_no_template_carries_a_dash(self):
         hits = {}
-        for path in _sources(".html"):
-            src = path.read_text(encoding="utf-8")
-            found = []
-            for script in _SCRIPT.findall(src):
-                found += _script_dashes(script)
-            body = _PROTECT.sub("\n", _SCRIPT.sub("\n", src))
-            for value in _HUMAN_ATTR.findall(body):
-                found += _text_dashes(re.sub(r"{%.*?%}|{{.*?}}", "", value))
-            for node in re.split(r"{%.*?%}", body):
-                found += _text_dashes(re.sub(r"{{.*?}}", "x", node))
-            if found:
-                hits[str(path.relative_to(settings.BASE_DIR))] = found
+        for path in sources(".html"):
+            if found := _dashes(template_texts(path.read_text(encoding="utf-8")), joined=True):
+                hits[relative(path)] = found
         self.assertEqual(hits, {})
 
     def test_no_script_carries_a_dash(self):
         hits = {}
-        for path in _sources(".js"):
-            if found := _script_dashes(path.read_text(encoding="utf-8")):
-                hits[str(path.relative_to(settings.BASE_DIR))] = found
+        for path in sources(".js"):
+            if found := _dashes(script_strings(path.read_text(encoding="utf-8")), joined=True):
+                hits[relative(path)] = found
         self.assertEqual(hits, {})
 
     def test_no_string_in_the_code_carries_a_dash(self):
@@ -381,9 +298,9 @@ class SourcesTest(TestCase):
         release history (aso/release_notes.py) is never rewritten; the pages
         that show it read it through the rule (ReleaseNotesTest)."""
         hits = {}
-        for path in _sources(".py"):
+        for path in sources(".py"):
             if path.name == "release_notes.py" and path.parent.name == "aso":
                 continue
-            if found := _python_dashes(path.read_text(encoding="utf-8")):
-                hits[str(path.relative_to(settings.BASE_DIR))] = found
+            if found := _dashes(python_strings(path.read_text(encoding="utf-8"))):
+                hits[relative(path)] = found
         self.assertEqual(hits, {})

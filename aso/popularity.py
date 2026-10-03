@@ -116,7 +116,7 @@ def absent_cap(country, genre=""):
             genre or None,
         )
         return max(1, floor - 1) if floor else None
-    except Exception as e:  # Cap plumbing must never break scoring.
+    except Exception as e:  # noqa: BLE001 (the cap must never break scoring)
         logger.debug("Fallback cap lookup failed: %s", e)
         return None
 
@@ -150,9 +150,8 @@ def resolve_popularity(competitors, keyword, country, apple_lookup=None):
     Returns:
         PopularityResolution.
     """
-    from .services import PopularityEstimator
-
     from .apple_ads.genres import infer_genre
+    from .services import PopularityEstimator
 
     internal = PopularityEstimator().estimate(competitors, keyword)
     apple = _apple_value(keyword, country, apple_lookup)
@@ -321,7 +320,7 @@ def apple_rank_context(rows, country) -> str:
             "Apple top-search-terms context (rank within the storefront's "
             "genre, week of " + active + "): " + "; ".join(lines)
         )
-    except Exception as e:  # Prompt enrichment must never break analyses.
+    except Exception as e:  # noqa: BLE001 (prompt enrichment must never break analyses)
         logger.debug("Apple rank context skipped: %s", e)
         return ""
 
@@ -455,14 +454,13 @@ def prefetch_apple_values(keywords, country) -> None:
         _materialize_apple_rows(
             [normalize_term(k) for k in keywords or []], country
         )
-    except Exception as e:  # Lookup problems must never affect scoring.
+    except Exception as e:  # noqa: BLE001 (lookup problems must never affect scoring)
         logger.debug("Apple prefetch skipped: %s", e)
 
 
 def _materialize_apple_rows(terms, country) -> None:
     """Ensure an AppleSearchPopularity row exists for every given term."""
-    from .apple_ads import storage as apple_storage
-    from .apple_ads import sync as apple_sync
+    from .apple_ads import storage as apple_storage, sync as apple_sync
     from .models import AppleSearchPopularity, AppleTopTerm
 
     country = (country or "").lower()
@@ -754,7 +752,7 @@ def maybe_upgrade_difficulty_version() -> None:
     try:
         stats = recalculate_stored_difficulty()
         logger.info("Difficulty upgraded to v%d: %s", DIFFICULTY_VERSION, stats)
-    except Exception as e:  # Never block app start; retried next boot.
+    except Exception as e:  # noqa: BLE001 (never block the app's start; retried at the next start)
         logger.error("Difficulty v%d recompute failed: %s", DIFFICULTY_VERSION, e)
         return
     apple_storage.save_apple_settings(
@@ -765,13 +763,36 @@ def maybe_upgrade_difficulty_version() -> None:
 def upgrade_stored_history() -> None:
     """Every one-time history upgrade, in the order they depend on each other.
 
-    Popularity first (it feeds everything), then difficulty, then the
-    labels, which read both. They used to run in two threads at once, which
+    Popularity first (it feeds everything), then difficulty, then the days
+    (one read per keyword and day, the reader's day, and twin rows of the
+    same keyword in one storefront sharing their day's newest read), then the
+    labels, which read all of it. They used to run in two threads at once, which
     could label a row from a difficulty that was about to change.
     """
     maybe_upgrade_estimator_version()
     maybe_upgrade_difficulty_version()
+    tidy_history_days()
     maybe_upgrade_classification_version()
+
+
+def tidy_history_days() -> None:
+    """One read per keyword, storefront and day, the reader's own day
+    (keyword_scoring.keep_last_read_per_day), and twin rows of the same day
+    sharing its newest read (keyword_scoring.align_twin_history). Every
+    start and when the reader's time zone changes: it changes nothing once
+    the days are tidy, and it mends rows an older version of the app wrote.
+    Never blocks startup."""
+    from .keyword_scoring import align_twin_history, keep_last_read_per_day
+
+    try:
+        removed = keep_last_read_per_day()
+        changed = align_twin_history()
+    except Exception as e:  # noqa: BLE001 (retried at the next start)
+        logger.error("Tidying the history's days failed: %s", e)
+        return
+    if removed or changed:
+        logger.info("History days tidied: %d earlier reads of a day removed, %d twin rows aligned.",
+                    removed, changed)
 
 
 def start_history_upgrade() -> None:
@@ -874,7 +895,7 @@ def maybe_upgrade_classification_version() -> None:
             "Classification rule v%d applied: %s rows relabelled",
             CLASSIFICATION_VERSION, updated,
         )
-    except Exception as e:  # Never block app start; retried next boot.
+    except Exception as e:  # noqa: BLE001 (never block the app's start; retried at the next start)
         logger.error(
             "Classification v%d recompute failed: %s", CLASSIFICATION_VERSION, e,
         )
@@ -899,7 +920,7 @@ def maybe_upgrade_estimator_version() -> None:
     try:
         stats = recalculate_stored_popularity()
         logger.info("Estimator upgraded to v%d: %s", ESTIMATOR_VERSION, stats)
-    except Exception as e:  # Never block app start; retried next boot.
+    except Exception as e:  # noqa: BLE001 (never block the app's start; retried at the next start)
         logger.error("Estimator v%d recompute failed: %s", ESTIMATOR_VERSION, e)
         return
     apple_storage.save_apple_settings(

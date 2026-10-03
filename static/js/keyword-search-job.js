@@ -14,8 +14,11 @@
  * Dashboard:  SearchJob.init({currentUrl, resultsUrl, pauseUrl, resumeUrl,
  *                 discardUrl, retryFailedUrl, dismissUrl, queueRunNowUrl,
  *                 queueMoveUrl, csrfToken, isPro, isNative, bootstrap,
- *                 renderResults, onProgress, onFinished})
+ *                 renderResults, onFinished})
  *             URL templates carry a 0 where the job id goes.
+ *             Search History follows the search by itself: the Dashboard
+ *             fetches its sections whenever the server's change count moves
+ *             (aso/history_revision.py).
  * The global bottom strip lives in job-strip.js: it shows either job type.
  */
 (function () {
@@ -23,17 +26,11 @@
 
     var POLL_MS = 3000;            // while a search runs or waits
     var PAUSED_POLL_MS = 15000;    // while it is paused (another window may resume it)
-    var HISTORY_REFRESH_MS = 15000;
-    var QUEUED_NOTE_MS = 8000;
 
     var cfg = null;
     var timer = null;
     var state = {job: null, finished: null, others: []};
     var renderedFinishedId = null;
-    var lastDoneCount = null;
-    var historyDirty = false;
-    var lastHistoryRefresh = 0;
-    var noteTimer = null;
     var counterEls = null;
 
     // --- helpers ------------------------------------------------------------
@@ -54,17 +51,16 @@
         return fmt(n) + ' ' + word + (Number(n) === 1 ? '' : 's');
     }
 
+    // A wait in words, from the one copy every page loads first
+    // (static/js/country-picker.js), so the Dashboard and the Opportunity
+    // page word a wait the same way.
     function durationText(seconds) {
-        var minutes = Math.round(seconds / 60);
-        if (minutes < 1) return 'less than a minute';
-        if (minutes < 60) return 'about ' + minutes + ' min';
-        var hours = Math.floor(minutes / 60);
-        minutes = minutes % 60;
-        return 'about ' + hours + ' h' + (minutes ? ' ' + minutes + ' min' : '');
+        return window.CountryPicker.durationText(seconds);
     }
 
     function etaText(seconds) {
-        return durationText(seconds) + ' left';
+        var text = durationText(seconds);
+        return text ? text + ' left' : '';
     }
 
     function byId(id) {
@@ -156,35 +152,30 @@
         var count = countKeywords(counterEls.field.value);
         var limit = cfg.limit;
         var over = count > limit;
+        // The free edition's one Pro line (UI_REDESIGN_PLAN.md 11.4).
+        // The Pro button looks the same everywhere (btn-pro, aso/tests/test_pro_button_style.py).
+        var pro = ' <a href="' + esc(cfg.upgradeUrl) + '" target="_blank" rel="noopener"' +
+                  ' class="btn-pro ml-2 px-3 py-1 text-xs">' + esc(cfg.upgradeLabel || 'Get Pro') + '</a>';
         var html;
-        if (count === 0) {
-            html = cfg.isPro
-                ? esc('Up to ' + fmt(limit) + ' keywords per search')
-                : esc('Up to ' + limit + ' keywords per search') +
-                  ' <span class="text-slate-600">·</span> <a href="' + esc(cfg.upgradeUrl) + '"' +
-                  (cfg.upgradeNewTab ? ' target="_blank" rel="noopener"' : '') +
-                  ' class="text-purple-300 hover:text-purple-200">Pro runs up to 1,000 per search</a>';
-        } else if (cfg.isPro) {
-            html = over
-                ? esc(plural(count, 'keyword') + ' - a search holds up to ' + fmt(limit) + '. Start a second search for the rest.')
-                : esc(plural(count, 'keyword')) + ' <span class="text-slate-600">· up to ' + fmt(limit) + ' per search</span>';
+        if (cfg.isPro) {
+            if (count === 0) html = '';
+            else html = over
+                ? esc(plural(count, 'keyword') + ': a search holds up to ' + fmt(limit) + '. Start a second search for the rest.')
+                : esc(plural(count, 'keyword'));
+        } else if (over) {
+            html = esc(plural(count, 'keyword') + ': the free version checks ' + limit + ' at a time.') + pro;
         } else {
-            html = over
-                ? esc(plural(count, 'keyword') + ' - the free version runs up to ' + limit + ' per search.')
-                : esc(count + ' of ' + limit + ' keywords') +
-                  ' <span class="text-slate-600">·</span> <a href="' + esc(cfg.upgradeUrl) + '"' +
-                  (cfg.upgradeNewTab ? ' target="_blank" rel="noopener"' : '') +
-                  ' class="text-purple-300 hover:text-purple-200">Pro runs up to 1,000 per search</a>';
+            html = esc((count ? count + ' of ' + limit + ' keywords. ' : limit + ' keywords at a time. ') +
+                       'Pro checks up to 1,000.') + pro;
         }
         counterEls.counter.innerHTML = html;
         counterEls.counter.classList.toggle('text-red-300', over);
-        counterEls.counter.classList.toggle('text-slate-500', !over);
+        counterEls.counter.classList.toggle('text-slate-300', !over);
         if (counterEls.button) {
             counterEls.button.disabled = over;
             counterEls.button.classList.toggle('opacity-50', over);
             counterEls.button.classList.toggle('cursor-not-allowed', over);
         }
-        if (!cfg.isPro) toggle('keyword-limit-nudge', over);
         return over;
     }
 
@@ -220,35 +211,32 @@
         if (!box) return;
         box.textContent = (data && data.error) || 'Search failed';
         box.classList.remove('hidden');
-        if (data && data.upgrade_url) toggle('keyword-limit-nudge', true);
     }
 
     function hideError() {
         toggle('search-error', false);
-        if (!overLimit()) toggle('keyword-limit-nudge', false);
     }
 
-    function showQueuedNote(data) {
-        var note = byId('search-queued-note');
-        if (!note || !data.queued_behind) return;
+    // The note that flies into the Activity pill (activity-indicator.js):
+    // what was started, and when it starts.
+    function announceStart(data) {
+        if (!window.ActivityIndicator || !ActivityIndicator.announce || !data || !data.job) return;
         var job = data.job;
-        var text = 'Added to the queue' + (job.queue_position ? ' at position ' + job.queue_position : '') +
-            '. It starts after ' + data.queued_behind + ' finishes' +
-            (data.eta_seconds !== null && data.eta_seconds !== undefined ? ' (' + durationText(data.eta_seconds) + ')' : '') +
-            (job.can_run_now ? ', or press Run now below.' : '.');
-        note.textContent = text;
-        note.classList.remove('hidden');
-        clearTimeout(noteTimer);
-        noteTimer = setTimeout(function () { note.classList.add('hidden'); }, QUEUED_NOTE_MS);
+        ActivityIndicator.announce({
+            queued: !!data.queued_behind,
+            label: plural(job.total_keywords, 'keyword') + ' in ' + (job.countries_text || ''),
+            current: data.queued_behind || '',
+            eta: data.eta_seconds || null
+        });
     }
 
     // --- the status panel ---------------------------------------------------
 
     function button(action, label, style, extra) {
         var cls = {
-            primary: 'bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors',
-            secondary: 'bg-slate-700/50 hover:bg-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg transition-colors',
-            quiet: 'text-xs text-red-400 hover:text-red-300 px-2 py-2 transition-colors'
+            primary: 'btn-primary px-3 py-1.5',
+            secondary: 'btn-quiet',
+            quiet: 'link-danger text-sm px-2 py-1'
         }[style];
         return '<button type="button" data-action="' + action + '" class="' + cls + '"' + (extra || '') + '>' + esc(label) + '</button>';
     }
@@ -257,39 +245,36 @@
         var at = 'Paused at ' + fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords';
         switch (job.status) {
             case 'queued':
-                return 'Keyword search queued';
+                return 'Waiting to start';
             case 'running':
-                return 'Researching ' + plural(job.total_keywords, 'keyword') + ' in ' + job.countries_text;
+                return 'Checking ' + plural(job.total_keywords, 'keyword') + ' in ' + job.countries_text;
             default:
-                return (job.status === 'failed' || job.error_message) ? at + ' after an error' : at;
+                return at;
         }
     }
 
     function lineFor(job) {
         if (job.status === 'queued') {
-            return job.waiting_for
-                ? 'Waiting for ' + job.waiting_for + ' to finish. Your search starts automatically.'
-                : 'Starting now...';
+            return job.waiting_for ? 'Starts after ' + job.waiting_for + '.' : 'Starts next.';
         }
         if (job.status === 'running') {
-            if (job.eta_seconds !== null && job.eta_seconds !== undefined) {
-                return fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords done · ' + etaText(job.eta_seconds);
+            if (job.keywords_done > 0 && etaText(job.eta_seconds)) {
+                return fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' · ' + etaText(job.eta_seconds);
             }
             return job.keywords_done > 0
-                ? fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords done'
-                : 'Starting...';
+                ? fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords)
+                : 'Starting…';
         }
         if (job.auto_resume) {
-            return 'Letting ' + (job.yielded_for ? '"' + job.yielded_for + '"' : 'another run') + ' go first. This search resumes by itself right after.';
+            return (job.yielded_for ? '"' + job.yielded_for + '"' : 'Another run') + ' goes first. This search carries on right after.';
         }
         if (job.status === 'failed' || job.error_message) {
-            return job.error_message || 'Something went wrong. Press Resume to continue from where it stopped.';
+            return job.error_message || 'Something went wrong. Press Resume to carry on.';
         }
         if (job.throttle_state === 'paused') {
             return job.progress_message;
         }
-        return 'Resume when you are ready. Everything researched so far is already in your Search History, ' +
-            'and this search stays here until you resume or discard it. Quitting the app is fine.';
+        return 'Everything checked so far is in your table.';
     }
 
     function actionsFor(job) {
@@ -306,13 +291,6 @@
             html += button('discard', 'Discard the rest', 'quiet');
         }
         return html;
-    }
-
-    function tickerText(pair) {
-        if (!pair) return '';
-        var at = pair.lastIndexOf(' (');
-        if (at === -1) return 'Checking "' + pair + '"';
-        return 'Checking "' + pair.slice(0, at) + '"' + pair.slice(at);
     }
 
     function renderPanel(job) {
@@ -336,12 +314,14 @@
         byId('sjp-actions').innerHTML = actionsFor(job);
 
         toggle('sjp-progress', running);
+        if (!running) { toggle('sjp-percent', false); toggle('sjp-throttle', false); toggle('sjp-line', true); }
         if (running) {
-            setText('sjp-ticker', tickerText(job.current_pair));
             setText('sjp-percent', (job.progress_percent || 0) + '%');
+            toggle('sjp-percent', true);
             byId('sjp-fill').style.width = (job.progress_percent || 0) + '%';
             var throttled = job.throttle_state && job.throttle_state !== 'normal';
             toggle('sjp-throttle', throttled);
+            toggle('sjp-line', !throttled);
             setText('sjp-throttle', throttled ? job.progress_message : '');
         }
 
@@ -350,14 +330,6 @@
         toggle('sjp-picked-up', !!pickedUp);
         setText('sjp-picked-up', pickedUp);
 
-        var note = '';
-        if (running) {
-            note = cfg.isNative
-                ? 'Feel free to use other tabs. The search runs while RespectASO is open; if you quit, it continues where it left off next time you open the app.'
-                : 'Feel free to use other tabs. The search keeps running in the background.';
-        }
-        toggle('sjp-note', !!note);
-        setText('sjp-note', note);
     }
 
     function renderOthers(others) {
@@ -376,7 +348,7 @@
                 '<span class="text-sm text-slate-300 flex-1 min-w-0 truncate">' + esc(text) + '</span>' +
                 '<div class="flex items-center gap-2 shrink-0">' +
                     '<button type="button" data-action="resume" class="text-xs px-2.5 py-1 rounded-full border border-purple-500/30 text-purple-300 hover:bg-purple-600/20 transition-colors">Resume</button>' +
-                    '<button type="button" data-action="discard" class="text-xs text-red-400 hover:text-red-300 px-1 py-1 transition-colors">Discard the rest</button>' +
+                    '<button type="button" data-action="discard" class="link-danger text-xs px-1 py-1">Discard the rest</button>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -411,9 +383,8 @@
     function confirmDiscard(job) {
         var remaining = job.remaining_count;
         var done = job.keywords_done;
-        var message = 'Discard the ' + plural(remaining, 'keyword') + ' that were not searched yet? ' +
-            'The ' + fmt(done) + ' already researched stay in your Search History. ' +
-            'If you want to keep the list, copy the remaining keywords from the panel first.';
+        var message = 'Discard the ' + plural(remaining, 'keyword') + ' not searched yet? ' +
+            'The ' + fmt(done) + ' already checked stay in your tracked keywords.';
         return window.showConfirm(message, {
             title: 'Discard the rest',
             confirmLabel: 'Discard',
@@ -534,7 +505,6 @@
     // --- polling ------------------------------------------------------------
 
     function apply(data) {
-        var previous = state.job;
         state = {job: data.job || null, finished: data.finished || null, others: data.others || []};
         renderPanel(state.job);
         renderOthers(state.others);
@@ -547,21 +517,6 @@
         } else if (renderedFinishedId !== null) {
             renderedFinishedId = null;
             clearResults();
-        }
-
-        // Search History streams the results in: at most every 15 s while the
-        // done count changed, and once when the search ends.
-        if (state.job) {
-            if (lastDoneCount !== null && state.job.done_count !== lastDoneCount) historyDirty = true;
-            lastDoneCount = state.job.done_count;
-        } else {
-            if (previous) historyDirty = true;
-            lastDoneCount = null;
-        }
-        if (historyDirty && (!state.job || Date.now() - lastHistoryRefresh > HISTORY_REFRESH_MS)) {
-            historyDirty = false;
-            lastHistoryRefresh = Date.now();
-            if (cfg.onProgress) cfg.onProgress();
         }
         schedule();
     }
@@ -583,7 +538,7 @@
 
     function started(data) {
         // The answer to a submit: show the new job at once, then keep polling.
-        showQueuedNote(data);
+        announceStart(data);
         apply({job: data.job, finished: state.finished, others: state.others});
         refresh();
     }

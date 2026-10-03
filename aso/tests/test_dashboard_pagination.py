@@ -9,7 +9,7 @@ lookups.
 
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -78,7 +78,9 @@ class DashboardPaginationTest(TestCase):
         create_results(30)
         resp = self.get_dashboard(sort="opportunity", per_page="50")
         self.assertEqual(len(resp.context["history_results"]), 30)
-        resp = self.get_dashboard(sort="opportunity")
+        # Another visitor: this one would be sent back to the page size it
+        # chose, which the Dashboard remembers (aso/ui_memory.py).
+        resp = Client().get(reverse("aso:dashboard"), {"sort": "opportunity"})
         self.assertEqual(len(resp.context["history_results"]), 25)
 
     def test_trend_annotations_survive_batched_lookup(self):

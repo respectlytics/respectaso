@@ -65,24 +65,20 @@
     }
 
     /**
-     * The ASO Targeting card, from a payload's `targeting` object:
-     * {icon, label, css, description, basis}. Returns '' when a response
-     * carries no targeting, so an older cached row degrades quietly.
-     * `withBasis: false` leaves out the score's explanation, for a card that
-     * already prints it under the score.
+     * The ASO Targeting card, from a payload's `targeting` object: the tag
+     * and the row's one reason. Returns '' when a response carries no
+     * targeting, so an older cached row degrades quietly. What the score
+     * means for the app is never printed on a card: it is the hover of the
+     * Opportunity cell, and a card that also printed it said the same
+     * numbers twice (owner, 2026-10-01: help text is short).
      */
-    function render(targeting, options) {
+    function render(targeting) {
         if (!targeting || !targeting.label) return '';
-        const withBasis = !options || options.withBasis !== false;
-        const basis = withBasis && targeting.basis
-            ? `<p class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">${esc(targeting.basis)}</p>`
-            : '';
         return `
             <div class="${esc(targeting.css)} border rounded-lg p-2.5">
-                <p class="text-[10px] uppercase tracking-wide text-slate-500 mb-1">ASO Targeting</p>
+                <p class="text-2xs uppercase tracking-wide text-slate-400 mb-1">ASO Targeting</p>
                 <p class="text-xs font-medium">${esc(targeting.icon)} ${esc(targeting.label)}</p>
-                <p class="text-[11px] text-slate-400 mt-0.5 leading-relaxed">${esc(targeting.description)}</p>
-                ${basis}
+                <p class="text-2xs text-slate-400 mt-0.5 leading-relaxed">${esc(targeting.description)}</p>
             </div>`;
     }
 
@@ -105,7 +101,7 @@
     function chipHtml(label, tip) {
         var item = get(label);
         if (!item) return '';
-        return '<span class="' + esc(item.css) + ' border rounded px-1.5 py-0.5 text-[11px] whitespace-nowrap '
+        return '<span class="' + esc(item.css) + ' border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap '
             + 'inline-flex items-center gap-0.5 cursor-help" data-tip="' + esc(tip || item.description) + '">'
             + esc(item.icon) + ' ' + esc(item.label) + '</span>';
     }

@@ -78,7 +78,7 @@ def _fetch_latest_release():
             "download_url": download_url,
             "is_native": is_native,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 (a failed update check says so and never breaks a page)
         logger.warning("Update check failed: %s: %s", type(e).__name__, e)
         return {
             "update_available": False,

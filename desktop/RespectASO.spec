@@ -47,7 +47,9 @@ shared_datas = [
 # here and quietly returns nothing, so the walk is ours.) Tests stay out;
 # migrations ship as source files through shared_datas. After analysis the
 # build stops if any of these modules did not make it into the bundle.
-FIRST_PARTY = ["core", "aso", "aso_pro", "licensing", "llm_providers"]
+# desktop is ours too, but only the Mac app's window process uses it: it
+# goes into the GUI analysis alone (GUI_ONLY_MODULES), never the MCP binary.
+FIRST_PARTY = ["core", "aso", "aso_pro", "licensing", "llm_providers", "desktop"]
 
 
 def _is_shipped(name):
@@ -75,14 +77,33 @@ def _own_modules(package):
     return modules
 
 
-OWN_MODULES = [module for package in FIRST_PARTY for module in _own_modules(package)]
+OWN_MODULES = [
+    module for package in FIRST_PARTY if package != "desktop" for module in _own_modules(package)
+]
+
+
+def _require_modules(analysis, names, what):
+    bundled = {name for name, *_ in analysis.pure}
+    missing = sorted(set(names) - bundled)
+    if missing:
+        raise SystemExit(f"{what} missing from the bundle: " + ", ".join(missing))
 
 
 def _require_own_modules(analysis):
-    bundled = {name for name, *_ in analysis.pure}
-    missing = sorted(set(OWN_MODULES) - bundled)
-    if missing:
-        raise SystemExit("Modules of ours missing from the bundle: " + ", ".join(missing))
+    _require_modules(analysis, OWN_MODULES, "Modules of ours")
+
+
+# The Mac app's native side and the macOS frameworks it imports lazily
+# (desktop/mac_integration.py): the menu bar, the login item, notifications.
+# GUI only: the MCP binary never shows a window. desktop/main.py imports
+# mac_integration inside main(), so it is listed here and checked after
+# analysis like our own modules.
+GUI_ONLY_MODULES = [
+    "desktop",
+    "desktop.mac_integration",
+    "ServiceManagement",
+    "UserNotifications",
+]
 
 
 shared_hiddenimports = [
@@ -121,7 +142,7 @@ a = Analysis(
     pathex=[str(BASE_DIR)],
     binaries=[],
     datas=shared_datas,
-    hiddenimports=shared_hiddenimports,
+    hiddenimports=shared_hiddenimports + GUI_ONLY_MODULES,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -133,6 +154,7 @@ a = Analysis(
 )
 
 _require_own_modules(a)
+_require_modules(a, GUI_ONLY_MODULES, "Mac app modules")
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

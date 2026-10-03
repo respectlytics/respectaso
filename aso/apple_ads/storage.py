@@ -176,6 +176,25 @@ def save_apple_settings(*, popularity_source=None, apple_ads=None) -> None:
         _cache["data"] = None
 
 
+def load_block(name: str) -> dict:
+    """One small top-level block of the shared settings file that is not
+    Apple Ads', such as the "ui" choices a person makes for good
+    (aso.ui_memory); {} when it is not there."""
+    with _lock:
+        block = _read_raw().get(name)
+    return dict(block) if isinstance(block, dict) else {}
+
+
+def save_block(name: str, values: dict) -> None:
+    """Merge ``values`` into the block ``name``, keeping every other key of
+    the file as it is (the same merge-write as save_apple_settings)."""
+    with _lock:
+        raw = _read_raw()
+        block = raw.get(name) if isinstance(raw.get(name), dict) else {}
+        raw[name] = {**block, **values}
+        _write_raw(raw)
+
+
 def reset_cache() -> None:
     """Drop the mtime cache - used by tests that swap DATA_DIR."""
     with _lock:

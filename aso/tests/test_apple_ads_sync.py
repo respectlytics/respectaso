@@ -4,7 +4,6 @@ aso.apple_ads.impressions)."""
 import datetime as dt
 from unittest import mock
 
-from django.test import override_settings
 from django.utils import timezone
 
 from aso.apple_ads import api, impressions, storage, sync
@@ -124,11 +123,10 @@ class WeeklyIngestTest(SyncTestBase):
             api, "query_search_term_popularity", return_value=(rows, -1)
         ), mock.patch.object(
             storage, "get_popularity_source", return_value="apple"
+        ), mock.patch(
+            "aso.popularity.get_popularity_source", return_value="apple"
         ):
-            with mock.patch(
-                "aso.popularity.get_popularity_source", return_value="apple"
-            ):
-                sync._run_sync()
+            sync._run_sync()
         result.refresh_from_db()
         self.assertEqual(result.apple_popularity_score, 95)
         self.assertIsInstance(before, str)  # sanity
@@ -268,7 +266,7 @@ class FailureModesTest(SyncTestBase):
             sync._run_sync()
         block = storage.load_apple_settings()["apple_ads"]
         self.assertEqual(block["last_sync_status"], "partial")
-        self.assertIn("ceiling", block["last_sync_error"])
+        self.assertIn("still to come", block["last_sync_error"])
 
     def test_daily_ceiling_partial(self):
         now = timezone.now().isoformat()
@@ -370,9 +368,8 @@ class BackfillTest(SyncTestBase):
         })
         sync._persist_rows(sync._clean_rows(_sane_week_rows(), "us", WEEK))
         # First run with a tiny budget parks mid-way.
-        with mock.patch.object(sync, "MAX_REQUESTS_PER_RUN", 5):
-            with self.assertRaises(sync._CeilingReached):
-                self._run_with_pages(run_state={"requests": 0, "pacing": 0})
+        with mock.patch.object(sync, "MAX_REQUESTS_PER_RUN", 5), self.assertRaises(sync._CeilingReached):
+            self._run_with_pages(run_state={"requests": 0, "pacing": 0})
         cursor_after = storage.load_apple_settings()["apple_ads"][
             "backfill"]["us"]["cursor"]
         self.assertFalse(

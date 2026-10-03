@@ -27,7 +27,8 @@
  * - A newer load cancels an older one, so fast typing never lands an old
  *   answer on top of a newer one. A background refresh ({background: true},
  *   e.g. a finished search) never cancels what the reader just asked for:
- *   it steps aside, since that answer brings fresh data anyway.
+ *   it steps aside, since that answer brings fresh data anyway. It is sent
+ *   with the header X-In-Place: background.
  * - `reveal` names an element to bring into view when it has scrolled
  *   above the screen, for "next page": the new page starts at its first row,
  *   not at the bottom of the old one, and never at the top of the page.
@@ -105,10 +106,14 @@
         var anchorTop = anchor ? anchor.getBoundingClientRect().top : null;
 
         var method = options.method || 'GET';
+        // A background refresh says so: the Dashboard remembers the view a
+        // reader chose (aso/ui_memory.py), never one the page asked for.
+        var headers = { 'X-Requested-With': 'XMLHttpRequest' };
+        if (options.background) headers['X-In-Place'] = 'background';
         return fetch(url, {
             method: method,
             body: options.body || undefined,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            headers: headers,
             signal: controller.signal,
         }).then(function (resp) {
             if (!resp.ok) throw new Error('HTTP ' + resp.status);

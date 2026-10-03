@@ -4,5 +4,5 @@ check (aso/error_views.csrf_failure).{% endcomment %}
 {% block title %}Request not confirmed · RespectASO{% endblock %}
 {% block extra_head %}<meta name="robots" content="noindex">{% endblock %}
 {% block content %}
-{% include "aso/partials/error_card.html" with code="Error 403" heading="This request couldn't be confirmed" message="RespectASO checks that every change comes from one of its own pages, and this one didn't pass the check. Go back, reload the page and try again." %}
+{% include "aso/partials/error_card.html" with code="Error 403" heading="This request couldn't be confirmed" message="Go back, reload the page and try again." %}
 {% endblock %}

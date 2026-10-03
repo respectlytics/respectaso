@@ -25,11 +25,17 @@ own:
   * the hanging hyphen of a compound ("pre- and post-war");
   * the missing-value glyph alone in a table cell ("| — |") or named in
     quotes ('a rank of "—"').
+
+The owner's second copy rule (2026-10-01), that screens show what a person
+needs and never how the tool works inside, has its predicate at the end of
+this module: ``mechanics_in``.
 """
 
 from __future__ import annotations
 
 import re
+
+from .words import has_word
 
 _DASH_CHARS = "-‐‑‒–—―−﹘﹣－"
 # Tight between two characters, these are a compound, a range or a quoted
@@ -121,12 +127,6 @@ def _dash_sub(m: re.Match) -> str:
     return ", "
 
 
-# A line with no letter or digit in it is structure, not prose: a Markdown
-# rule or table separator, an ASCII box. It never carries a dash a reader
-# would read as punctuation, so the whole line is left alone.
-_HAS_WORD = re.compile(r"[^\W_]", re.UNICODE)
-
-
 def no_dash_punctuation(text: str) -> str:
     """``text`` with every dash that stands between words or clauses replaced.
     Word hyphens, number ranges, minus signs, list markers, hanging hyphens
@@ -134,7 +134,10 @@ def no_dash_punctuation(text: str) -> str:
     that never had one."""
     lines, changed = [], 0
     for line in (text or "").split("\n"):
-        if not _HAS_WORD.search(line):
+        # A line with no letter or digit in it is structure, not prose: a
+        # Markdown rule or table separator, an ASCII box. It never carries a
+        # dash a reader would read as punctuation, so it is left alone.
+        if not has_word(line):
             lines.append(line)
             continue
         out, n = _DASH_RUN.subn(_dash_sub, line)
@@ -153,7 +156,7 @@ def dash_punctuation_in(text: str) -> str:
     either side, '' when there is none. One predicate with
     ``no_dash_punctuation`` (the same ``_dash_role``)."""
     for line in (text or "").split("\n"):
-        if not _HAS_WORD.search(line):
+        if not has_word(line):
             continue
         for m in _DASH_RUN.finditer(line):
             if _dash_role(m) == "punct":
@@ -213,7 +216,7 @@ def no_dash_punctuation_keeping(text: str, keep: re.Pattern) -> str:
 
 # A bold or code label closed right before the dash: "<strong>Label</strong> — text".
 _MARKUP_LABEL = re.compile(r"(</(?:strong|b|em|code)>)[ \t]+[—–-][ \t]+")
-_MARKUP_HELD = re.compile(r"<code\b[^>]*>.*?</code>|<[^>]+>", re.S)
+_MARKUP_HELD = re.compile(r"<code\b[^>]*>.*?</code>|<[^>]+>", re.DOTALL)
 
 
 def no_dash_in_markup(text: str) -> str:
@@ -221,3 +224,54 @@ def no_dash_in_markup(text: str) -> str:
     release notes): a dash after a closing bold or code tag is a label's
     colon, and tags and ``<code>`` are left exactly as they are."""
     return no_dash_punctuation_keeping(_MARKUP_LABEL.sub(r"\1: ", text or ""), _MARKUP_HELD)
+
+
+# ---- the second rule: screens show value, not mechanics ---------------------
+#
+# The owner's rule (2026-10-01), for the app and respectaso.com alike: a
+# person reads what a number means for their app, what to do next, how long
+# they will wait and what went wrong, never how the tool works inside. These
+# are the ways RespectASO has told people about its own plumbing: how often a
+# keyword is read, that a read is reused or costs no App Store search, counts
+# of AI requests, searches or calls, caching, pacing, throttling,
+# deduplication, storage. ``mechanics_in`` finds the first one in a text; the
+# guards (aso/tests/test_value_not_mechanics.py, and core/test_value_not_mechanics.py
+# on respectaso.com, which keeps a copy of this list) read every surface
+# through it. A demand rate ("about 110 searches a day") is about the people
+# searching, not about the tool, and passes. The same list as
+# respectaso.com's core/copy_rules.py; change both together.
+MECHANICS = tuple(re.compile(p, re.IGNORECASE) for p in (
+    r"\bcosts? no (?:App Store )?search",
+    r"\bAI requests?\b",
+    r"\brequests? to (?:your|the) AI provider\b",
+    r"\bApp Store searches\b",
+    r"\balready read\b",
+    r"\bread (?:from (?:Apple|the App Store) )?once\b",
+    r"\bre-?reads?\b|\breads? (?:\w+ ){0,2}again\b",
+    r"\breus(?:e|ed|es|ing)\b",
+    r"\b(?:API|LLM|AI) calls?\b",
+    r"\bcach(?:e|ed|es|ing)\b",
+    r"\bpacing\b|\bpaces? (?:the )?requests\b",
+    r"\bthrottl\w*",
+    r"\bdedup\w*",
+    r"\b(?:from|in|by) (?:the same|one|a single) App Store search\b|\bfrom (?:the same|one) search\b",
+    r"\bone search of\b|\b(?:single|double) (?:App Store )?search(?:es)?\b",
+    (r"\b\d[\d,]*\s+(?:to\s+\d[\d,]*\s+)?(?:AI\s+|App Store\s+|iTunes\s+|API\s+)?(?:requests|searches|calls|lookups)\b"
+     r"(?!\s+(?:a|an|per|each|every)\s+(?:day|week|month|year))"),
+    r"\bApp Store API\b",
+    r"\bs/keyword\b|\bseconds? per (?:keyword|country|call|request)\b|\bper (?:API )?call\b",
+    r"\blocal ?storage\b|\bsession ?storage\b|\bIndexedDB\b",
+    r"\brequest (?:budget|ceiling)\b|\bquota\b",
+    r"\bcollect(?:s|ed)? (?:\w+ ){0,4}(?:daily|every day)\b|\bchecked in the App Store\b",
+))
+
+
+def mechanics_in(text: str) -> str:
+    """The first account of the tool's own internals in ``text`` (the words
+    that matched), or an empty string when the text tells a person only
+    what they need."""
+    flat = re.sub(r"\s+", " ", text or "")
+    for pattern in MECHANICS:
+        if found := pattern.search(flat):
+            return found.group()
+    return ""

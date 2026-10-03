@@ -13,10 +13,10 @@ from aso.services import (
 )
 from aso.throttle import (
     ABORT_AFTER_FAILURES,
-    AdaptiveITunesRateLimiter,
     BASE_DELAY,
     MAX_DELAY,
     PAUSED_AFTER_FAILURES,
+    AdaptiveITunesRateLimiter,
     classify_throttle_state,
 )
 

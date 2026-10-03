@@ -21,7 +21,7 @@ from aso import run_queue, search_jobs
 from aso.keyword_scoring import result_payload
 from aso.models import App, Keyword, KeywordSearchJob, SearchResult
 from aso.services import ITunesRateLimited, SearchAPIUnavailableError
-from aso.tests.helpers import _SyncThread
+from aso.tests.helpers import _SyncThread, ranked_search
 
 
 def fake_competitors(n=10):
@@ -55,11 +55,10 @@ class JobTestBase(TestCase):
         itunes_patch = mock.patch("aso.search_jobs.ITunesSearchService")
         self.itunes = itunes_patch.start().return_value
         self.addCleanup(itunes_patch.stop)
-        self.itunes.search_apps.return_value = fake_competitors()
-        self.itunes.find_app_rank.return_value = None
+        self.itunes.search_ranked.return_value = ranked_search(fake_competitors())
 
     def job(self, keywords=("alpha", "beta"), countries=("us",), **fields):
-        defaults = dict(keywords=list(keywords), countries=list(countries), status="queued")
+        defaults = {"keywords": list(keywords), "countries": list(countries), "status": "queued"}
         defaults.update(fields)
         return KeywordSearchJob.objects.create(**defaults)
 
@@ -71,7 +70,7 @@ class JobTestBase(TestCase):
                                 {"keywords": keywords, "countries": countries, **extra})
 
     def searched_pairs(self):
-        return [(call.args[0], call.kwargs["country"]) for call in self.itunes.search_apps.call_args_list]
+        return [(call.args[0], call.kwargs["country"]) for call in self.itunes.search_ranked.call_args_list]
 
 
 class ParseAndLimitTest(JobTestBase):
@@ -91,7 +90,7 @@ class ParseAndLimitTest(JobTestBase):
         with free_tier():
             context = search_jobs.limit_context()
         self.assertEqual(context["limit"], 3)
-        self.assertIn(context["upgrade_label"], ("Activate Pro", "Get Pro"))
+        self.assertIn(context["upgrade_label"], ("Get Pro", "Get Pro for Mac"))
         self.assertTrue(context["upgrade_url"])
 
 
@@ -203,8 +202,8 @@ class WorkerTest(JobTestBase):
                          "Skipped 1 keyword already in your list today: a (US). Use Refresh to update them.")
 
     def test_one_failing_pair_never_ends_the_search(self):
-        self.itunes.search_apps.side_effect = [
-            fake_competitors(), SearchAPIUnavailableError("down"), fake_competitors(),
+        self.itunes.search_ranked.side_effect = [
+            ranked_search(fake_competitors()), SearchAPIUnavailableError("down"), ranked_search(fake_competitors()),
         ]
         job = self.job(keywords=["a", "b", "c"], countries=["us"])
         with self.run_inline():
@@ -225,7 +224,8 @@ class WorkerTest(JobTestBase):
             seen.append((row.next_index, row.current_pair))
             return fake_competitors()
 
-        self.itunes.search_apps.side_effect = search
+        self.itunes.search_ranked.side_effect = (
+            lambda term, country="us": ranked_search(search(term, country=country, limit=25)))
         self.job(keywords=["a", "b"], countries=["us"])
         with self.run_inline():
             run_queue.kick()
@@ -240,7 +240,8 @@ class WorkerTest(JobTestBase):
                 App.objects.filter(pk=app.pk).delete()
             return fake_competitors()
 
-        self.itunes.search_apps.side_effect = search
+        self.itunes.search_ranked.side_effect = (
+            lambda term, country="us": ranked_search(search(term, country=country, limit=25)))
         with self.run_inline():
             run_queue.kick()
         job.refresh_from_db()
@@ -251,10 +252,11 @@ class WorkerTest(JobTestBase):
 class PauseResumeDiscardTest(JobTestBase):
     def _pause_after(self, job, calls):
         def search(keyword, country, limit):
-            if self.itunes.search_apps.call_count == calls:
+            if self.itunes.search_ranked.call_count == calls:
                 KeywordSearchJob.objects.filter(pk=job.pk).update(status="paused")
             return fake_competitors()
-        self.itunes.search_apps.side_effect = search
+        self.itunes.search_ranked.side_effect = (
+            lambda term, country="us": ranked_search(search(term, country=country, limit=25)))
 
     def test_pause_stops_at_the_next_keyword_boundary_and_resume_continues_there(self):
         job = self.job(keywords=["a", "b", "c", "d"], countries=["us"])
@@ -267,7 +269,7 @@ class PauseResumeDiscardTest(JobTestBase):
         self.assertEqual(job.done_count, 2)
         self.assertEqual(search_jobs.job_payload(job, include_results=True)["remaining_keywords"], ["c", "d"])
 
-        self.itunes.search_apps.side_effect = None
+        self.itunes.search_ranked.side_effect = None
         with self.run_inline():
             resp = self.client.post(reverse("aso:search_job_resume", args=[job.pk]))
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -284,7 +286,8 @@ class PauseResumeDiscardTest(JobTestBase):
                 self.client.post(reverse("aso:search_job_pause", args=[job.pk]))
             return fake_competitors()
 
-        self.itunes.search_apps.side_effect = search
+        self.itunes.search_ranked.side_effect = (
+            lambda term, country="us": ranked_search(search(term, country=country, limit=25)))
         with self.run_inline():
             run_queue.kick()
         job.refresh_from_db()
@@ -372,7 +375,7 @@ class PauseResumeDiscardTest(JobTestBase):
 
 class ThrottleTest(JobTestBase):
     def test_repeated_rejections_cool_down_and_finally_pause_with_a_message(self):
-        self.itunes.search_apps.side_effect = ITunesRateLimited("slow down", retry_after=5)
+        self.itunes.search_ranked.side_effect = ITunesRateLimited("slow down", retry_after=5)
         job = self.job(keywords=[f"kw{i}" for i in range(30)], countries=["us"])
         with self.run_inline(), mock.patch("aso.search_jobs._cooldown", return_value=True) as cooldown:
             run_queue.kick()
@@ -380,7 +383,7 @@ class ThrottleTest(JobTestBase):
         self.assertEqual(cooldown.call_count, search_jobs.MAX_COOLDOWNS)
         self.assertEqual(job.status, "paused")
         self.assertEqual(job.throttle_state, "paused")
-        self.assertTrue(job.progress_message.startswith("Apple rejected "), job.progress_message)
+        self.assertTrue(job.progress_message.startswith("Apple's App Store is still not answering."), job.progress_message)
         self.assertTrue(job.progress_message.endswith("Wait a few minutes, then press Resume."))
         self.assertEqual(job.failed_count, job.next_index)
         self.assertLess(job.next_index, 30)
@@ -457,7 +460,9 @@ class EndpointTest(JobTestBase):
         self.assertEqual(self.client.get(url).json()["finished"]["id"], newest.pk)
         self.client.post(reverse("aso:search_job_dismiss", args=[newest.pk]))
         self.assertIsNone(self.client.get(url).json()["finished"])
-        self.assertIsNone(search_jobs.strip_job())
+        from aso import job_strip
+
+        self.assertIsNone(job_strip.strip_state())
         self.assertNotContains(self.client.get(reverse("aso:dashboard")), f'"id": {older[1].pk}')
 
     def test_a_newer_search_replaces_the_results_on_show(self):
@@ -530,7 +535,9 @@ class EndpointTest(JobTestBase):
         # The badge is composed on the server so no renderer carries a copy of
         # the labels. It travels with the row it describes.
         self.assertEqual(payload["targeting"]["label"], payload["classification"])
-        self.assertTrue(payload["targeting"]["basis"])
+        # The line under the score; what it means is the hover in the table.
+        self.assertTrue(payload["targeting"]["reach_label"])
+        self.assertNotIn("basis", payload["targeting"])
         self.assertEqual(payload["keyword"], "alpha")
         self.assertEqual(payload["popularity_score"], 55)
         self.assertEqual(payload["popularity_internal"], 55)
@@ -584,17 +591,21 @@ class DashboardTest(JobTestBase):
     def test_free_form_carries_the_nudge(self):
         with free_tier():
             resp = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(resp, 'id="keyword-limit-nudge"')
-        self.assertContains(resp, "Pro researches up to 1,000 keywords per search")
-        self.assertNotContains(resp, 'id="queue-section"')
+        # The free edition's one Pro line is drawn by keyword-search-job.js
+        # from the limit and the upgrade address the page hands it.
+        self.assertNotContains(resp, 'id="keyword-limit-nudge"')
+        self.assertContains(resp, "limit: 3,")
+        self.assertContains(resp, "upgradeLabel: 'Get Pro")
+        # The run queue shows in every edition: it holds keyword searches and
+        # country scans too, and anyone can reorder it (the owner, 2026-10-02).
+        self.assertContains(resp, 'id="queue-section"')
 
-    def test_the_keep_open_line_matches_the_edition(self):
-        with override_settings(IS_NATIVE_APP=True):
-            resp = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(resp, "Keep RespectASO open and your Mac awake: rankings refresh once a day")
-        with override_settings(IS_NATIVE_APP=False):
-            resp = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(resp, "Rankings refresh once a day while the container runs")
+    def test_the_table_says_when_it_was_updated_not_how(self):
+        # The lead says the keywords update every day; the table says when it
+        # last did, and nothing about how (KEYWORDS_PAGE_PLAN.md M1.1).
+        resp = self.client.get(reverse("aso:dashboard"))
+        self.assertContains(resp, "Every keyword you search is tracked here and updated every day.")
+        self.assertNotContains(resp, "Rankings refresh once a day")
 
     def test_the_nav_guard_no_longer_fires_for_keyword_searches(self):
         from pathlib import Path
@@ -605,15 +616,19 @@ class DashboardTest(JobTestBase):
         self.assertNotIn("searchInProgress = true", html)
         self.assertNotIn("loading-state", html)
 
-    def test_the_strip_shows_on_other_pages_only(self):
+    def test_the_job_shows_in_the_activity_panel_on_every_page(self):
+        """Background work lives in one place, the activity indicator in the
+        top bar, on every page; the page that owns the job shows it in full
+        as well (owner, 2026-10-01: a run in the middle of another tab was
+        confusing)."""
         self.job(status="running", keywords=["a"] * 4)
-        resp = self.client.get(reverse("aso:methodology"))
-        self.assertContains(resp, 'id="search-job-strip"')
-        self.assertContains(resp, "job-strip-data")
-        # The sentence is composed on the server now, for either job type.
-        self.assertContains(resp, "Keyword research running")
-        resp = self.client.get(reverse("aso:dashboard"))
-        self.assertNotContains(resp, 'id="search-job-strip"')
+        for name in ("aso:methodology", "aso:dashboard"):
+            resp = self.client.get(reverse(name))
+            self.assertContains(resp, 'id="activity-pill"')
+            self.assertContains(resp, 'id="search-job-strip"')
+            self.assertContains(resp, "job-strip-data")
+            # The sentence is composed on the server now, for either job type.
+            self.assertContains(resp, "Keyword search running")
 
     def test_the_strip_shows_a_country_scan_too(self):
         """The strip belongs to whichever long job is running."""
@@ -626,11 +641,11 @@ class DashboardTest(JobTestBase):
         resp = self.client.get(reverse("aso:methodology"))
         self.assertContains(resp, "Country scan running: 1 of 3 countries")
 
-    def test_the_strip_is_hidden_on_the_page_that_owns_the_job(self):
+    def test_the_page_that_owns_the_job_shows_it_in_the_top_bar_too(self):
         from aso.models import OpportunityScan
 
         OpportunityScan.objects.create(
             keyword="fitness tracker", countries=["us"], status="running",
         )
         resp = self.client.get(reverse("aso:opportunity"))
-        self.assertNotContains(resp, 'id="search-job-strip"')
+        self.assertContains(resp, 'id="search-job-strip"')  # in the top bar's panel, as on every page

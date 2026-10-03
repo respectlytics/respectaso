@@ -48,7 +48,7 @@ class AdaptiveITunesRateLimiter:
         limiter = AdaptiveITunesRateLimiter()
         for kw in keywords:
             try:
-                result = itunes.search_apps(kw, ...)
+                read = day_reads.get_or_fetch(kw, country, itunes_service=itunes)
                 limiter.record_success()
             except ITunesRateLimited as exc:
                 limiter.record_failure(retry_after=exc.retry_after)
@@ -159,3 +159,31 @@ def classify_throttle_state(
     if limiter.is_slowed_down:
         return "slowed_down"
     return "normal"
+
+
+# ---- what a person reads while Apple slows down --------------------------------
+#
+# Why they wait and that nothing needs doing, never the pace, the delay or how
+# many requests failed (the owner's rule: screens show value, not mechanics,
+# aso/copy_rules.mechanics_in). One wording for the keyword searches, the
+# country scans and the three AI tabs, whose banner shows the same sentence.
+WAIT_MESSAGES = {
+    "slowed_down": "Apple's App Store is answering slowly, so this takes a little longer. It carries on by itself.",
+    "paused": "Apple's App Store is not answering right now. This carries on by itself once it does.",
+    "aborted": ("Apple's App Store stopped answering, so this run finishes with the keywords scored so far. "
+                "Run it again in a few minutes for the full picture."),
+    "stopped": "Apple's App Store is still not answering. Wait a few minutes, then press Resume.",
+}
+
+
+def wait_message(state: str, cooldown_seconds: float = 0) -> str:
+    """The sentence for a throttle state, or "" for a normal one. A queued
+    keyword search or country scan does not end when Apple keeps refusing: it
+    cools down and carries on, so it passes how long it waits, and its
+    "aborted" says when it carries on instead of that the run is finishing."""
+    if state == "aborted" and cooldown_seconds:
+        from .opportunity_scans import duration_text
+
+        return f"Apple's App Store is busy. This carries on by itself in {duration_text(cooldown_seconds)}."
+    return WAIT_MESSAGES.get(state, "")
+

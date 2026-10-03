@@ -1,0 +1,41 @@
+{% load aso_tags %}
+{% comment %}
+Column headers of the Rival Tracker keyword table. ONE copy, included by the
+live card (aso_pro/rival_tracker/_keywords.html) and by the sample-data
+preview (partials/rival_tracker_preview.html), so the preview can never
+drift from the real columns. Expects `columns`: the tracked app first, then
+its rivals, each {short_name, icon_url, is_tracked_app}. `locked` locks the
+names in the preview and leaves out the (i) tips, which nobody can hover
+there (the preview takes no pointer events).
+
+The table compares positions only. Each keyword's scores for the tracked
+app (difficulty, opportunity, downloads, insight) are its Tracked Keywords
+row, one click away through the last column, so they are not repeated here.
+
+Every header sorts the table (static/js/rival-tracker.js, not in the locked
+preview): data-sort names the column, the arrow shows the order.
+
+One header row: the card's lead says the app columns hold today's rank and
+the move since the day before. A group label above them sat centred over
+those columns, off the card's centre, with no room above the icons (the
+owner, 2026-10-02).
+{% endcomment %}
+<thead>
+    <tr class="border-b border-white/5 text-left text-2xs uppercase tracking-wide text-slate-400">
+        <th class="px-4 py-2 align-bottom{% if not locked %} cursor-pointer select-none hover:text-slate-200{% endif %}"{% if not locked %} data-sort="keyword" tabindex="0" aria-sort="none"{% endif %}>
+            <span class="inline-flex items-center gap-1">Keyword {% if not locked %}{% column_info "keyword" %}<span class="sort-indicator"></span>{% endif %}</span>
+        </th>
+        <th class="px-3 py-2 text-center align-bottom{% if not locked %} cursor-pointer select-none hover:text-slate-200{% endif %}"{% if not locked %} data-sort="popularity" tabindex="0" aria-sort="descending"{% endif %}>
+            <span class="inline-flex items-center gap-1">Popularity {% if not locked %}{% column_info "popularity" %}<span class="sort-indicator">▼</span>{% endif %}</span>
+        </th>
+        {% for column in columns %}
+        <th class="px-3 pb-2 pt-3 text-center align-bottom font-medium normal-case tracking-normal{% if not locked %} cursor-pointer select-none hover:text-white{% endif %}"{% if not locked %} data-sort="app-{{ forloop.counter0 }}" tabindex="0" aria-sort="none" title="{{ column.name|default:column.short_name }}: sort by its rank"{% endif %}>
+            <span class="inline-flex flex-col items-center gap-1">
+                {% if column.icon_url %}<img src="{{ column.icon_url }}" alt="" class="w-5 h-5 rounded">{% else %}<span class="w-5 h-5 rounded bg-slate-700" aria-hidden="true"></span>{% endif %}
+                <span class="inline-flex max-w-[7rem] items-center gap-1"><span class="text-2xs truncate {% if column.is_tracked_app %}text-purple-300{% else %}text-slate-300{% endif %}{% if locked %} preview-term blur-sm select-none{% endif %}">{{ column.short_name }}</span>{% if not locked %}<span class="sort-indicator text-2xs text-slate-400"></span>{% endif %}</span>
+            </span>
+        </th>
+        {% endfor %}
+        <th class="px-3 py-2 align-bottom"><span class="sr-only">Ranks over time and scores</span></th>
+    </tr>
+</thead>

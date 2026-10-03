@@ -1,0 +1,11 @@
+{% comment %}
+The close of every Pro preview: the promise once more, and the same two
+buttons, so the call to action is there wherever the reader stops scrolling.
+{% endcomment %}
+<section class="card mt-4 flex flex-wrap items-center justify-between gap-4 px-4 py-3" data-preview-footer>
+    <div class="min-w-0">
+        <p class="card-title">{{ cta.headline }}</p>
+        <p class="card-lead">{{ cta.body }}</p>
+    </div>
+    {% include "aso/partials/preview_buttons.html" %}
+</section>

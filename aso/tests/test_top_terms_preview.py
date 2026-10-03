@@ -16,6 +16,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from aso import top_terms_preview as preview
+from aso.links import PRO_PAGE_URL
 from aso.tests.test_popularity_views import PopularityViewTestBase
 
 
@@ -34,7 +35,7 @@ class SampleDataTest(TestCase):
             for key in ("eyebrow", "headline", "body", "primary_label",
                         "primary_url", "primary_tone", "table_line"):
                 self.assertTrue(cta[key], f"{state}: empty {key}")
-            self.assertIn(cta["primary_tone"], ("purple", "amber", "sky"))
+            self.assertIn(cta["primary_tone"], ("pro", "renew", "sky"))
             # A secondary link is either complete or absent.
             self.assertEqual(
                 bool(cta["secondary_label"]), bool(cta["secondary_url"]),
@@ -103,9 +104,9 @@ class PreviewPartialTest(TestCase):
     def test_every_term_is_blurred_and_unselectable(self):
         html = self._render()
         ctx = preview.preview_context(preview.STATE_FREE)["preview"]
-        expected = (
-            len(ctx["rows"]) + len(ctx["risers"]) + len(ctx["fallers"])
-            + len(ctx["new_terms"])
+        # Each movers card shows its first five rows, as on the live page.
+        expected = len(ctx["rows"]) + sum(
+            min(5, len(ctx[name])) for name in ("risers", "fallers", "new_terms")
         )
         self.assertEqual(html.count('class="preview-term blur-sm"'), expected)
         # The blurred text is never selectable / copyable.
@@ -120,8 +121,9 @@ class PreviewPartialTest(TestCase):
         self.assertNotIn("onclick=", html)
         self.assertNotIn("<select", html)
         self.assertNotIn("<input", html)
+        # The only link is the call to action (the free edition has no key to enter).
         self.assertEqual(html.count("<a "), 1)
-        self.assertIn(preview.PRICING_URL, html)
+        self.assertIn(PRO_PAGE_URL, html)
 
     def test_columns_match_the_shared_header(self):
         """Row cells line up with the header partial the live page uses."""
@@ -130,7 +132,7 @@ class PreviewPartialTest(TestCase):
         header_cells = head.count("<th ")
         first_row = html.split("<tbody")[1].split("</tr>")[0]
         self.assertEqual(first_row.count("<td "), header_cells)
-        self.assertEqual(header_cells, 7)
+        self.assertEqual(header_cells, 6)
 
     def test_rows_carry_sparkline_payloads(self):
         html = self._render()
@@ -159,7 +161,7 @@ class PreviewPartialTest(TestCase):
     def test_cta_line_follows_the_state(self):
         self.assertIn("Connect Apple Ads to unlock",
                       self._render(preview.STATE_NOT_CONNECTED))
-        self.assertIn("Renew your license", self._render(preview.STATE_EXPIRED))
+        self.assertIn("Renew Pro to unlock", self._render(preview.STATE_EXPIRED))
         self.assertIn("first sync", self._render(preview.STATE_SYNCING))
 
 
@@ -178,18 +180,15 @@ class FreeEditionPageTest(PopularityViewTestBase):
         response = pro_promo_top_terms_view(request)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Top Search Terms")
-        self.assertContains(response, "unlock with RespectASO Pro")
-        self.assertContains(response, "Get RespectASO Pro")
-        self.assertContains(response, preview.PRICING_URL)
+        self.assertContains(response, "See what people search for this week")
+        self.assertContains(response, "Get Pro for Mac")
+        self.assertContains(response, PRO_PAGE_URL)
         self.assertContains(response, "Preview with sample data")
         self.assertContains(response, "preview-term blur-sm")
         self.assertContains(response, "js/sparkline.js")
-        # The value points sit above the preview.
-        self.assertContains(response, "Apple's official ranking")
-        self.assertContains(response, "Weekly movement")
-        self.assertContains(response, "One-click actions")
+        self.assertContains(response, "data-preview-footer")
         # No license-activation link: the free edition has no license page.
-        self.assertNotContains(response, "Activate it")
+        self.assertNotContains(response, "I have a license key")
 
     def test_template_needs_no_pro_url(self):
         """The page template is synced to the public repo, where aso_pro
@@ -199,4 +198,4 @@ class FreeEditionPageTest(PopularityViewTestBase):
             preview.preview_context(preview.STATE_FREE),
         )
         self.assertNotIn("aso_pro:", html)
-        self.assertIn("Get RespectASO Pro", html)
+        self.assertIn("Get Pro for Mac", html)

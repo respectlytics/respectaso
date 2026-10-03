@@ -1,6 +1,16 @@
 import sys
 
 from django.apps import AppConfig
+from django.db.models.signals import post_migrate
+
+
+def _ensure_history_triggers(sender, using, **kwargs):
+    """After every migrate, the Dashboard's change count keeps counting
+    (aso/history_revision.py): a migration that rebuilds a table drops its
+    triggers, and this puts them back."""
+    from .history_revision import ensure_triggers
+
+    ensure_triggers(using)
 
 
 class AsoConfig(AppConfig):
@@ -9,6 +19,10 @@ class AsoConfig(AppConfig):
     verbose_name = "ASO Keyword Research"
 
     def ready(self):
+        # Before the early return below: migrate and test are exactly the
+        # commands whose migrate must create the triggers.
+        post_migrate.connect(_ensure_history_triggers, sender=self)
+
         # Don't start background work during management commands. "test" is
         # in the set because these hooks fire before the test database exists:
         # the estimator upgrade thread would log "no such table" on every run
@@ -25,17 +39,25 @@ class AsoConfig(AppConfig):
 
         migrate_legacy_settings()
 
+        import os
+        import threading
+
+        from django.conf import settings
+
+        # The MCP server (aso_pro/mcp/bootstrap.py) is a second process on
+        # the same database. It must never do the day's background work: its
+        # scheduler refreshed every keyword a second time next to the Mac
+        # app's (each process only sees its own "running" flag), and it raced
+        # the history upgrade. The Mac app or the Docker server does that work.
+        if os.environ.get("RESPECTASO_PROCESS") == "mcp":
+            return
+
         # One-time history re-score when a version marker bumps, in one
         # background thread. The Mac app starts it itself once its migrations
         # have run (desktop/main.py): started from here it raced them, and on
         # a new install or an upgrade that adds a column every step failed
         # with "no such column" until the next launch. The Docker image
         # migrates in a separate process before gunicorn starts.
-        import os
-        import threading
-
-        from django.conf import settings
-
         if not settings.IS_NATIVE_APP:
             from .popularity import start_history_upgrade
 

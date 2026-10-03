@@ -1,0 +1,82 @@
+{% comment %}
+"Get set up" on the Keywords page (aso/setup_checklist.py,
+UI_REDESIGN_PLAN.md 6.3). Without Pro it stays, and can be folded; with Pro
+it goes when every step is done, and Close for good removes it at any time
+(the owner, 2026-10-02).
+{% endcomment %}
+<section id="setup-checklist" class="card p-4" data-folded="{% if setup.folded %}true{% else %}false{% endif %}">
+    <div class="flex items-center justify-between gap-3">
+        <h2 class="card-title">Get set up</h2>
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-slate-400">{{ setup.done }} of {{ setup.total }} done</span>
+            <button type="button" class="btn-quiet" data-setup-toggle aria-expanded="{% if setup.folded %}false{% else %}true{% endif %}">{% if setup.folded %}Show{% else %}Hide{% endif %}</button>
+            {% if setup.can_close %}<button type="button" class="btn-quiet text-xs" data-setup-close data-url="{% url 'aso:ui_memory' %}">Close for good</button>{% endif %}
+        </div>
+    </div>
+    <ul class="mt-3 space-y-3{% if setup.folded %} hidden{% endif %}" data-setup-body>
+        {% for step in setup.steps %}
+        <li class="flex items-center justify-between gap-4" data-setup-step="{{ step.key }}">
+            <div class="flex items-start gap-3">
+                {% if step.done %}
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span class="text-sm text-slate-400 line-through">{{ step.label }}</span>
+                {% else %}
+                <span class="mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 {% if step.key == 'pro' %}border-emerald-400/70{% else %}border-slate-500{% endif %}" aria-hidden="true"></span>
+                <div>
+                    <p class="text-sm font-medium text-white">{{ step.label }}</p>
+                    {% if step.hint %}<p class="text-sm text-slate-400">{{ step.hint }}</p>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% if not step.done and step.action %}
+            <div class="flex shrink-0 items-center gap-2">
+                {% if step.key == "apple" %}
+                <form method="post" action="{% url 'aso:settings_popularity' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="estimate_opt_out">
+                    <input type="hidden" name="opt_out" value="1">
+                    <button type="submit" class="btn-quiet">Stay on the estimate</button>
+                </form>
+                {% endif %}
+                {% if step.action.tone == 'pro' %}
+                <a href="{{ step.action.url }}" target="_blank" rel="noopener" class="btn-pro py-1.5">{{ step.action.label }}</a>
+                {% else %}
+                <a href="{{ step.action.url }}" class="{% if step.action.tone == 'primary' %}btn-primary{% elif step.action.tone == 'apple' %}inline-flex items-center rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-sky-500{% else %}btn-secondary{% endif %}">{{ step.action.label }}</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+<script>
+(function () {
+    var card = document.getElementById('setup-checklist');
+    if (!card) return;
+    var button = card.querySelector('[data-setup-toggle]');
+    var body = card.querySelector('[data-setup-body]');
+    button.addEventListener('click', function () {
+        var folded = !body.classList.contains('hidden');
+        body.classList.toggle('hidden', folded);
+        button.textContent = folded ? 'Show' : 'Hide';
+        button.setAttribute('aria-expanded', folded ? 'false' : 'true');
+        if (window.UiMemory) UiMemory.save('setup_checklist_folded', folded);
+    });
+    var close = card.querySelector('[data-setup-close]');
+    if (close) close.addEventListener('click', function () {
+        window.showConfirm('Close Get set up for good? Every step stays in Settings.',
+                           {title: 'Close Get set up', confirmLabel: 'Close for good'}).then(function (ok) {
+            if (!ok) return;
+            var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+            fetch(close.dataset.url, {
+                method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+                body: JSON.stringify({name: 'setup_checklist_closed', value: true})
+            }).then(function (r) {
+                if (r.ok) card.remove();
+                else window.showAlert && showAlert('Get set up could not be closed. Try again.');
+            });
+        });
+    });
+})();
+</script>

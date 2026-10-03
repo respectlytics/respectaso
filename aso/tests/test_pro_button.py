@@ -1,14 +1,15 @@
-"""The button under the navbar that invites a free user to Pro.
+"""The one Pro button in the top bar (docs/development/APP_SHELL_PLAN.md,
+UI_REDESIGN_PLAN.md 11.2).
 
-Mac app without a license: a Go Pro button to the pricing page. Docker,
-where Pro cannot run: the Pro page with the Mac download. Nothing for Pro
-users, for an expired license (it has its own banner), or on pages that
-already make the offer. Free-tier test: no aso_pro or licensing import at
-module level.
+Mac app without a license: Get Pro, to the pricing page. Expired: Renew Pro.
+Licensed: nothing. Docker, where Pro cannot run: Get Pro for Mac, to the Pro
+page with the Mac download. Shown on every page, the Pro pages included.
+Free-tier test: no aso_pro or licensing import at module level.
 """
 
 import os
 import re
+from pathlib import Path
 from unittest import mock, skipUnless
 
 from django.apps import apps as django_apps
@@ -16,40 +17,39 @@ from django.conf import settings
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from aso.context_processors import PRO_INVITE_DOCKER, PRO_INVITE_MAC
 from aso.copy_rules import dash_punctuation_in
-from aso.links import PRICING_URL, PRO_PAGE_URL
+from aso.links import PRICING_URL, PRO_PAGE_URL, RENEW_URL
 
 PRICE = re.compile(r"[$€£]\s?\d|\d\s?(kr|SEK|USD|EUR)\b")
+WORDS = ("Get Pro", "Renew Pro", "Get Pro for Mac")
 
 
-def invite(html):
-    match = re.search(r'<a href="([^"]+)"[^>]*data-pro-invite[^>]*>(.*?)</a>', html, re.S)
+def button(html):
+    match = re.search(r'<a href="([^"]+)"[^>]*data-pro-button[^>]*>(.*?)</a>', html, re.DOTALL)
     if not match:
         return None
-    text = re.sub(r"<[^>]+>", "", match.group(2)).strip()
-    return match.group(1), text
+    return match.group(1), re.sub(r"<[^>]+>", "", match.group(2)).strip()
 
 
-class TheInviteTest(TestCase):
+class TheButtonTest(TestCase):
     def page(self, name="aso:dashboard"):
         return self.client.get(reverse(name)).content.decode()
 
     @override_settings(IS_NATIVE_APP=True, DEBUG_SKIP_LICENSE=False)
-    def test_the_mac_app_without_a_license_invites_to_pricing(self):
-        self.assertEqual(invite(self.page()), (PRICING_URL, PRO_INVITE_MAC))
+    def test_the_mac_app_without_a_license_offers_pro(self):
+        self.assertEqual(button(self.page()), (PRICING_URL, "Get Pro"))
 
     @override_settings(IS_NATIVE_APP=False)
-    def test_docker_invites_to_the_mac_app(self):
-        self.assertEqual(invite(self.page()), (PRO_PAGE_URL, PRO_INVITE_DOCKER))
+    def test_docker_offers_the_mac_app(self):
+        self.assertEqual(button(self.page()), (PRO_PAGE_URL, "Get Pro for Mac"))
 
     @override_settings(IS_NATIVE_APP=True, DEBUG=True, DEBUG_SKIP_LICENSE=True)
     def test_pro_users_see_nothing(self):
-        self.assertIsNone(invite(self.page()))
+        self.assertIsNone(button(self.page()))
 
     @skipUnless(django_apps.is_installed("licensing"), "the Mac build only")
     @override_settings(IS_NATIVE_APP=True, DEBUG_SKIP_LICENSE=False)
-    def test_an_expired_license_gets_its_banner_not_the_invite(self):
+    def test_an_expired_license_is_asked_to_renew(self):
         from types import SimpleNamespace
 
         expired = SimpleNamespace(is_valid=False, is_expired=True, is_refunded=False,
@@ -59,17 +59,23 @@ class TheInviteTest(TestCase):
         with mock.patch("licensing.decorators.get_license_info", return_value=expired), \
              mock.patch("licensing.middleware.get_license_info", return_value=expired):
             html = self.page()
-        self.assertIsNone(invite(html))
-        self.assertIn("Your Pro license has expired", html)
+        self.assertEqual(button(html), (RENEW_URL, "Renew Pro"))
+        self.assertIn("Your Pro license has ended.", html)
+        self.assertIn('data-license-notice="expired"', html)
 
     @override_settings(IS_NATIVE_APP=True, DEBUG_SKIP_LICENSE=False)
-    def test_pages_that_make_the_offer_do_not_repeat_it(self):
-        for name in ("aso:pro_promo_researcher", "aso:pro_promo_simulator"):
+    def test_it_shows_on_every_page_the_pro_pages_included(self):
+        names = ["aso:dashboard", "aso:apps", "aso:opportunity", "aso:methodology"]
+        if django_apps.is_installed("aso_pro"):
+            names += ["aso_pro:ai_researcher", "aso_pro:simulator", "aso_pro:top_terms", "aso_pro:settings_license"]
+        else:
+            names += ["aso:pro_promo_researcher", "aso:pro_promo_simulator"]
+        for name in names:
             with self.subTest(page=name):
-                self.assertIsNone(invite(self.page(name)))
+                self.assertEqual(button(self.page(name)), (PRICING_URL, "Get Pro"))
 
     def test_the_words_carry_no_price_and_no_dash(self):
-        for text in (PRO_INVITE_MAC, PRO_INVITE_DOCKER):
+        for text in WORDS:
             self.assertIsNone(PRICE.search(text), text)
             self.assertEqual(dash_punctuation_in(text), "")
 
@@ -84,7 +90,7 @@ class OnePricingAddressTest(TestCase):
                 for name in files:
                     if not name.endswith((".py", ".html", ".js")) or name == "links.py":
                         continue
-                    text = open(os.path.join(root, name), encoding="utf-8", errors="ignore").read()
+                    text = Path(os.path.join(root, name)).read_text(encoding="utf-8", errors="ignore")
                     if 'href="https://respectaso.com/pricing' in text or '= "https://respectaso.com/pricing' in text:
                         offenders.append(os.path.join(root, name))
         self.assertEqual(offenders, [], "Link to aso.links.PRICING_URL ({{ pricing_url }}) instead")

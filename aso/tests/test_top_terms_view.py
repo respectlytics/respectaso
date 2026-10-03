@@ -3,7 +3,7 @@
 aso_pro/tests/test_top_terms.py.)"""
 
 import datetime as dt
-from unittest import mock
+from pathlib import Path
 
 from django.urls import reverse
 
@@ -61,7 +61,7 @@ class TrendPlumbingTest(PopularityViewTestBase):
 
         from aso.templatetags.aso_tags import APPLE_TREND_MIN_DELTA
 
-        js_source = open("static/js/popularity-display.js").read()
+        js_source = Path("static/js/popularity-display.js").read_text()
         match = re.search(r"APPLE_TREND_MIN_DELTA = (\d+)", js_source)
         self.assertIsNotNone(match)
         self.assertEqual(int(match.group(1)), APPLE_TREND_MIN_DELTA)

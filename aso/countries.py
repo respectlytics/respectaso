@@ -260,6 +260,14 @@ _TABLE: tuple[Country, ...] = (
 COUNTRIES: dict[str, Country] = {c.code: c for c in _TABLE}
 CODES = frozenset(COUNTRIES)
 
+# The storefronts English names with "the" inside a sentence: plural names
+# ("the Netherlands", "the Bahamas", "the Cayman Islands"), names built on a
+# common noun ("the United States", "the Dominican Republic", "the UAE") and
+# the Gambia. Every other name reads without one ("in Argentina"), including
+# the plural names that never take it (Barbados, Honduras, Seychelles, St.
+# Kitts & Nevis). aso/tests/test_store_phrase.py holds the reviewed list.
+_NAMED_WITH_THE = frozenset({"bs", "vg", "ky", "do", "tc", "us", "nl", "gb", "ae", "gm", "mv", "ph", "sb"})
+
 # Storefronts where Apple Ads operates and therefore publishes search-term
 # popularity. Filled by `manage.py probe_storefronts --apple-ads`, which needs
 # a working Apple Ads connection.
@@ -291,6 +299,36 @@ def flag(code: str) -> str:
     if len(code) != 2 or not code.isalpha():
         return ""
     return "".join(chr(0x1F1E6 + ord(c.upper()) - ord("A")) for c in code)
+
+
+def sentence_name(code: str) -> str:
+    """The storefront's name as a sentence uses it: "the United States",
+    "the Netherlands", "Argentina"."""
+    country = get(code)
+    if country is None:
+        return name(code)
+    return f"the {country.name}" if country.code in _NAMED_WITH_THE else country.name
+
+
+def store_phrase(code: str) -> str:
+    """"the App Store in Argentina", "the App Store in the United States".
+
+    The one way a sentence names a storefront's App Store. The country goes
+    after "in" because most country names are not adjectives: "the Argentina
+    App Store" is not English, "the App Store in Argentina" is. The browser
+    reads the same phrase from the country catalog (aso/country_picker.py).
+    """
+    return f"the App Store in {sentence_name(code or 'us')}"
+
+
+def stores_phrase(codes) -> str:
+    """store_phrase for one or more storefronts: "the App Store in Sweden",
+    "the App Store in Sweden or the United States", "the App Store in Sweden,
+    Norway or Denmark"."""
+    names = [sentence_name(code) for code in codes or ()]
+    if len(names) < 2:
+        return store_phrase(next(iter(codes or ()), ""))
+    return f"the App Store in {', '.join(names[:-1])} or {names[-1]}"
 
 
 def is_valid(code: str) -> bool:

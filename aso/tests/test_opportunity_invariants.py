@@ -10,6 +10,7 @@ not a rule.
 """
 
 import itertools
+from datetime import UTC
 
 from django.test import SimpleTestCase
 
@@ -289,8 +290,9 @@ class ContinuityTest(SimpleTestCase):
     RATINGS = (None, 100, 5_000, 200_000)
 
     def _score(self, popularity, difficulty, code, ratings=None, *, app=None, app_rank=None):
-        from aso.scoring import expected_downloads, OPPORTUNITY_POINTS_PER_DECADE
         import math
+
+        from aso.scoring import OPPORTUNITY_POINTS_PER_DECADE, expected_downloads
 
         if app is None:
             app = app_with(ratings)
@@ -339,7 +341,7 @@ class ContinuityTest(SimpleTestCase):
         for code in SPREAD:
             for popularity, difficulty in ((48, 38), (80, 60), (97, 84)):
                 previous = None
-                for hundredths in range(0, 501):
+                for hundredths in range(501):
                     app = app_with(5_000, average=hundredths / 100)
                     current = self._score(popularity, difficulty, code, app=app)
                     if previous is not None:
@@ -353,13 +355,13 @@ class ContinuityTest(SimpleTestCase):
     def test_no_jump_as_the_app_ages(self):
         """A week on the store changes the score by a sliver, never a step,
         including at the half year where momentum stops being floored."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for code in SPREAD:
             for popularity, difficulty in ((48, 38), (97, 84)):
                 previous = None
-                for weeks in range(0, 52 * 12):
+                for weeks in range(52 * 12):
                     released = (now - timedelta(weeks=weeks)).isoformat()
                     app = app_with(2_000, released=released)
                     current = self._score(popularity, difficulty, code, app=app)

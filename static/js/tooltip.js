@@ -18,7 +18,7 @@
 (function () {
 
     const tip = document.createElement('div');
-    tip.className = 'fixed z-[9999] max-w-[320px] bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-slate-300 leading-snug shadow-xl opacity-0 transition-opacity duration-150';
+    tip.className = 'fixed z-[9999] max-w-[320px] bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-2xs text-slate-300 leading-snug shadow-xl opacity-0 transition-opacity duration-150';
     tip.style.display = 'none';
     tip.style.pointerEvents = 'none';  // the element underneath stays hoverable
     document.body.appendChild(tip);

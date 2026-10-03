@@ -27,15 +27,20 @@
         researcher: 'Researcher',
         competitor: 'Competitor',
         simulator: 'Simulator',
-        keyword_search: 'Keyword Research'
+        keyword_search: 'Keyword search',
+        opportunity_scan: 'Country scan'
     };
+
+    // The runs the activity panel's job row draws itself (static/js/job-strip.js).
+    var JOB_ROW_FEATURES = ['keyword_search', 'opportunity_scan'];
 
     // Complete class strings - Tailwind only extracts whole literals.
     var FEATURE_BADGE_CLASSES = {
         researcher: 'bg-purple-900/30 text-purple-300',
         competitor: 'bg-amber-900/30 text-amber-300',
         simulator: 'bg-sky-900/30 text-sky-300',
-        keyword_search: 'bg-teal-900/30 text-teal-300'
+        keyword_search: 'bg-teal-900/30 text-teal-300',
+        opportunity_scan: 'bg-indigo-900/30 text-indigo-300'
     };
 
     var ICON_UP = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>';
@@ -46,6 +51,7 @@
     var timer = null;
     var payload = null;          // the latest queue status
     var busy = false;            // anything running or queued, anywhere
+    var lastBusyWith = '';       // what runs now, in words ("the ranking refresh"), for the queued note
     var lastRun = null;          // {id, label} of the run this tab last showed
     var handledIds = {};         // runs whose outcome has already been surfaced
     var tickerRunId = null;      // run id the progress ticker was started for
@@ -53,6 +59,10 @@
     var cancelling = false;
     var noticeRun = null;        // the finished run shown in the queue notice
     var lastSignature = null;    // running + queued ids, to fire onChanged
+    var lastElsewhere = null;    // {feature, id} of the other tab's run last seen running
+    var pendingFinished = null;  // that run, once it stopped running, until its outcome is known
+    var ending = null;           // {feature, since}: a run stopped, its outcome not known yet
+    var outcome = null;          // {feature, failed}: how the last run ended, for the top bar
 
     function esc(value) {
         var text = value === null || value === undefined ? '' : String(value);
@@ -92,9 +102,16 @@
     }
 
     // "sleep sounds" for an AI run, 1,000 keywords for a keyword search.
-    function displayLabel(item) {
-        if (item.quote_label === false) return item.label || '';
-        return '"' + (item.label || '') + '"';
+    // A run's kind as a small coloured badge, and its name: the same in the
+    // running row and in Up next.
+    function badgeHtml(item) {
+        var badgeClass = FEATURE_BADGE_CLASSES[item.feature] || 'bg-slate-700/30 text-slate-300';
+        var badgeLabel = FEATURE_BADGE_LABELS[item.feature] || item.feature_label;
+        return '<span class="shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium ' + badgeClass + '">' + esc(badgeLabel) + '</span>';
+    }
+
+    function runName(item) {
+        return item.is_refinement ? 'Refinement of "' + (item.label || '') + '"' : (item.label || '');
     }
 
     // --- the progress panel -------------------------------------------------
@@ -153,39 +170,41 @@
     // --- the queue panel ----------------------------------------------------
 
     function controlHtml(cls, title, inner, disabled) {
-        return '<button type="button" class="' + cls + ' shrink-0 inline-flex items-center justify-center rounded-md border border-white/5 text-slate-400 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:border-white/5 transition-colors p-1.5"' +
+        return '<button type="button" class="' + cls + ' shrink-0 inline-flex items-center justify-center rounded-md border border-white/5 text-slate-400 hover:text-white hover:border-white/20 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:border-white/5 transition-colors p-1"' +
             ' title="' + title + '" aria-label="' + title + '"' + (disabled ? ' disabled' : '') + '>' + inner + '</button>';
     }
 
-    function pillHtml(cls, text, title) {
-        return '<button type="button" class="' + cls + ' shrink-0 text-xs px-2.5 py-1 rounded-full border border-purple-500/30 text-purple-300 hover:bg-purple-600/20 transition-colors"' +
-            ' title="' + title + '">' + text + '</button>';
+    function quietHtml(cls, text, title) {
+        return '<button type="button" class="' + cls + ' btn-quiet shrink-0 px-1 py-0 text-xs" title="' + title + '">' + text + '</button>';
     }
 
+    // One waiting task on two lines, so a name is never cut to nothing in the
+    // activity panel (the owner, 2026-10-02): the kind and the name, then the
+    // detail with Run next and Run now; moving and removing on the right.
     function queueRowHtml(item, index, count) {
-        var badgeClass = FEATURE_BADGE_CLASSES[item.feature] || 'bg-slate-700/30 text-slate-300';
-        var badgeLabel = FEATURE_BADGE_LABELS[item.feature] || item.feature_label;
-        var label = item.is_refinement
-            ? 'Refinement of "' + (item.label || '') + '"'
-            : (item.label || '');
         var data = ' data-feature="' + esc(item.feature) + '" data-id="' + item.id + '"';
+        var actions = '' +
+            (index > 0 ? quietHtml('queue-run-next', 'Run next', 'Put this run first in line') : '') +
+            (item.can_run_now ? quietHtml('queue-run-now', 'Run now', 'Start this run now; the running keyword search pauses and resumes right after') : '');
         var controls = '' +
             controlHtml('queue-move-up', 'Move up', ICON_UP, index === 0) +
             controlHtml('queue-move-down', 'Move down', ICON_DOWN, index === count - 1) +
-            (index > 0 ? pillHtml('queue-run-next', 'Run next', 'Put this run first in line') : '') +
-            (item.can_run_now ? pillHtml('queue-run-now', 'Run now', 'Start this run now; the running keyword search pauses and resumes right after') : '') +
-            controlHtml('queue-remove-btn text-slate-600 hover:text-red-400', 'Remove from queue', ICON_REMOVE, false);
+            controlHtml('queue-remove-btn text-slate-500 hover:text-red-400', 'Remove from queue', ICON_REMOVE, false);
         return '' +
-            '<div class="bg-slate-800/30 border border-white/5 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3"' + data + '>' +
-                '<div class="flex items-center gap-3 min-w-0 flex-1">' +
-                    '<span class="text-xs text-slate-500 font-mono tabular-nums w-4 shrink-0">' + item.position + '</span>' +
-                    '<span class="text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ' + badgeClass + '">' + esc(badgeLabel) + '</span>' +
+            '<div class="rounded-lg border border-white/5 bg-slate-800/30 px-3 py-2"' + data + '>' +
+                '<div class="flex items-center gap-2.5">' +
+                    '<span class="w-3 shrink-0 text-2xs tabular-nums text-slate-500">' + item.position + '</span>' +
                     '<div class="min-w-0 flex-1">' +
-                        '<div class="text-sm text-white truncate">' + esc(label) + '</div>' +
-                        '<div class="text-xs text-slate-500 truncate">' + esc(item.detail) + '</div>' +
+                        '<div class="flex min-w-0 items-center gap-1.5">' +
+                            badgeHtml(item) +
+                            '<span class="truncate text-sm font-medium text-white">' + esc(runName(item)) + '</span>' +
+                        '</div>' +
+                        '<div class="mt-0.5 flex min-w-0 items-center gap-2">' +
+                            '<span class="truncate text-xs text-slate-400">' + esc(item.detail) + '</span>' + actions +
+                        '</div>' +
                     '</div>' +
+                    '<div class="flex shrink-0 items-center gap-1">' + controls + '</div>' +
                 '</div>' +
-                '<div class="flex items-center gap-1.5 pl-7 sm:pl-0 shrink-0">' + controls + '</div>' +
             '</div>';
     }
 
@@ -196,6 +215,7 @@
         var elsewhereRun = payload && payload.running_elsewhere;
         var windingDown = !!payload && payload.lane_state === 'winding_down';
         var busyWith = payload && payload.busy_with;
+        lastBusyWith = busyWith || '';
 
         // Notice: a run finished while the user was busy elsewhere.
         toggle('queue-notice', !!noticeRun);
@@ -207,16 +227,29 @@
                 noticeRun.status === 'completed' ? 'View results' : 'See details');
         }
 
-        // The lane is busy with another tab's run.
-        toggle('queue-running-elsewhere', !!elsewhereRun);
-        if (elsewhereRun) {
-            // Short on purpose: the full detail belongs to that tab's own panel.
-            var where = 'Now running in ' + elsewhereRun.feature_label + ': ' + displayLabel(elsewhereRun);
-            if (elsewhereRun.country) where += ' (' + elsewhereRun.country + ')';
-            setText('queue-running-elsewhere-text',
-                where + ' · ' + (elsewhereRun.progress_percent || 0) + '%');
-            var link = byId('queue-running-elsewhere-link');
-            if (link) link.href = elsewhereRun.url || '#';
+        // The run that is going, first, on every page: its own page too (the
+        // owner, 2026-10-02: on the Simulator page the running simulation was
+        // missing from the panel, so the queue looked as if it had dropped it).
+        // The activity panel's job row (static/js/job-strip.js) already shows a
+        // running keyword search or country scan, so this row shows only the
+        // other runs: one task, one row.
+        var runningRun = elsewhereRun || (payload && payload.running_here);
+        var shownRunning = runningRun && JOB_ROW_FEATURES.indexOf(runningRun.feature) === -1 ? runningRun : null;
+        toggle('queue-running', !!shownRunning);
+        if (shownRunning) {
+            // Drawn like a row of Up next; the full detail belongs to that
+            // tab's own panel.
+            var name = byId('queue-running-name');
+            if (name) {
+                name.innerHTML = badgeHtml(shownRunning) +
+                    '<span class="truncate text-sm font-medium text-white">' + esc(runName(shownRunning)) + '</span>';
+            }
+            setText('queue-running-detail', shownRunning.detail || '');
+            setText('queue-running-pct', (shownRunning.progress_percent || 0) + '%');
+            var fill = byId('queue-running-fill');
+            if (fill) fill.style.width = (shownRunning.progress_percent || 0) + '%';
+            var link = byId('queue-running-link');
+            if (link) link.href = shownRunning.url || '#';
         }
 
         // Nothing runs, but the next run cannot start yet.
@@ -242,8 +275,29 @@
 
         section.classList.toggle(
             'hidden',
-            !noticeRun && !elsewhereRun && !waitingText && queued.length === 0
+            !noticeRun && !shownRunning && !waitingText && queued.length === 0
         );
+        reportActivity(runningRun, queued.length);
+    }
+
+    // Tell the activity indicator in the top bar (static/js/activity-indicator.js).
+    // A run that just stopped stays "running" until its outcome is known (at
+    // most a few seconds), so the top bar says Done or Stopped truthfully.
+    function reportActivity(run, waiting) {
+        if (!window.ActivityIndicator) return;
+        if (ending && Date.now() - ending.since > 6000) ending = null;
+        var state = {waiting: waiting};
+        if (run) {
+            state.running = {label: FEATURE_BADGE_LABELS[run.feature] || run.feature_label || 'Run',
+                             pct: run.progress_percent || 0};
+        } else if (ending) {
+            state.running = {label: FEATURE_BADGE_LABELS[ending.feature] || 'Run', pct: 100};
+        }
+        if (outcome) {
+            state.done = {label: FEATURE_BADGE_LABELS[outcome.feature] || 'Run', failed: outcome.failed};
+        }
+        window.ActivityIndicator.report('queue', state.running || waiting || outcome ? state : null);
+        if (!state.running && !waiting) outcome = null;   // said once
     }
 
     function syncStartButton() {
@@ -259,18 +313,23 @@
         // progress endpoint to ask.
         if (!previous || handledIds[previous.id] || !cfg.progressUrl) return;
         handledIds[previous.id] = true;
+        ending = {feature: cfg.feature, since: Date.now()};
         fetch(cfg.progressUrl(previous.id))
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
                 // A 404 means the row was deleted - nothing to report.
                 if (!data) return;
+                ending = null;
+                outcome = {feature: cfg.feature, failed: data.status === 'failed'};
+                reportActivity(null, (payload && payload.queued || []).length);
                 if (data.status !== 'completed' && data.status !== 'failed') return;
                 var run = {
                     id: previous.id,
                     status: data.status,
                     error: data.error,
                     failure: data.failure,
-                    label: previous.label
+                    label: previous.label,
+                    feature: cfg.feature
                 };
                 if (cfg.isIdle && cfg.isIdle()) {
                     cfg.openSession(run);
@@ -286,6 +345,24 @@
 
     function apply(data) {
         payload = data;
+
+        // A run from another tab ended: ask once how, then show it as done.
+        var elsewhere = data.running_elsewhere;
+        if (lastElsewhere && (!elsewhere || elsewhere.id !== lastElsewhere.id || elsewhere.feature !== lastElsewhere.feature)) {
+            pendingFinished = lastElsewhere;
+            ending = {feature: lastElsewhere.feature, since: Date.now()};
+        }
+        lastElsewhere = elsewhere ? {feature: elsewhere.feature, id: elsewhere.id} : null;
+        if (data.finished && pendingFinished && data.finished.id === pendingFinished.id
+                && data.finished.feature === pendingFinished.feature) {
+            pendingFinished = null;
+            ending = null;
+            outcome = {feature: data.finished.feature, failed: data.finished.status === 'failed'};
+            if (data.finished.status !== 'cancelled') {
+                noticeRun = {id: data.finished.id, status: data.finished.status, label: data.finished.label,
+                             feature: data.finished.feature, url: data.finished.url};
+            }
+        }
         busy = data.lane_state !== 'idle' || data.queued.length > 0;
 
         var here = data.running_here;
@@ -305,7 +382,12 @@
     }
 
     function refresh() {
-        return fetch(cfg.statusUrl)
+        var url = cfg.statusUrl;
+        if (pendingFinished) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'finished=' +
+                encodeURIComponent(pendingFinished.feature + ':' + pendingFinished.id);
+        }
+        return fetch(url)
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) { if (data && !data.error) apply(data); })
             .catch(function () { /* ignore transient errors */ });
@@ -390,6 +472,7 @@
                 var run = noticeRun;
                 noticeRun = null;
                 renderQueue();
+                if (run && run.url && (!cfg.openSession || run.feature !== cfg.feature)) { window.location.href = run.url; return; }
                 if (run && cfg.openSession) cfg.openSession(run);
             });
         }
@@ -425,6 +508,8 @@
         init: init,
         refresh: refresh,
         isBusy: function () { return busy; },
+        busyWith: function () { return lastBusyWith; },
+        started: function () { return cfg !== null; },
         syncStartButton: syncStartButton,
         removeQueued: removeQueued,
         moveQueued: moveQueued,

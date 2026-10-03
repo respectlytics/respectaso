@@ -16,15 +16,16 @@ in priority order:
    affected: last-synced values keep serving but stop refreshing.
 2. Amber non-dismissible while the APPLE source is selected, credentials
    saved, but verification has not passed yet (one actionable step left).
-3. Recommend banner (indigo, informational, NON-dismissible by product
-   decision): internal source active, Apple not connected, no explicit
-   opt-out. Silenced only by connecting or by "I'll stay on the estimate"
-   in Settings (reversible).
+3. (No banner.) The recommendation to connect Apple Ads is a step of the
+   Keywords page's setup checklist (aso/setup_checklist.py) since
+   docs/development/APP_SHELL_PLAN.md.
 4. Soft AMBER, DISMISSIBLE notice when the internal source is selected but
    previously working credentials got rejected: no score is affected (only
    the secondary Apple values stop refreshing), so dismissal is allowed BY
-   DESIGN. The dismiss key includes the rejection timestamp, so a later
-   new rejection shows the notice again.
+   DESIGN. The dismissal is kept per install (aso.ui_state, keyed by the
+   rejection time), so it survives a restart and a later new rejection
+   shows the notice again; the context processor leaves a dismissed
+   notice out.
 
 Context flags come from aso.context_processors.popularity_source.
 {% endcomment %}
@@ -32,9 +33,8 @@ Context flags come from aso.context_processors.popularity_source.
 <div id="apple-upgrade-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
-            <span class="font-semibold">Apple Ads popularity now uses Apple's official API. Reconnect once to keep it flowing.</span>
-            Your scores keep using the last-synced Apple data, but it stops refreshing until you connect
-            with the new one-time API key setup (about 5 minutes).
+            <span class="font-semibold">Reconnect Apple Ads once to keep Apple's popularity current.</span>
+            It takes about 5 minutes; until then your scores keep the last Apple values.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -47,8 +47,7 @@ Context flags come from aso.context_processors.popularity_source.
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple Ads is disconnected but still your popularity source.</span>
-            Scores keep using your last-synced Apple data; new keywords use the estimate.
-            Connect again, or switch to the RespectASO estimate in Settings.
+            New keywords use the estimate meanwhile. Connect again, or switch to the RespectASO estimate in Settings.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -60,9 +59,8 @@ Context flags come from aso.context_processors.popularity_source.
 <div id="apple-rejected-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
-            <span class="font-semibold">Apple rejected the API credentials.</span>
-            Popularity data stopped refreshing. The key may have been revoked or replaced at Apple.
-            Re-verify the connection in Settings.
+            <span class="font-semibold">Apple no longer accepts your Apple Ads key.</span>
+            Apple popularity has stopped updating. Re-verify the connection in Settings.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -75,7 +73,7 @@ Context flags come from aso.context_processors.popularity_source.
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
             <span class="font-semibold">Apple Ads is almost connected: one step left.</span>
-            Run the connection verification in Settings to resume Apple popularity syncing.
+            Verify the connection in Settings to start getting Apple's popularity.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-amber-100 bg-amber-600/40 hover:bg-amber-600/60 border border-amber-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
@@ -83,29 +81,13 @@ Context flags come from aso.context_processors.popularity_source.
         </a>
     </div>
 </div>
-{% elif apple_recommend_connect %}
-<div id="apple-recommend-banner" class="bg-indigo-900/30 border-b border-indigo-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
-        <p class="text-xs text-indigo-200/90">
-            <span class="font-semibold">Recommended: connect Apple Ads for official search popularity.</span>
-            Apple now publishes its search popularity data through an official API, a free, read-only,
-            one-time key setup (about 5 minutes, no ads or spend required). Your scores currently use
-            RespectASO's estimate; prefer to keep it? Choose "stay on the estimate" in Settings.
-        </p>
-        <a href="{% url 'aso:settings_popularity' %}"
-           class="text-xs font-medium text-indigo-100 bg-indigo-600/40 hover:bg-indigo-600/60 border border-indigo-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">
-            Connect Apple Ads
-        </a>
-    </div>
-</div>
 {% elif apple_secondary_stale %}
-<div id="apple-stale-banner" class="hidden bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5"
-     data-expired-at="{{ apple_credentials_rejected_at }}">
+<div id="apple-stale-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
-            <span class="font-semibold">Apple rejected the API credentials.</span>
+            <span class="font-semibold">Apple no longer accepts your Apple Ads key.</span>
             The Apple values shown beside your scores are no longer refreshing.
-            <a href="{% url 'aso:settings_popularity' %}" class="underline hover:text-amber-100">Re-verify the connection</a>
+            <a href="{% url 'aso:settings_popularity' %}" class="link">Re-verify the connection</a>
             to keep them current.
         </p>
         <button type="button" onclick="dismissAppleStaleBanner()"

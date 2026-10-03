@@ -5,6 +5,7 @@ Used by both free (Dashboard, Opportunity page) and Pro features
 (Researcher, Competitor Analyzer, Simulator, Metadata Evaluator).
 """
 
+import itertools
 import math
 
 # Popularity → estimated daily searches (US App Store baseline).
@@ -91,11 +92,6 @@ def daily_searches(popularity, country=None) -> float:
 # three hundred a day at 100, which is the range the app actually produces.
 OPPORTUNITY_MIDPOINT_DOWNLOADS = 1.0
 OPPORTUNITY_POINTS_PER_DECADE = 20.0
-
-# The end of the download table and of the first page of results. Ranks
-# past it still count, on the continuous tail DownloadEstimator.ttr_at()
-# draws; this is only where the table stops and where the wording changes.
-WORST_POSITION = 20
 
 # The rank model: where an app of a given strength lands for a keyword of a
 # given difficulty, both measured on the one yardstick in aso/strength.py.
@@ -237,7 +233,7 @@ def rank_from_gap(gap: float) -> float:
         (g0, r0), (g1, r1) = RANK_BY_GAP[-2], RANK_BY_GAP[-1]
         slope = (math.log(r1) - math.log(r0)) / (g1 - g0)
         return min(DEEPEST_RANK, r1 * math.exp(slope * (gap - g1)))
-    for (g0, r0), (g1, r1) in zip(RANK_BY_GAP, RANK_BY_GAP[1:]):
+    for (g0, r0), (g1, r1) in itertools.pairwise(RANK_BY_GAP):
         if g0 <= gap <= g1:
             t = (gap - g0) / (g1 - g0) if g1 > g0 else 0.0
             return math.exp(math.log(r0) + t * (math.log(r1) - math.log(r0)))
@@ -290,7 +286,7 @@ def typical_landing(difficulty, app=None) -> tuple[int, float]:
     elif gap >= points[-1][0]:
         rank, share = points[-1][1], points[-1][2]
     else:
-        for (g0, r0, s0), (g1, r1, s1) in zip(points, points[1:]):
+        for (g0, r0, s0), (g1, r1, s1) in itertools.pairwise(points):
             if g0 <= gap <= g1:
                 t = (gap - g0) / (g1 - g0) if g1 > g0 else 0.0
                 rank = math.exp(math.log(r0) * (1 - t) + math.log(r1) * t)
@@ -392,7 +388,7 @@ def _score_for_downloads(downloads: float) -> int:
     raw = 50 + OPPORTUNITY_POINTS_PER_DECADE * math.log10(
         downloads / OPPORTUNITY_MIDPOINT_DOWNLOADS
     )
-    return max(0, min(100, int(round(raw))))
+    return max(0, min(100, round(raw)))
 
 
 def top_spot_opportunity(popularity, country=None) -> int:
@@ -450,7 +446,7 @@ def fmt_expected(per_day: float) -> str:
     if per_day < 0.001:
         return "<0.001"
     if per_day >= 99.5:
-        return str(int(round(per_day)))
+        return str(round(per_day))
     return f"{per_day:.2g}"
 
 
@@ -567,16 +563,16 @@ CLASSIFICATION_SUMMARY = {
 # one the score uses. It used to be typed into two JavaScript copies.
 DIFFICULTY_FACTORS = [
     ("rating_volume", "volume", "Rating count",
-     "How many ratings the apps already ranking have, in the middle of the field. "
-     "The more they have, the harder they are to outrank."),
+     ("How many ratings the apps already ranking have, in the middle of the field. "
+      "The more they have, the harder they are to outrank.")),
     ("review_velocity", "momentum", "Rating growth speed",
-     "How fast those apps gain new ratings. Apps that grow fast are actively "
-     "maintained and harder to pass."),
+     ("How fast those apps gain new ratings. Apps that grow fast are actively "
+      "maintained and harder to pass.")),
     ("dominant_players", "dominance", "Big-brand presence",
      "Whether big-name apps dominate the results. Big brands are hard to displace."),
     ("title_relevance", "title", "Keyword in titles",
-     "How many of those apps carry this keyword in their title. The more do, "
-     "the harder it is to stand out for it."),
+     ("How many of those apps carry this keyword in their title. The more do, "
+      "the harder it is to stand out for it.")),
     ("rating_quality", "rating", "Competitor ratings",
      "The average star rating of those apps. Highly rated apps are harder to displace."),
     ("market_age", "age", "Market maturity",
@@ -724,13 +720,37 @@ def fmt_downloads(n) -> str:
         return "0"
     if n >= 1000:
         text = f"{n / 1000:.1f}"
-        return (text[:-2] if text.endswith(".0") else text) + "K"
+        return (text.removesuffix(".0")) + "K"
     if n < 1:
         return f"{n:.1f}"
     if n < 10:
         text = f"{n:.1f}"
-        return text[:-2] if text.endswith(".0") else text
+        return text.removesuffix(".0")
     return str(round(n))
+
+
+def fmt_count(value) -> str:
+    """A count as every table prints it: "50,672", "0" when there is none.
+
+    The one formatter behind the rating counts of every competitor list:
+    the Search History list through the ``format_number`` filter, and the
+    result card and the Opportunity row through ``display_competitors()``,
+    so no script formats a count in the browser's own locale.
+    """
+    try:
+        return f"{int(value):,}"
+    except (TypeError, ValueError):
+        return "0"
+
+
+def display_competitors(competitors) -> list[dict]:
+    """A competitor list as the scripts draw it: each app as Apple sent it,
+    plus ``ratings_text``, its rating count as ``fmt_count`` prints it."""
+    return [
+        {**app, "ratings_text": fmt_count(app.get("userRatingCount"))}
+        for app in competitors or ()
+        if isinstance(app, dict)
+    ]
 
 
 def top_spot_range(popularity, country=None) -> tuple[float, float]:
@@ -752,7 +772,10 @@ def downloads_range_phrase(low: float, high: float) -> str:
         return "no downloads"
     if fmt_downloads(low) != "0.0":
         return f"{fmt_downloads(low)} to {fmt_downloads(high)} downloads a day"
-    return "at most " + downloads_phrase(high).removeprefix("about ")
+    most = downloads_phrase(high)
+    if most == "effectively nothing":
+        return most              # never "at most effectively nothing"
+    return "at most " + most.removeprefix("about ")
 
 
 def estimate_range(per_day: float) -> tuple[float, float]:
@@ -802,29 +825,12 @@ def downloads_phrase(per_day: float, noun: bool = True) -> str:
     return f"about {one} every {days / 365:.0f} years"
 
 
-def searches_phrase(per_day: float, reported: bool = False) -> str:
-    """Searches a day, rounded the way a person would say them. Unless the
-    popularity is Apple's own reported value, "up to": for a term Apple does
-    not report, search volume is the least certain part of every estimate
-    (Apple only says it is below its reporting floor), and the real figure
-    can be far below it."""
-    if per_day >= 100:
-        phrase = f"about {per_day:,.0f} searches a day"
-    elif per_day >= 10:
-        phrase = f"about {per_day:.0f} searches a day"
-    elif per_day >= 1:
-        phrase = f"about {per_day:.1f} searches a day"
-    else:
-        return "under one search a day"
-    return phrase if reported else f"up to {phrase}"
-
-
 def _store_name(country) -> str:
-    """"the Argentina App Store". Naming the store sidesteps the article that
-    "the United States" needs and "Argentina" does not."""
+    """"the App Store in Argentina", "the App Store in the United States":
+    aso.countries.store_phrase, which knows the names that take "the"."""
     from aso import countries
 
-    return f"the {countries.name(country or 'us')} App Store"
+    return countries.store_phrase(country or "us")
 
 
 def short_app_name(name) -> str:
@@ -853,7 +859,7 @@ def sentence_app_name(name) -> str:
 def _ratings_text(count) -> str:
     if not count or count <= 0:
         return "no ratings yet"
-    return f"{count:,} rating{'s' if count != 1 else ''}"
+    return f"{fmt_count(count)} rating{'s' if count != 1 else ''}"
 
 
 def _age_text(years) -> str:
@@ -890,27 +896,26 @@ def quoted_keyword(keyword) -> str:
 
 
 def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=None,
-                      keyword=None, reported=False) -> dict:
-    """Where an app could rank for a keyword, what that pays, and why.
+                      keyword=None) -> dict:
+    """Where an app could rank for a keyword, what that pays, and the one
+    sentence that says so.
 
-    The opportunity score is the downloads at this rank, so this is the
-    score's working shown: the table puts ``label`` under the number and
-    ``explanation`` behind it, and the result card prints the explanation in
-    full. Composed here, once, so every screen says the same thing.
+    The opportunity score is the downloads at this rank, so ``tip`` says what
+    the number means for the row's app: every keyword table shows it on hover
+    over the score, and the Dashboard's result card prints ``label`` under
+    it. Composed here, once, so every screen says the same thing.
 
     ``app`` is the tracked app's AppProfile in this storefront, or None; a
     profile marked unknown is an app whose store data has not been read yet.
     ``app_rank`` is its real rank for this keyword here, when known, and
     ``keyword`` the keyword, which decides whether that rank is final.
-    ``reported`` says the popularity is Apple's own reported value, so its
-    searches are written "about" rather than "up to" (searches_phrase).
 
     Returns:
         position     the effective rank (whose taps the app can expect), rounded
         downloads    downloads a day at that rank, unrounded
         label        the short line under the score, e.g. "Calm Minutes: typically
                      ~#40", or "Calm Minutes ranks #2" when its real rank is used
-        explanation  whose rank it is, where it comes from, what it pays
+        tip          the hover: one short sentence (opportunity_tip)
         name         the app the rank belongs to, or None for a new app
         in_title     whether that app's title already carries the keyword
         real_rank    whether the position is the app's real rank
@@ -922,8 +927,6 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     model_position = reachable_position(difficulty, app)
     searches = daily_searches(popularity, country)
     downloads = expected_downloads(popularity, difficulty, country, app, app_rank, keyword)
-    store = _store_name(country)
-    band = difficulty_label(difficulty)
 
     name = sentence_app_name(app.name) if app is not None and app.name else None
     known = name is not None and getattr(app, "known", True)
@@ -933,7 +936,6 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     real_rank_decides = bool(app_rank) and name is not None and (
         in_title or app_rank < model_position
     )
-    stronger = known and not real_rank_decides and app_strength(app) > _new_app_strength()
 
     typical, top_ten = typical_landing(difficulty, app if known else None)
     who_short = short_app_name(name) if (known or real_rank_decides) else "new app"
@@ -942,115 +944,14 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     else:
         label = f"{who_short}: typically {'' if typical > 200 else '~'}{rank_text(typical)}"
 
-    whose = f"apps as strong as {name}" if stronger else "new apps"
-    why = (
-        f"the difficulty of {difficulty or 0} ({band}), which measures how "
-        "strong the apps already ranking for this keyword are"
-    )
-    if stronger:
-        why += f", set against the same measures for {name}"
-    why += f", and from where {whose} actually rank in App Store searches"
-
-    prefix = ""
-    kw = quoted_keyword(keyword)
-    if real_rank_decides and in_title:
-        opening = (
-            f"{name} has {kw} in its title and ranks #{app_rank} for it "
-            f"in {store}, so that is the rank this uses."
-        )
-    elif real_rank_decides:
-        opening = (
-            f"{name} already ranks #{app_rank} in the search results for {kw} "
-            f"in {store}, so that is the rank this uses."
-        )
-    elif known and app_rank:
-        # It ranks, without the keyword in its title and not better than the
-        # model: say both facts, never a "typical" rank that reads as worse
-        # than the one it already holds.
-        opening = (
-            f"{name} has {_profile_text(app)} in {store}, and ranks #{app_rank} for "
-            f"{kw} without it in its title. Apps that strong, with the "
-            "keyword in their title, land all over the search results; the middle "
-            f"one lands {_around(typical)}"
-            + (", so this app already does better than most of them."
-               if app_rank < typical else ".")
-        )
-    elif known:
-        opening = (
-            f"{name} has {_profile_text(app)} in {store}. Apps that strong, "
-            f"with {kw} in their title, land all over the search "
-            f"results; the middle one lands {_around(typical)}."
-        )
-        new_typical = typical_landing(difficulty)[0]
-        if stronger and new_typical != typical:
-            opening += f" A brand new app typically lands {_around(new_typical)}."
-    else:
-        if name:
-            prefix = (
-                f"RespectASO has not read {name}'s ratings in {store} yet, "
-                "so this assumes a brand new app. "
-            )
-        opening = (
-            f"Brand new apps, with no ratings yet, that put {kw} in "
-            f"their title land all over the search results in {store}; the "
-            f"middle one lands {_around(typical)}."
-        )
-
-    past_first_page = (
-        " That is past the first 20 results, where far fewer people scroll."
-        if position > WORST_POSITION else ""
-    )
-    # A low score always shows its ceiling: what the keyword pays whoever
-    # holds the top spot, the part that can change as the app grows. The
-    # range is the one the Downloads at #1 column shows.
-    ceiling = ""
-    if position > 1 and searches >= MIN_DAILY_SEARCHES:
-        at_first = downloads_range_phrase(*top_spot_range(popularity, country))
-        ceiling = f" Holding #1 here would bring {at_first}."
-
-    if searches < MIN_DAILY_SEARCHES:
-        subject = name if known else "A brand new app"
-        where = (f"already ranks #{app_rank}" if real_rank_decides
-                 else f"would typically land {_around(typical)}, judging by {why}")
-        explanation = (
-            f"{prefix}This keyword gets under one search a day in {store}, so "
-            f"there is little to win at any rank. {subject} {where}."
-            f"{past_first_page if real_rank_decides else ''}"
-        )
-    elif real_rank_decides:
-        explanation = (
-            f"{prefix}{opening} At #{position}, with "
-            f"{searches_phrase(searches, reported)} here, that is "
-            f"{estimate_range_phrase(downloads)}, and the Opportunity score "
-            f"counts the top of that range.{past_first_page}{ceiling}"
-        )
-    else:
-        # The score is the average over where apps land. Said as downloads,
-        # never as "the downloads of #14": that rank is where almost none of
-        # them land, and read as a place it misleads.
-        subject = name if known else "a new app"
-        if typical > 10:
-            share = (" the few near the top get most of the downloads, so "
-                     f"averaged over all of them, {subject}")
-        else:
-            share = f" averaged over where they land, {subject}"
-        explanation = (
-            f"{prefix}{opening} That comes from {why}. With "
-            f"{searches_phrase(searches, reported)} here,{share} can expect "
-            f"{estimate_range_phrase(downloads)}, and the Opportunity score "
-            f"counts the top of that range.{ceiling}"
-        )
-    if stronger:
-        explanation += (
-            " The same keyword scores differently for each of your apps, "
-            "because a stronger app ranks higher."
-        )
-
     return {
         "position": position,
         "downloads": downloads,
         "label": label,
-        "explanation": explanation,
+        "tip": opportunity_tip(
+            name, downloads, real_rank=real_rank_decides, position=position, known=known,
+            in_title=in_title, typical=typical,
+        ),
         # Whose rank this is: the app's name when it is the app's own (its
         # profile is known, or its real rank decides), else None for a new
         # app. The badge sentence speaks of the one or the other.
@@ -1065,16 +966,30 @@ def opportunity_reach(popularity, difficulty, country=None, app=None, app_rank=N
     }
 
 
-def opportunity_basis(popularity, difficulty, country=None, app=None, app_rank=None,
-                      keyword=None) -> str:
-    """The sentence that shows the arithmetic behind an opportunity score.
+def opportunity_tip(name, downloads, *, real_rank, position, known, in_title, typical) -> str:
+    """The hover on an Opportunity number: one short sentence saying what it
+    means for the row's app on this keyword (the owner, 2026-10-01: help text
+    is one short sentence; it used to be a 300 to 900 character account of
+    the method, which the Methodology page explains).
 
-    The explanation half of opportunity_reach(), for the screens that print
-    it in full rather than behind a tooltip.
+    It names the app, or says a new app, never "your app" (2026-09-23), and
+    quotes the downloads a day as the Insight tag beside it does
+    (estimate_range_phrase). A rank is the app's real rank, or where apps
+    like it typically land (never the effective rank, which is not a place),
+    and never a typical rank worse than one the app already holds: an app
+    whose title lacks the keyword is told what putting it there brings.
+    Within 120 characters for any App Store name, which Apple caps at 30.
     """
-    return opportunity_reach(
-        popularity, difficulty, country, app=app, app_rank=app_rank, keyword=keyword,
-    )["explanation"]
+    worth = estimate_range_phrase(downloads)
+    if real_rank:
+        return f"{name} ranks {rank_text(position)} here, worth {worth}."
+    if known and not in_title:
+        return f"{name} can expect {worth} with the keyword in its title."
+    if known:
+        return f"{name} can expect {worth} here, typically landing {_around(typical)}."
+    if name:
+        return f"{name} can expect {worth} here, scored as a new app."
+    return f"A new app can expect {worth} here, typically landing {_around(typical)}."
 
 
 def scored_for(app=None, country=None, *, reason=None) -> str:
@@ -1089,7 +1004,7 @@ def scored_for(app=None, country=None, *, reason=None) -> str:
     if reason == "picked":
         base = scored_for(app, country)
         if app is not None and getattr(app, "known", True):
-            return (base + " For keywords you track for it on the Dashboard, "
+            return (base + " For keywords you track for it on the Keywords page, "
                     "its rank there counts too.")
         return base
     if reason == "competitor":
@@ -1130,13 +1045,6 @@ def scored_for(app=None, country=None, *, reason=None) -> str:
         "Opportunity is scored for a brand new app, because this is not tied "
         "to one of your apps."
     )
-
-
-# The storefront the scoring guide uses to show that popularity is relative.
-# Any mid sized market makes the point; Argentina is the one that was asked
-# about, a keyword at popularity 48 that the old guide called good volume.
-GUIDE_EXAMPLE_POPULARITY = 48
-GUIDE_EXAMPLE_COUNTRY = "ar"
 
 
 def _named_list(names) -> str:
@@ -1199,8 +1107,6 @@ def scoring_guide() -> dict:
         new_app[key] = typical
         new_app[f"{key}_top_ten"] = top_ten_phrase(top_ten)
 
-    us = daily_searches(GUIDE_EXAMPLE_POPULARITY, "us")
-    there = daily_searches(GUIDE_EXAMPLE_POPULARITY, GUIDE_EXAMPLE_COUNTRY)
     return {
         "opportunity": opportunity,
         "difficulty": difficulty,
@@ -1209,12 +1115,6 @@ def scoring_guide() -> dict:
             "searches": f"{RANK_STUDY['searches']:,}",
             "apps": f"{RANK_STUDY['apps']:,}",
             "storefronts": _named_list(countries.name(c) for c in RANK_STUDY["storefronts"]),
-        },
-        "popularity_example": {
-            "popularity": GUIDE_EXAMPLE_POPULARITY,
-            "us": f"{round(us, -1):,.0f}",
-            "there": f"{there:.0f}",
-            "there_name": countries.name(GUIDE_EXAMPLE_COUNTRY),
         },
     }
 
@@ -1227,12 +1127,11 @@ _TARGETING = {
     "Good Target": ("✅", "Good Target", "bg-green-900/20 text-green-300 border-green-500/20",
                     "Target now. One to ten downloads a day at the rank you can expect."),
     "Supporting": ("👍", "Supporting", "bg-blue-900/20 text-blue-300 border-blue-500/20",
-                   "Target now, as a supporting keyword. Between one download every ten days "
-                   "and one a day at the rank you can expect."),
+                   ("Target now, as a supporting keyword. Between one download every ten days "
+                    "and one a day at the rank you can expect.")),
     "Worth Climbing": ("🌱", "Worth Climbing", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
-                       "Worth targeting. #1 brings a download a day or more, but the rank you "
-                       "can expect today brings little. It pays more as the app climbs, and a "
-                       "title with it also ranks for longer searches that contain it."),
+                       ("Worth targeting. #1 brings a download a day or more, but today's rank "
+                        "brings little. It pays more as the app climbs.")),
     "Low Volume": ("🔍", "Low Volume", "bg-slate-800 text-slate-300 border-white/10",
                    "Skip. Even #1 brings under one download a day here."),
 }
@@ -1267,9 +1166,9 @@ def targeting_description(label, popularity, difficulty, country=None, app=None,
                 if typical > 10 else ", which averages")
     kw = quoted_keyword(keyword)
     if name and reach["real_rank"] and reach["in_title"]:
-        stands = f"{name} ranks #{position} with {kw} in its title, which brings {now}."
+        stands = f"{name} ranks #{position} with {kw} in its title: {now}."
     elif name and reach["real_rank"]:
-        stands = f"{name} already ranks #{position} for {kw}, which brings {now}."
+        stands = f"{name} ranks #{position} for {kw}: {now}."
     elif name and app_rank and app_rank < typical:
         # It already ranks better than the middle app as strong: never say
         # it "typically lands" below the rank it holds (the owner's #23 row
@@ -1288,18 +1187,17 @@ def targeting_description(label, popularity, difficulty, country=None, app=None,
         upside = f" #1 here brings {top}." if position > 1 else ""
         return f"Target now. {stands}{_TARGET_NOW_TAIL[label]}{upside}"
     if label == "Worth Climbing" and not reach["real_rank"]:
-        # Where it lands is in the score's own explanation; the tag says
-        # the decision and the two figures it rests on.
+        # Where it lands is in the hover on the score; the tag says the
+        # decision and the two figures it rests on.
         subject = name or "a new app"
         return (f"Worth targeting. #1 for {kw} here brings {top}, but {subject} can expect only "
-                f"{now} for now. It pays more as the app gains ratings, and a title with it "
-                "also ranks for longer searches that contain it.")
+                f"{now} until it gains ratings.")
     if label == "Worth Climbing":
         if name and reach["in_title"]:
             climb = "It pays more as the app gains ratings and climbs."
         else:
-            climb = "Putting it in the title is how it climbs, and it pays more as it does."
-        return f"Worth targeting. #1 for {kw} here brings {top}. {stands} {climb}"
+            climb = "Put it in the title to climb."
+        return f"Worth targeting. #1 here brings {top}. {stands} {climb}"
     # Low Volume: the keyword, not the app, is the limit.
     if reach["searches"] < MIN_DAILY_SEARCHES:
         skip = f"Skip. {kw[0].upper()}{kw[1:]} gets under one search a day in {store}."
@@ -1347,22 +1245,21 @@ def get_targeting_advice(popularity, difficulty, country=None, app=None, app_ran
 
 
 def targeting_payload(popularity, difficulty, country=None, app=None,
-                      app_rank=None, keyword=None, reported=False) -> dict:
+                      app_rank=None, keyword=None) -> dict:
     """What a classification badge needs, ready to render.
 
-    Every screen that shows the badge reads this. ``reach`` is the line under
-    the score and its explanation, for the same app and rank.
+    Every screen that shows the badge reads this. ``reach_label`` is the line
+    under the score on the Dashboard's result card, for the same app and rank.
     """
     icon, label, css, description = get_targeting_advice(
         popularity, difficulty, country, app, app_rank, keyword
     )
     reach = opportunity_reach(popularity, difficulty, country, app=app, app_rank=app_rank,
-                              keyword=keyword, reported=reported)
+                              keyword=keyword)
     return {
         "icon": icon,
         "label": label,
         "css": css,
         "description": description,
-        "basis": reach["explanation"],
         "reach_label": reach["label"],
     }

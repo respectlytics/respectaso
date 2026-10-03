@@ -24,14 +24,13 @@ import logging
 import time
 
 import requests
-from django.apps import apps as django_apps
 from django.conf import settings
 from django.db.models import F
-from django.urls import reverse
 from django.utils import timezone
 
-from . import countries, run_queue
+from . import countries, day_reads, local_day, run_queue, throttle
 from .keyword_scoring import result_payload, score_keyword_pair
+from .links import PRICING_URL, PRO_PAGE_URL
 from .models import App, Keyword, KeywordSearchJob, SearchResult
 from .popularity import (
     SOURCE_APPLE,
@@ -66,7 +65,6 @@ FAILED_ITEMS_CAP = 200      # failed keywords kept on the row (the retry uses th
 LIST_DISPLAY_CAP = 30       # names spelled out in a warning before "and N more"
 ETA_MIN_PAIRS = 3           # pairs done in this run before an ETA is shown
 
-from .links import PRICING_URL  # noqa: E402 (the one address)
 FREE_BUSY_MESSAGE = (
     "Your current search is still running. Wait for it to finish, or get Pro "
     "to queue searches and run up to 1,000 keywords at a time."
@@ -111,15 +109,10 @@ def limit_context() -> dict:
     """What the form and the JSON errors need to explain the limit."""
     if has_pro_license():
         return {"limit": PRO_KEYWORD_LIMIT, "is_pro": True, "upgrade_url": None, "upgrade_label": ""}
-    if django_apps.is_installed("aso_pro"):
-        return {
-            "limit": FREE_KEYWORD_LIMIT, "is_pro": False,
-            "upgrade_url": reverse("aso_pro:settings_license"), "upgrade_label": "Activate Pro",
-        }
-    return {
-        "limit": FREE_KEYWORD_LIMIT, "is_pro": False,
-        "upgrade_url": PRICING_URL, "upgrade_label": "Get Pro",
-    }
+    # The same place the top bar's Pro button opens (aso.context_processors.pro_button).
+    if getattr(settings, "IS_NATIVE_APP", False):
+        return {"limit": FREE_KEYWORD_LIMIT, "is_pro": False, "upgrade_url": PRICING_URL, "upgrade_label": "Get Pro"}
+    return {"limit": FREE_KEYWORD_LIMIT, "is_pro": False, "upgrade_url": PRO_PAGE_URL, "upgrade_label": "Get Pro for Mac"}
 
 
 def limit_error(count: int, limit: int, is_pro: bool) -> str:
@@ -177,12 +170,6 @@ def finished_job():
     return newest if newest is not None and not newest.acknowledged else None
 
 
-def strip_job():
-    """What the global strip shows: the active job, else the newest
-    finished one not yet dismissed."""
-    return panel_job() or finished_job()
-
-
 # ---------------------------------------------------------------------------
 # Creating and describing jobs
 # ---------------------------------------------------------------------------
@@ -228,7 +215,6 @@ def describe(job) -> dict:
         "detail": ", ".join(country_names(job.countries)),
         "country": ", ".join(c.upper() for c in job.countries),
         "is_refinement": False,
-        "quote_label": False,
     }
 
 
@@ -318,6 +304,10 @@ def job_payload(job, *, include_results=False) -> dict:
     if include_results:
         data.update(_results(job))
         data["remaining_keywords"] = job.remaining_keywords
+        # The keyword and country pairs the job worked through, so the Keywords
+        # page can find their rows in its table (KEYWORDS_PAGE_PLAN.md M2.6).
+        data["pairs"] = [[job.pair(i)[0].lower(), job.pair(i)[1]]
+                         for i in range(min(job.next_index, job.total_pairs))]
     return data
 
 
@@ -346,7 +336,7 @@ def _results(job) -> dict:
     if not n or not upto:
         return {"results": [], "results_total": 0, "opportunity_ranking": []}
 
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = local_day.today_start()
     scope = {"keyword__app_id": job.app_id} if job.app_id else {"keyword__app__isnull": True}
     light_rows = (
         SearchResult.objects
@@ -468,8 +458,7 @@ def _status_and_app(pk):
 
 
 def _has_result_today(keyword_obj, country) -> bool:
-    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    return keyword_obj.results.filter(country=country, searched_at__gte=today_start).exists()
+    return keyword_obj.results.filter(country=country, searched_at__gte=local_day.today_start()).exists()
 
 
 def _cooldown(pk) -> bool:
@@ -482,16 +471,6 @@ def _cooldown(pk) -> bool:
             return False
     return True
 
-
-def _throttle_message(state, limiter) -> str:
-    if state == "slowed_down":
-        return f"Apple is slowing responses. Now pacing at {round(limiter.current_delay)} s per keyword."
-    if state == "paused":
-        return (f"Apple is not answering: {limiter.consecutive_failures} requests failed in a row, "
-                f"retrying at {round(limiter.current_delay)} s per keyword.")
-    if state == "aborted":
-        return "Apple is rejecting requests. Cooling down for 2 minutes, then retrying."
-    return "Researching..."
 
 
 def execute_job(pk) -> None:
@@ -535,11 +514,12 @@ def _execute(pk) -> None:
     skipped_items, failed_items = list(job.skipped_items), list(job.failed_items)
     attempted = failed = 0          # this run, for the throttle classifier
     cooldowns = 0
-    pairs_this_run = 0
     run_started = time.monotonic()
     elapsed_before = job.elapsed_seconds or 0.0
     seconds_per_pair = job.seconds_per_pair
-    first_call = True
+    # Waits on the limiter before real App Store reads only; a keyword read
+    # today anywhere in the app is written from that read (aso/day_reads.py).
+    pacer = day_reads.Pacer(wait=lambda: limiter.wait())
 
     KeywordSearchJob.objects.filter(pk=pk, status="running").update(
         progress_message="Researching...", error_message="", throttle_state="normal",
@@ -552,7 +532,8 @@ def _execute(pk) -> None:
         if len(failed_items) < FAILED_ITEMS_CAP:
             failed_items.append({"keyword": keyword, "country": country, "error": error[:200]})
 
-    for index in range(start_index, total):
+    # pairs_this_run counts the pairs this run has finished, this one included.
+    for pairs_this_run, index in enumerate(range(start_index, total), start=1):
         status, current_app_id = _status_and_app(pk)
         if status != "running":     # Pause, Discard, Run now, or removed
             return
@@ -567,14 +548,14 @@ def _execute(pk) -> None:
             skipped += 1
             skipped_items.append(_pair_text(keyword, country))
         else:
-            if not first_call:
-                limiter.wait()
-            first_call = False
-            attempted += 1
+            fetches = pacer.before(keyword, country)
+            if fetches:
+                attempted += 1
             try:
                 score_keyword_pair(keyword_obj, country, app=app, itunes_service=itunes,
                                    difficulty_calc=difficulty_calc, download_est=download_est)
-                limiter.record_success()
+                if fetches:
+                    limiter.record_success()
                 done += 1
             except ITunesRateLimited as exc:
                 limiter.record_failure(retry_after=exc.retry_after)
@@ -584,11 +565,10 @@ def _execute(pk) -> None:
                 limiter.record_failure()
                 failed += 1
                 record_failure(keyword, country, str(exc) or exc.__class__.__name__)
-            except Exception as exc:    # one keyword never ends the job
+            except Exception:    # one keyword never ends the job
                 logger.exception("Keyword search %s: unexpected error on %s (%s)", pk, keyword, country)
                 record_failure(keyword, country, "Unexpected error")
 
-        pairs_this_run += 1
         active_seconds = time.monotonic() - run_started
         if pairs_this_run >= ETA_MIN_PAIRS:
             seconds_per_pair = active_seconds / pairs_this_run
@@ -605,7 +585,7 @@ def _execute(pk) -> None:
         )
         KeywordSearchJob.objects.filter(pk=pk, status="running").update(
             current_pair=next_pair, throttle_state=STATUS_NAME_FOR_THROTTLE.get(state, state),
-            progress_message=_throttle_message(state, limiter),
+            progress_message=throttle.wait_message(state, COOLDOWN_SECONDS) or "Researching...",
         )
 
         if state == "aborted":
@@ -613,8 +593,7 @@ def _execute(pk) -> None:
             if cooldowns > MAX_COOLDOWNS:
                 KeywordSearchJob.objects.filter(pk=pk, status="running").update(
                     status="paused", throttle_state="paused", auto_resume=False, current_pair="",
-                    progress_message=(f"Apple rejected {limiter.consecutive_failures} requests in a row. "
-                                      "Wait a few minutes, then press Resume."),
+                    progress_message=throttle.wait_message("stopped"),
                 )
                 return
             if not _cooldown(pk):

@@ -28,11 +28,12 @@
         // Twenty bars of 0.0 would read as a broken chart rather than as
         // the fact it is, so say the fact. Same rule as the download cell
         // in aso_tags.download_cell and ai-tabs-shared.js.
-        return '<div class="mb-4">' +
-            '<h4 class="text-xs font-medium text-slate-400 mb-2">Estimated downloads by position</h4>' +
-            '<div class="bg-slate-900/60 border border-white/5 rounded-xl p-4">' +
+        // One card, its label inside (.detail-card, PRO_AND_CLICKABLE_TEXT_PLAN.md).
+        return '<div class="detail-card">' +
+            '<h4 class="section-label mb-2">Estimated downloads by position</h4>' +
+            '<div>' +
             '<p class="text-sm text-slate-300">Under 1 search a day in this storefront.</p>' +
-            '<p class="text-xs text-slate-500 mt-1 leading-relaxed">This keyword is too quiet here for a ' +
+            '<p class="text-xs text-slate-400 mt-1 leading-relaxed">This keyword is too quiet here for a ' +
             'download range to mean anything. The difficulty and the competitor list above still describe ' +
             'the market.</p>' +
             '</div></div>';
@@ -101,11 +102,11 @@
         // "YOU" marker for your app position
         if (isAppPos) {
             bars += `<rect x="${x - 2}" y="${yHigh - 2}" width="${barW + 4}" height="${hHigh + 4}" rx="3" fill="none" stroke="rgb(250,204,21)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
-            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="700" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
+            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="600" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
         }
 
         // Position number on x-axis
-        bars += `<text x="${x + barW/2}" y="${PAD_T + chartH + 14}" font-size="9" fill="${isAppPos ? 'rgb(250,204,21)' : 'rgba(148,163,184,0.7)'}" ${isAppPos ? 'font-weight="bold"' : ''} text-anchor="middle">${p.pos}</text>`;
+        bars += `<text x="${x + barW/2}" y="${PAD_T + chartH + 14}" font-size="9" fill="${isAppPos ? 'rgb(250,204,21)' : 'rgba(148,163,184,0.7)'}" ${isAppPos ? 'font-weight="600"' : ''} text-anchor="middle">${p.pos}</text>`;
     });
 
     const axisLabels = `
@@ -124,7 +125,7 @@
     const tierCards = `
         <div class="grid grid-cols-3 gap-3 mt-3">
             <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5 — per position</p>
+                <p class="text-2xs text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5, per position</p>
                 <div class="space-y-1 text-purple-300">
                     ${posRow(1, p1, true)}
                     ${posRow(3, p3, false)}
@@ -132,7 +133,7 @@
                 </div>
             </div>
             <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310 — per position</p>
+                <p class="text-2xs text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310, per position</p>
                 <div class="space-y-1 text-blue-300">
                     ${posRow(6, p6, true)}
                     ${posRow(8, p8, false)}
@@ -140,7 +141,7 @@
                 </div>
             </div>
             <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
-                <p class="text-[10px] text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320 — per position</p>
+                <p class="text-2xs text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320, per position</p>
                 <div class="space-y-1 text-slate-300">
                     ${posRow(11, p11, true)}
                     ${posRow(15, p15, false)}
@@ -150,16 +151,16 @@
         </div>`;
 
     return `
-        <div class="mb-4">
+        <div class="detail-card">
             <div class="flex items-center gap-2 mb-2">
-                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide">Estimated Downloads by Position</h4>
+                <h4 class="section-label">Estimated downloads by position</h4>
                 <span class="relative group/dlinfo">
-                    <svg class="w-3.5 h-3.5 text-slate-500 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-[10px] text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">Based on ${searchesPrefix}${fmt(dailySearches)} estimated daily searches for this keyword. Each bar runs from a tenth of the estimate (solid) up to the estimate (lighter). Real downloads depend on how many people search this term, which Apple reports only for its most searched terms, and on how many of the people who see your app install it (your conversion rate), which RespectASO cannot measure. App Store Connect shows your real impressions and conversion rate.</span>
+                    <svg class="w-3.5 h-3.5 text-slate-400 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-72 bg-slate-900 border border-white/10 rounded-lg p-2.5 text-2xs text-slate-300 leading-snug opacity-0 pointer-events-none group-hover/dlinfo:opacity-100 transition-opacity z-50 shadow-lg">A rough range per rank. Real downloads also depend on the app's conversion rate, shown in App Store Connect.</span>
                 </span>
             </div>
-            <div class="bg-slate-900/60 border border-white/5 rounded-xl p-3 overflow-x-auto">
-                <div class="mb-2 text-[10px] text-slate-500">
+            <div class="overflow-x-auto">
+                <div class="mb-2 text-2xs text-slate-400">
                     <span>Estimated daily searches: <span class="text-slate-300 font-medium">${searchesPrefix}${fmt(dailySearches)}</span></span>
                 </div>
                 <svg viewBox="0 0 ${W} ${H}" class="w-full" style="min-width:500px;max-width:700px">
@@ -170,12 +171,12 @@
                     <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${PAD_T + chartH}" y2="${PAD_T + chartH}" stroke="rgba(255,255,255,0.1)"/>
                     ${axisLabels}
                 </svg>
-                <div class="flex items-center justify-center gap-5 mt-2 text-[10px] text-slate-500">
+                <div class="flex items-center justify-center gap-4 mt-2 text-2xs text-slate-400">
                     <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.8"></span> A tenth of the estimate</span>
                     <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-2 rounded-sm" style="background:rgb(139,92,246);opacity:0.22"></span> Up to the estimate</span>
                     <span class="flex items-center gap-1.5"><span class="inline-block w-6 h-2 rounded-sm" style="border:1px dashed rgb(250,204,21);"></span> Your Position</span>
                 </div>
-                <p class="mt-2 text-[10px] text-slate-500">
+                <p class="mt-2 text-2xs text-slate-400">
                     These are directional ranges for keyword contribution, not precise planning numbers.
                 </p>
                 ${tierCards}

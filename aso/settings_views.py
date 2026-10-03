@@ -11,16 +11,14 @@ Fully headless - works identically in the desktop, browser, and Docker
 editions.
 """
 
-import json
 import logging
 
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
-from .apple_ads import api as apple_api
-from .apple_ads import keys as apple_keys
-from .apple_ads import storage, sync
+from . import desktop_bridge
+from .apple_ads import api as apple_api, keys as apple_keys, storage, sync
 from .popularity import recompute_all_classifications
 
 logger = logging.getLogger(__name__)
@@ -87,8 +85,10 @@ def _handle_select_source(request):
         return "Unknown popularity source.", "error"
     if source == storage.SOURCE_APPLE and not storage.apple_source_ready():
         return (
-            "Apple Ads isn't connected yet. Complete the connection "
-            "steps below first.",
+            (
+                "Apple Ads isn't connected yet. Complete the connection "
+                "steps below first."
+            ),
             "error",
         )
     previous = storage.get_popularity_source()
@@ -101,10 +101,10 @@ def _handle_select_source(request):
         )
     label = "Apple Ads" if source == storage.SOURCE_APPLE else "RespectASO estimate"
     return (
-        f"Popularity source set to {label}. Popularity, opportunity, insights, "
-        "and download estimates now use it everywhere, including your history "
-        "and trends. Difficulty is unaffected, and saved AI analyses keep the "
-        "source they were run with.",
+        (
+            f"Popularity source set to {label}. Opportunity, insights and "
+            "download estimates now use it everywhere."
+        ),
         "success",
     )
 
@@ -114,12 +114,13 @@ def _handle_estimate_opt_out(request):
     storage.save_apple_settings(apple_ads={"estimate_opt_out": opt_out})
     if opt_out:
         return (
-            "Noted. You'll stay on the RespectASO estimate and the "
-            "recommendation banner is hidden. You can connect Apple Ads "
-            "here any time.",
+            (
+                "Noted: you stay on the RespectASO estimate. Connect Apple Ads "
+                "here any time."
+            ),
             "success",
         )
-    return "The Apple Ads recommendation is back on.", "success"
+    return "Apple Ads is back on your Get set up list.", "success"
 
 
 # ── Connection wizard endpoints ──────────────────────────────────────────
@@ -255,8 +256,8 @@ def apple_verify_view(request):
         storage.save_apple_settings(apple_ads={"credentials_rejected": True})
         return JsonResponse({
             "ok": False,
-            "error": "Apple rejected the session during the probe. "
-                     "Re-check the credentials.",
+            "error": "Apple did not accept these credentials. Check the three "
+                     "ids and verify again.",
         }, status=400)
     except apple_api.AppleAdsError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=502)
@@ -326,3 +327,78 @@ def apple_sync_now_view(request):
 
 def apple_sync_status_view(request):
     return JsonResponse(sync.get_status())
+
+
+# What Settings → Mac App says after a button, by the login item state macOS
+# reports afterwards (aso/desktop_bridge.py LOGIN_ITEM_STATES).
+MAC_APP_MESSAGES = {
+    "turned_on": (
+        "RespectASO will open in the menu bar when you log in.",
+        "success",
+    ),
+    "needs_approval": (
+        "One more step: approve RespectASO in System Settings → General → Login Items.",
+        "info",
+    ),
+    "turn_on_failed": (
+        (
+            "macOS did not add RespectASO to your login items. Try again, or add "
+            "it yourself in System Settings → General → Login Items."
+        ),
+        "error",
+    ),
+    "turned_off": (
+        "RespectASO no longer opens at login.",
+        "success",
+    ),
+    "turn_off_failed": (
+        (
+            "macOS did not remove RespectASO from your login items. Remove it in "
+            "System Settings → General → Login Items."
+        ),
+        "error",
+    ),
+    "opened_settings": (
+        "System Settings is open at Login Items.",
+        "info",
+    ),
+}
+
+
+def _mac_app_action(action):
+    """Run one button of Settings → Mac App: (message, message_type)."""
+    if action == "login_on":
+        state = desktop_bridge.set_login_item(True)
+        if state == "enabled":
+            return MAC_APP_MESSAGES["turned_on"]
+        if state == "requires_approval":
+            return MAC_APP_MESSAGES["needs_approval"]
+        return MAC_APP_MESSAGES["turn_on_failed"]
+    if action == "login_off":
+        if desktop_bridge.set_login_item(False) == "disabled":
+            return MAC_APP_MESSAGES["turned_off"]
+        return MAC_APP_MESSAGES["turn_off_failed"]
+    if action == "open_login_items":
+        desktop_bridge.open_login_items_settings()
+        return MAC_APP_MESSAGES["opened_settings"]
+    return "", ""
+
+
+def settings_mac_app_view(request):
+    """Settings → Mac App: opening at login, and what closing the window does.
+
+    Only the running Mac app has this page; in Docker and in a source run
+    without the Mac app it is a 404. The login item state is read from macOS
+    on every render (desktop_bridge.login_item_state), never stored, so a
+    change made in System Settings shows here at once.
+    """
+    if not desktop_bridge.is_desktop_app():
+        raise Http404("Settings → Mac App exists only in the Mac app.")
+    message, message_type = "", ""
+    if request.method == "POST":
+        message, message_type = _mac_app_action(request.POST.get("action", ""))
+    return render(request, "aso/settings_mac_app.html", {
+        "login_item_state": desktop_bridge.login_item_state(),
+        "message": message,
+        "message_type": message_type,
+    })

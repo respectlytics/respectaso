@@ -1,10 +1,12 @@
 """Tests for centralized ASO scoring functions."""
 
 import math
+from pathlib import Path
+from typing import ClassVar
 
 from django.test import TestCase
 
-from aso.scoring import GOOD_TARGET_SCORE, calc_opportunity, classify_keyword, _pop_to_searches
+from aso.scoring import GOOD_TARGET_SCORE, _pop_to_searches, calc_opportunity, classify_keyword
 
 
 class PopToSearchesTest(TestCase):
@@ -113,7 +115,7 @@ class CalcOpportunityTest(TestCase):
                     self.assertEqual(score, 0)
                 else:
                     raw = 50 + OPPORTUNITY_POINTS_PER_DECADE * math.log10(downloads)
-                    self.assertEqual(score, max(0, min(100, int(round(raw)))))
+                    self.assertEqual(score, max(0, min(100, round(raw))))
 
     def test_a_brutal_keyword_is_worth_little_to_a_new_app(self):
         """"period tracker", difficulty 84: brand new apps get the taps of
@@ -136,7 +138,7 @@ class CalcOpportunityTest(TestCase):
     def test_the_reachable_position_falls_as_the_keyword_hardens(self):
         from aso.scoring import reachable_position
 
-        positions = [reachable_position(d) for d in range(0, 101)]
+        positions = [reachable_position(d) for d in range(101)]
         self.assertEqual(positions, sorted(positions))
         # Brand new apps land at different places even on the easiest
         # keyword, so the rank whose taps they can expect is not #1.
@@ -217,7 +219,7 @@ class EveryTagIsOneRangeTest(TestCase):
     COUNTRIES = ("us", "ar", "bg", "ad")
     POPULARITIES = range(1, 101, 3)
     DIFFICULTIES = range(0, 101, 3)
-    ORDER = {"Low Volume": 0, "Worth Climbing": 1, "Supporting": 2, "Good Target": 3, "Sweet Spot": 4}
+    ORDER: ClassVar[dict[str, int]] = {"Low Volume": 0, "Worth Climbing": 1, "Supporting": 2, "Good Target": 3, "Sweet Spot": 4}
 
     @classmethod
     def setUpClass(cls):
@@ -363,20 +365,29 @@ class TheRealRankWhenTheTitleCarriesTheKeywordTest(TestCase):
         from aso.scoring import short_app_name
 
         self.assertEqual(reach["label"], f"{short_app_name('Soccer Betting Tips & Odds')} ranks #71")
-        self.assertIn("has \u201cbetting tips\u201d in its title and ranks #71", reach["explanation"])
-        self.assertIn("Holding #1 here would bring", reach["explanation"])
+        from aso.scoring import estimate_range_phrase
+
+        self.assertEqual(reach["tip"], "Soccer Betting Tips & Odds ranks #71 here, worth "
+                                       f"{estimate_range_phrase(reach['downloads'])}.")
 
 
 class EveryLowScoreShowsItsCeilingTest(TestCase):
-    def test_the_explanation_ends_with_what_the_top_spot_pays(self):
-        from aso.scoring import opportunity_reach
+    """What #1 pays is the Downloads at #1 column, and the tag beside a low
+    score says it in words. The hover on the score says only what the score
+    means for the app (2026-10-01)."""
 
-        self.assertIn("Holding #1 here would bring", opportunity_reach(63, 74, "us")["explanation"])
+    def test_the_tag_says_what_the_top_spot_pays(self):
+        from aso.scoring import downloads_range_phrase, get_targeting_advice, top_spot_range
+
+        _, label, _, text = get_targeting_advice(63, 74, "us")
+        self.assertEqual(label, "Worth Climbing")
+        self.assertIn(f"here brings {downloads_range_phrase(*top_spot_range(63, 'us'))}", text)
 
     def test_an_empty_market_does_not_promise_a_ceiling(self):
-        from aso.scoring import opportunity_reach
+        from aso.scoring import get_targeting_advice, opportunity_reach
 
-        self.assertNotIn("Holding #1", opportunity_reach(43, 31, "ag")["explanation"])
+        self.assertNotIn("#1", get_targeting_advice(43, 31, "ag")[3])
+        self.assertNotIn("#1", opportunity_reach(43, 31, "ag")["tip"])
 
 
 class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
@@ -399,8 +410,7 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
         self.assertEqual(label, "Worth Climbing")
         self.assertTrue(text.startswith("Worth targeting."))
         self.assertIn("but a new app can expect only", text)
-        self.assertIn("for now", text)
-        self.assertIn("a title with it also ranks for longer searches that contain it", text)
+        self.assertIn("until it gains ratings", text)
 
     def test_an_app_that_already_ranks_is_never_told_it_lands_lower(self):
         """The owner's "volatility trading" row: Rank #23, and the line under
@@ -410,8 +420,10 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
         app = self.app(name="Options Trading AI : OpPreds", ratings=173)
         self.assertGreater(typical_landing(44, app)[0], 23)
         reach = opportunity_reach(48, 44, "us", app=app, app_rank=23, keyword="volatility trading")
-        self.assertIn("ranks #23 for \u201cvolatility trading\u201d without it in its title", reach["explanation"])
-        self.assertIn("already does better than most of them", reach["explanation"])
+        # No rank at all in the hover: it says what the keyword in the title brings.
+        self.assertTrue(reach["tip"].startswith("Options Trading AI can expect "), reach["tip"])
+        self.assertTrue(reach["tip"].endswith(" with the keyword in its title."), reach["tip"])
+        self.assertNotIn("#", reach["tip"])
         label = self.advice(48, 44, "us", app, 23, "volatility trading")[1]
         text = self.advice(48, 44, "us", app, 23, "volatility trading")[3]
         self.assertNotIn("typically land", text, label)
@@ -431,7 +443,7 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
                         text = self.advice(pop, diff, country)[3]
                         self.assertNotIn("your app", text.lower())
                         self.assertNotIn("your app",
-                                         opportunity_reach(pop, diff, country)["explanation"].lower())
+                                         opportunity_reach(pop, diff, country)["tip"].lower())
 
     def test_the_app_by_name_when_its_title_carries_it(self):
         text = self.advice(52, 40, "us", self.app(), 71, "betting tips")[3]
@@ -441,7 +453,7 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
 
     def test_the_app_by_name_when_its_real_rank_is_better_without_the_title(self):
         text = self.advice(63, 80, "us", self.app(name="Score Predictor"), 3, "betting tips")[3]
-        self.assertIn("Score Predictor already ranks #3", text)
+        self.assertIn("Score Predictor ranks #3 for \u201cbetting tips\u201d: ", text)
 
     def test_the_app_by_name_at_the_rank_apps_like_it_get(self):
         text = self.advice(63, 80, "us", self.app(name="Score Predictor"), None, "betting tips")[3]
@@ -458,32 +470,33 @@ class EveryBadgeSentenceKnowsWhoseItIsTest(TestCase):
         _, label, _, text = self.advice(39, 27, "fr", keyword="minuteur")
         self.assertEqual(label, "Low Volume")
         self.assertTrue(text.startswith(
-            "Skip. Even #1 for \u201cminuteur\u201d in the France App Store brings "), text)
+            "Skip. Even #1 for \u201cminuteur\u201d in the App Store in France brings "), text)
         self.assertTrue(" to " in text or "at most" in text, text)
 
     def test_every_sentence_names_the_keyword_it_is_about(self):
-        """A tooltip over a filtered table must say which row it belongs to:
-        the owner read "ranks #2" for the row that ranks #14 (2026-09-23)."""
-        from aso.scoring import CLASSIFICATION_LABELS, opportunity_reach
+        """A tag's tooltip over a filtered table must say which row it belongs
+        to: the owner read "ranks #2" for the row that ranks #14 (2026-09-23).
+        The hover on the score is one short sentence that says "here", as the
+        owner's example of 2026-10-01 does; a tooltip belongs to the element
+        under the pointer only (static/js/tooltip.js)."""
+        from aso.scoring import CLASSIFICATION_LABELS
 
         seen = set()
         for app, rank in ((None, None), (self.app(name="Options Trading AI"), 14),
                           (self.app(name="Score Predictor"), None), (self.app(name="Score Predictor"), 3)):
             for pop, diff in ((80, 10), (63, 80), (52, 40), (39, 27), (61, 16)):
                 keyword = "options trading"
-                reach = opportunity_reach(pop, diff, "us", app=app, app_rank=rank, keyword=keyword)
                 label = self.advice(pop, diff, "us", app, rank, keyword)[1]
                 text = self.advice(pop, diff, "us", app, rank, keyword)[3]
                 seen.add(label)
                 with self.subTest(pop=pop, diff=diff, rank=rank, label=label):
-                    self.assertIn("\u201coptions trading\u201d", reach["explanation"])
                     self.assertIn("\u201coptions trading\u201d", text)
         self.assertLessEqual(len(set(CLASSIFICATION_LABELS) - seen), 1)
 
     def test_under_one_search_a_day_says_so(self):
-        _, label, _, text = self.advice(43, 31, "ag")
+        _, _label, _, text = self.advice(43, 31, "ag")
         self.assertEqual(text, "Skip. This keyword gets under one search a day in the "
-                               "Antigua & Barbuda App Store.")
+                               "App Store in Antigua & Barbuda.")
 
     def test_the_legend_speaks_to_you_never_to_your_app(self):
         from aso.scoring import classification_legend
@@ -497,14 +510,13 @@ class TheCeilingQuotesTheColumnTest(TestCase):
     """Round 2, D8: the sentence says the range the Downloads at #1 column
     shows, not only its low end."""
 
-    def test_the_explanation_quotes_the_range_of_the_column(self):
-        from aso.scoring import fmt_downloads, opportunity_reach
+    def test_the_tag_quotes_the_range_of_the_column(self):
+        from aso.scoring import fmt_downloads, get_targeting_advice
         from aso.services import DownloadEstimator
 
         first = DownloadEstimator().estimate(52, country="us")["positions"][0]
         column = f"{fmt_downloads(first['downloads_low'])} to {fmt_downloads(first['downloads_high'])}"
-        self.assertIn(f"Holding #1 here would bring {column} downloads a day.",
-                      opportunity_reach(52, 40, "us")["explanation"])
+        self.assertIn(f"here brings {column} downloads a day,", get_targeting_advice(52, 40, "us")[3])
 
     def test_a_range_too_small_to_print_says_the_most_it_can_be(self):
         from aso.scoring import downloads_range_phrase
@@ -512,6 +524,8 @@ class TheCeilingQuotesTheColumnTest(TestCase):
         self.assertEqual(downloads_range_phrase(0.02, 0.08), "at most one download every 12 days")
         self.assertEqual(downloads_range_phrase(5.94, 23.76), "5.9 to 24 downloads a day")
         self.assertEqual(downloads_range_phrase(0, 0), "no downloads")
+        # Never "at most effectively nothing".
+        self.assertEqual(downloads_range_phrase(0.00004, 0.0004), "effectively nothing")
 
 
 class OneDownloadFormatterTest(TestCase):
@@ -537,7 +551,6 @@ class OneOpportunityNumberTest(TestCase):
 
     def test_no_screen_draws_a_second_number(self):
         import os
-        import re
 
         from django.conf import settings
 
@@ -546,7 +559,7 @@ class OneOpportunityNumberTest(TestCase):
                 for name in files:
                     if not name.endswith((".html", ".js")):
                         continue
-                    text = open(os.path.join(folder, name), encoding="utf-8").read()
+                    text = Path(os.path.join(folder, name)).read_text(encoding="utf-8")
                     with self.subTest(file=name):
                         self.assertNotRegex(text, r"atFirstHtml|opportunity_at_first|reachHtml|opportunity_reach_line")
 
@@ -599,7 +612,7 @@ class WhereAppsTypicallyLandTest(TestCase):
             for diff in (5, 25, 45, 65, 85):
                 with self.subTest(pop=pop, diff=diff):
                     reach = opportunity_reach(pop, diff, "us")
-                    for text in (reach["label"], reach["explanation"], get_targeting_advice(pop, diff, "us")[3]):
+                    for text in (reach["label"], reach["tip"], get_targeting_advice(pop, diff, "us")[3]):
                         self.assertNotIn("on average", text)
                         self.assertNotIn("taps as #", text)
                         self.assertNotIn("can expect about #", text)
@@ -680,20 +693,22 @@ class OneDownloadRangeTest(TestCase):
 class SearchesUpToTest(TestCase):
     """A search figure is "up to" unless the popularity is Apple's own
     reported value: for a term Apple does not report, search volume is the
-    least certain part of every estimate."""
+    least certain part of every estimate. The Downloads at #1 chart is the
+    one place that quotes searches (static/js/download-chart.js); the hover
+    on the score stopped quoting them on 2026-10-01."""
 
-    def test_the_phrase(self):
-        from aso.scoring import searches_phrase
+    def test_the_chart_is_told_which(self):
+        from unittest import mock
 
-        self.assertEqual(searches_phrase(338), "up to about 338 searches a day")
-        self.assertEqual(searches_phrase(338, reported=True), "about 338 searches a day")
-        self.assertEqual(searches_phrase(0.4), "under one search a day")
+        from aso.models import Keyword, SearchResult
+        from aso.popularity import PopularityResolution
 
-    def test_the_explanation_says_it(self):
-        from aso.scoring import opportunity_reach
-
-        self.assertIn("With up to about", opportunity_reach(51, 39, "us")["explanation"])
-        self.assertIn("With about", opportunity_reach(51, 39, "us", reported=True)["explanation"])
+        row = SearchResult(keyword=Keyword(keyword="habit tracker"), country="us",
+                           popularity_score=51, difficulty_score=39)
+        for resolution, reported in ((PopularityResolution(55, 51, 55, "apple", False), True),
+                                     (PopularityResolution(51, 51, None, "internal", False), False)):
+            with mock.patch.object(SearchResult, "popularity_resolution", return_value=resolution):
+                self.assertIs(row.effective_download_estimates["searches_reported"], reported)
 
     def test_what_counts_as_reported(self):
         from aso.popularity import PopularityResolution, reported_by_apple

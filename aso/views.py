@@ -1,42 +1,49 @@
 import csv
 import json
 import logging
-import re
-import time
 
-logger = logging.getLogger(__name__)
-
-from django.conf import settings
 from django.http import HttpResponse, JsonResponse
-from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods, require_POST
 
-from . import run_queue, search_jobs, update_check
-from . import countries
-from .forms import AppForm, KeywordSearchForm, OpportunitySearchForm, COUNTRY_CHOICES
+from . import (
+    app_profiles,
+    countries,
+    history_filters,
+    history_revision,
+    history_selection,
+    keyword_labels,
+    pair_hooks,
+    run_queue,
+    search_jobs,
+    ui_memory,
+    update_check,
+)
+from .dashboard_summary import compute_app_summary
+from .forms import AppForm, KeywordSearchForm
+from .history_filters import (
+    HISTORY_PER_PAGE_CHOICES,
+    HISTORY_PER_PAGE_DEFAULT,
+    HistoryFilters,
+)
 from .keyword_scoring import score_keyword_pair
 from .models import App, Keyword, KeywordSearchJob, SearchResult
-from .pro_access import pro_required_json
-from .dashboard_summary import compute_app_summary
 from .popularity import (
-    annotate_effective_popularity,
     popularity_fields,
-    resolve_popularity,
 )
 from .scoring import (
     calc_opportunity,
-    classify_keyword,
-    CLASSIFICATION_LABELS,
     scoring_guide,
     sentence_app_name,
 )
 from .services import (
+    APP_STORE_UNAVAILABLE,
     DifficultyCalculator,
     DownloadEstimator,
+    ITunesAPIError,
     ITunesSearchService,
-    SearchAPIUnavailableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,11 +51,6 @@ logger = logging.getLogger(__name__)
 
 # app_rank is now persisted directly on SearchResult during search/refresh.
 # No need for a helper to find rank in stored competitors.
-
-# Allowed page sizes for the dashboard history table.
-HISTORY_PER_PAGE_CHOICES = (25, 50, 100, 200)
-HISTORY_PER_PAGE_DEFAULT = 25
-
 
 def methodology_view(request):
     """Our Methodology page — explains how RespectASO works.
@@ -105,16 +107,18 @@ def whats_new_seen_view(request):
 
 
 @require_POST
-def respectlytics_banner_dismiss_view(request):
-    """Hide the Respectlytics banner for good on this install.
+def apple_stale_banner_dismiss_view(request):
+    """Hide the soft notice that Apple rejected credentials which used to
+    work (partials/popularity_banner.html), for the rejection stored now.
 
-    Pro users never see the banner at all (base.html); this is the free
-    edition's opt-out. Stored server-side so it survives a restart in the
-    desktop app, where localStorage is not available.
+    Kept per install in aso.ui_state, so it stays hidden after a restart; a
+    later rejection has a new time and shows the notice again.
     """
     from . import ui_state
+    from .apple_ads import storage
 
-    ui_state.dismiss(ui_state.RESPECTLYTICS_BANNER)
+    rejected_at = storage.load_apple_settings()["apple_ads"]["credentials_rejected_at"]
+    ui_state.dismiss(ui_state.apple_stale_banner_key(rejected_at))
     return JsonResponse({"ok": True})
 
 
@@ -135,7 +139,23 @@ def dashboard_view(request):
     Shows only the latest result per keyword+country pair.  Each result
     is annotated with trend data (comparison to previous result) for
     inline ↑↓ indicators.
+
+    A full page load without a view in its address (the nav link, any link
+    to the bare Dashboard) is sent to the view last shown, kept in the
+    session by aso/ui_memory.py; the address then carries it, as it does
+    after every in-place update.
     """
+    restored = ui_memory.restored_dashboard_query(request)
+    if restored is not None:
+        return redirect(f"{request.path}?{restored}")
+    ui_memory.remember_dashboard_view(request)
+
+    # Read before any row. A change that lands while the page is drawn is
+    # then in the rows but not in this count, and the page's next check only
+    # fetches once more. Read after the rows, the same change would be
+    # counted as drawn when it never was.
+    revision = history_revision.current()
+
     apps = App.objects.all()
     search_form = KeywordSearchForm()
 
@@ -167,27 +187,16 @@ def dashboard_view(request):
     # has no associated app (or the app has no track_id).
     show_rank = True
     selected_app_name = None
+    selected_app_obj = None
     if app_id:
         selected_app_obj = App.objects.filter(id=app_id).first()
         if selected_app_obj:
             selected_app_name = selected_app_obj.name
 
-    # --- Filter params (insight, popularity, difficulty) ---
-    insight_filter = request.GET.getlist("insight")
-    pop_min_param = request.GET.get("pop_min", "")
-    diff_max_param = request.GET.get("diff_max", "")
-    search_q = request.GET.get("q", "").strip()
+    # --- Filters (search text, Insight, tags, popularity, difficulty) ---
+    # Read and applied by aso/history_filters.py, as the CSV export does.
+    filters = HistoryFilters.from_query(request.GET)
 
-    try:
-        pop_min = int(pop_min_param) if pop_min_param else None
-    except (ValueError, TypeError):
-        pop_min = None
-    try:
-        diff_max = int(diff_max_param) if diff_max_param else None
-    except (ValueError, TypeError):
-        diff_max = None
-
-    # Get the latest result ID for each keyword+country pair
     from django.db.models import Case, IntegerField, Max, Value, When
     from django.db.models.functions import Lower
 
@@ -196,14 +205,6 @@ def dashboard_view(request):
         latest_filter["keyword__app_id"] = app_id
     if country_filter:
         latest_filter["country"] = country_filter.lower()
-
-    latest_ids_qs = (
-        SearchResult.objects
-        .filter(**latest_filter)
-        .values("keyword_id", "country")
-        .annotate(latest_id=Max("id"))
-        .values_list("latest_id", flat=True)
-    )
 
     # Distinct countries that have results (for the history country filter)
     country_base_filter = {}
@@ -216,7 +217,8 @@ def dashboard_view(request):
         .distinct()
         .order_by("country")
     )
-    latest_ids = list(latest_ids_qs)
+    # The latest result of each keyword and country pair
+    latest_ids = history_filters.latest_ids(filters)
 
     # Most recent refresh timestamp (respects app/country filters above).
     # Surfaces the auto-refresh the scheduler runs in the background so users
@@ -233,33 +235,9 @@ def dashboard_view(request):
         .select_related("keyword", "keyword__app")
     )
 
-    # Total unfiltered count (before insight/pop/diff filters)
+    # Total unfiltered count (before the filters that hide rows)
     total_unfiltered_count = results_qs.count()
-
-    # Apply keyword text search
-    if search_q:
-        results_qs = results_qs.filter(keyword__keyword__icontains=search_q)
-
-    # Apply popularity / difficulty filters (on the EFFECTIVE popularity —
-    # the value the user sees, per their source selection)
-    results_qs = annotate_effective_popularity(results_qs)
-    if pop_min is not None:
-        results_qs = results_qs.filter(
-            effective_pop__isnull=False,
-            effective_pop__gte=pop_min,
-        )
-    if diff_max is not None:
-        results_qs = results_qs.filter(
-            difficulty_score__isnull=False,
-            difficulty_score__lte=diff_max,
-        )
-
-    # Apply insight filter using the stored classification column.
-    # classify_keyword() is the single source of truth — the column
-    # is set on save(), so a simple __in filter is always exact.
-    valid_insights = [i for i in insight_filter if i in CLASSIFICATION_LABELS]
-    if valid_insights:
-        results_qs = results_qs.filter(classification__in=valid_insights)
+    results_qs = history_filters.narrow(results_qs, filters)
 
     sorted_results = None
 
@@ -447,8 +425,14 @@ def dashboard_view(request):
 
     _attach_apple_trends(history_results)
 
-    # Determine if any filters are active
-    has_filters = bool(valid_insights or pop_min is not None or diff_max is not None or search_q)
+    # The user's own labels on each row's keyword (aso/keyword_labels.py)
+    labels_by_keyword = keyword_labels.names_by_keyword({r.keyword_id for r in history_results})
+    for result in history_results:
+        result.label_names = labels_by_keyword.get(result.keyword_id, [])
+    # The Labels filter offers the labels in this app's table, and keeps one that
+    # is chosen even when no row carries it any more, so it can be cleared.
+    label_choices = keyword_labels.names_in_use(app_id=filters.app_id)
+    label_choices += [t for t in filters.labels if t not in label_choices]
 
     # App Summary panel — aggregates the user's tracked-keyword data into a
     # 30-second read of the app's ASO posture. Returns None when no app is
@@ -464,6 +448,7 @@ def dashboard_view(request):
     # finished one not yet dismissed: rendered on page load so switching back
     # to the tab shows the live state at once. Results are fetched by the JS.
     from .keyword_cleanup import cleanup_suggestion
+    from .scheduler import bulk_refresh_question
 
     panel = search_jobs.panel_job()
     finished = search_jobs.finished_job()
@@ -476,22 +461,56 @@ def dashboard_view(request):
         SearchResult.objects.filter(id__in=latest_ids), app_id=int(app_id) if app_id else None,
     )
 
+    try:
+        from . import setup_checklist
+
+        setup = setup_checklist.checklist(request)
+    except Exception:  # noqa: BLE001 (the checklist must never break the page)
+        setup = None
+
+    # First run: no app and nothing tracked yet (KEYWORDS_PAGE_PLAN.md M2.5).
+    welcome = not apps.exists() and not SearchResult.objects.exists()
+
+    # The table's columns (KEYWORDS_PAGE_PLAN.md M1.2): Country only when the
+    # rows in view span more than one storefront.
+    show_country_column = len(available_countries) > 1 and not country_filter
+    history_colspan = 8 + (1 if show_rank else 0) + (1 if show_country_column else 0)
+
     return render(
         request,
         "aso/dashboard.html",
         {
             "apps": apps,
+            # "Get set up" (aso/setup_checklist.py), None when every step is done
+            "setup": setup,
+            "welcome": welcome,
             "search_form": search_form,
             # App Summary panel (None when hidden)
             "app_summary": app_summary,
+            # Folded or open, as this visitor left it (aso/ui_memory.py)
+            "app_summary_folded": ui_memory.app_summary_folded(request),
             # History table context
             "history_results": history_results,
             "keyword_count": keyword_count,
             "selected_app": int(app_id) if app_id else None,
             "selected_app_name": selected_app_name,
+            # The app switcher beside the title, each app with its logo
+            # (aso/partials/country_picker.html with items)
+            "app_menu": [
+                {"value": "", "label": "All apps", "glyph": "all", "selected": not app_id},
+                *({"value": str(app.pk), "label": app.name, "icon": app.icon_url or "",
+                   "selected": str(app.pk) == str(app_id)} for app in apps),
+                {"value": "__manage__", "label": "Add or remove apps…", "glyph": "manage"},
+            ],
             "selected_country": country_filter,
             "available_countries": list(available_countries),
+            # What Refresh Rankings refreshes in this view, for its confirm.
+            "refresh_question": bulk_refresh_question(
+                selected_app_obj, country_filter or "", available_countries,
+            ),
             "show_rank": show_rank,
+            "show_country_column": show_country_column,
+            "history_colspan": history_colspan,
             "page": page,
             "per_page": per_page,
             "per_page_choices": HISTORY_PER_PAGE_CHOICES,
@@ -504,18 +523,26 @@ def dashboard_view(request):
             "current_sort": sort_by,
             "current_dir": sort_dir,
             # Filter state
-            "selected_insights": valid_insights,
+            "selected_insights": list(filters.insights),
+            "selected_labels": list(filters.labels),
+            "label_choices": label_choices,
+            # The filters as a query, for links that keep the view (Prev, Next)
+            "history_query": filters.query_string(),
             # Built from the scoring code, so the guide cannot grade a number
             # the rows beneath it grade differently.
             "scoring_guide": scoring_guide(),
-            "selected_pop_min": pop_min,
-            "selected_diff_max": diff_max,
-            "search_q": search_q,
-            "has_filters": has_filters,
+            "selected_pop_min": filters.pop_min,
+            "selected_diff_max": filters.diff_max,
+            "search_q": filters.q,
+            "has_filters": filters.narrowing,
             # Keyword search jobs (aso/search_jobs.py)
             "search_job": search_job_bootstrap,
             "keyword_limit_context": search_jobs.limit_context(),
             "cleanup": cleanup,
+            # What the sections were drawn from (aso/history_revision.py)
+            "history_revision": revision,
+            # The rows ticked in the table, kept on the server (aso/history_selection.py)
+            "history_selection": history_selection.state(request),
         },
     )
 
@@ -727,6 +754,31 @@ def search_job_dismiss_view(request, job_id):
 
 
 @require_POST
+def time_zone_view(request):
+    """The browser tells the app its time zone (base.html), so every day in
+    Search History is the reader's own (aso/local_day.py).
+
+    POST body: {"time_zone": "Europe/Stockholm"}. When the zone changes, the
+    stored history is regrouped into the new days in the background, and
+    the Dashboard follows through its change count.
+    """
+    from . import local_day
+
+    try:
+        name = json.loads(request.body or b"{}").get("time_zone")
+        changed = local_day.remember(name)
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return JsonResponse({"success": False, "error": "That is not a time zone."}, status=400)
+    if changed:
+        import threading
+
+        from .popularity import tidy_history_days
+
+        threading.Thread(target=tidy_history_days, daemon=True, name="history-days").start()
+    return JsonResponse({"success": True, "changed": changed, "time_zone": local_day.zone_name()})
+
+
+@require_POST
 def keyword_cleanup_snooze_view(request):
     """"Remind me in 30 days" on the keyword cleanup banner."""
     from . import ui_state
@@ -756,7 +808,6 @@ def _queue_entry(feature, row, **extra):
         "detail": described["detail"],
         "country": described["country"],
         "is_refinement": described["is_refinement"],
-        "quote_label": described.get("quote_label", True),
         "url": feature.open_url,
         **extra,
     }
@@ -775,11 +826,34 @@ def _queue_target(request):
     return feature, session_id, None
 
 
-@pro_required_json
+def _finished_run(spec):
+    """How the run ``"<feature>:<id>"`` ended, for the activity indicator on
+    pages that did not start it; None while it has not ended or is unknown."""
+    feature_key, _sep, raw_id = spec.partition(":")
+    feature = run_queue.get_feature(feature_key) if feature_key else None
+    if feature is None or not raw_id.isdigit():
+        return None
+    row = feature.model.objects.filter(pk=int(raw_id), **feature.filter_kwargs).first()
+    if row is None or row.status not in ("completed", "failed", "cancelled"):
+        return None
+    url = feature.open_url if feature.key == "keyword_search" else f"{feature.open_url}?run={row.pk}"
+    return {"feature": feature.key, "id": row.pk, "status": row.status,
+            "label": feature.describe(row)["label"], "url": url}
+
+
 def queue_status_view(request):
-    """Everything a tab needs to draw its progress panel and the queue."""
-    feature = run_queue.get_feature((request.GET.get("feature") or "").strip())
-    if feature is None:
+    """Everything a tab needs to draw its progress panel and the queue.
+
+    In every edition: the queue holds keyword searches and country scans too,
+    so everyone sees what runs and what waits, and can reorder it (the owner,
+    2026-10-02); the AI runs in it exist only with Pro.
+
+    Without ``feature`` (a page that owns no runs, such as Apps or Settings)
+    every running run is "elsewhere": the activity indicator in the top bar
+    shows it on every page."""
+    raw = (request.GET.get("feature") or "").strip()
+    feature = run_queue.get_feature(raw) if raw else None
+    if raw and feature is None:
         return JsonResponse({"error": "Unknown feature."}, status=400)
 
     running_here = running_elsewhere = None
@@ -788,7 +862,7 @@ def queue_status_view(request):
     if running is not None:
         run_feature, run_row = running
         executing_can_yield = run_feature.can_yield
-        if run_feature.key == feature.key:
+        if feature is not None and run_feature.key == feature.key:
             progress = run_feature.progress(run_row) if run_feature.progress else {}
             running_here = _queue_entry(run_feature, run_row, **progress)
         else:
@@ -806,7 +880,8 @@ def queue_status_view(request):
         in enumerate(run_queue.queued_runs(), start=1)
     ]
     return JsonResponse({
-        "feature": feature.key,
+        "feature": feature.key if feature is not None else "",
+        "finished": _finished_run(request.GET.get("finished") or ""),
         "lane_state": run_queue.lane_state(),
         "busy_with": run_queue.busy_reason() if running is None else None,
         "running_here": running_here,
@@ -815,7 +890,6 @@ def queue_status_view(request):
     })
 
 
-@pro_required_json
 @require_POST
 def queue_remove_view(request):
     """Take one waiting run out of the queue. A run that never started
@@ -835,7 +909,6 @@ def queue_remove_view(request):
     )
 
 
-@pro_required_json
 @require_POST
 def queue_clear_view(request):
     """Take every waiting run out of the queue. The executing run is never touched."""
@@ -844,7 +917,6 @@ def queue_clear_view(request):
     return JsonResponse({"ok": True, "removed": removed})
 
 
-@pro_required_json
 @require_POST
 def queue_move_view(request):
     """Move a waiting run up, down or to the front (``direction``)."""
@@ -857,7 +929,6 @@ def queue_move_view(request):
     return JsonResponse({"position": position})
 
 
-@pro_required_json
 @require_POST
 def queue_run_now_view(request):
     """Put a waiting run first and pause the executing run when it can
@@ -880,47 +951,18 @@ def app_lookup_view(request):
       - A search query (app name)
 
     Returns JSON list of matching apps with icon, name, bundle_id, track_id.
+    A bare App Store ID finds that app too (ITunesSearchService.find_apps).
     """
     query = request.GET.get("q", "").strip()
     if not query or len(query) < 2:
         return JsonResponse({"apps": []})
 
-    itunes_service = ITunesSearchService()
-
-    # Check if the query is an App Store URL
-    url_match = re.search(r"/id(\d+)", query)
-    if url_match:
-        track_id = int(url_match.group(1))
-        # Extract country code from URL (e.g. apps.apple.com/de/app/...)
-        country_match = re.search(
-            r"apps\.apple\.com/([a-z]{2})/", query, re.IGNORECASE
-        )
-        country = country_match.group(1).lower() if country_match else "us"
-        app_data = itunes_service.lookup_by_id(track_id, country=country)
-        if app_data:
-            return JsonResponse(
-                {
-                    "apps": [
-                        {
-                            "trackId": app_data["trackId"],
-                            "trackName": app_data["trackName"],
-                            "artworkUrl100": app_data["artworkUrl100"],
-                            "bundleId": app_data["bundleId"],
-                            "sellerName": app_data["sellerName"],
-                            "genre": app_data.get("primaryGenreName") or "",
-                            "shortName": sentence_app_name(app_data["trackName"]),
-                        }
-                    ]
-                }
-            )
-        return JsonResponse({"apps": []})
-
-    # Otherwise search by name
     try:
-        results = itunes_service.search_apps(query, limit=5)
-    except SearchAPIUnavailableError:
+        results = ITunesSearchService().find_apps(query)
+    except ITunesAPIError:
+        # Apple cannot be reached or is busy: say so, never "no apps found".
         return JsonResponse(
-            {"apps": [], "error": "App Store search is temporarily unavailable."}
+            {"apps": [], "error": APP_STORE_UNAVAILABLE}
         )
     return JsonResponse(
         {
@@ -959,8 +1001,8 @@ def apps_view(request):
     elif refresh_status == "current":
         message = "App is already up to date."
         message_type = "success"
-    elif refresh_status == "failed":
-        message = "Couldn't reach the App Store to refresh. Please try again."
+    elif refresh_status in ("missing", "unanswered"):
+        message = _refresh_problem(refresh_status, request.GET)
         message_type = "error"
 
     if request.method == "POST":
@@ -1017,9 +1059,28 @@ def apps_view(request):
 def app_delete_view(request, app_id):
     """Delete an app. Keywords are preserved (app set to null)."""
     app = get_object_or_404(App, id=app_id)
-    name = app.name
     app.delete()
     return redirect("aso:apps")
+
+
+# How many of an app's storefronts a refresh asks in turn while Apple has
+# no listing there: a person waits on the answer.
+REFRESH_STOREFRONTS = 3
+
+
+def _refresh_problem(status, query) -> str:
+    """The one sentence a refresh that found nothing shows, naming the app:
+    Apple has no listing for it where it is known ("missing"), or Apple did
+    not answer ("unanswered")."""
+    try:
+        app = App.objects.filter(pk=int(query.get("app") or 0)).first()
+    except (TypeError, ValueError):
+        app = None
+    name = sentence_app_name(app.name) if app else "this app"
+    if status == "missing":
+        where = countries.stores_phrase(countries.clean((query.get("in") or "").split(",")))
+        return f"Apple has no listing for {name} in {where}."
+    return f"Apple did not answer about {name}; try again in a few minutes."
 
 
 @require_POST
@@ -1029,17 +1090,35 @@ def app_refresh_view(request, app_id):
     Name/icon/seller are a snapshot taken when the app was first added. If the
     developer later renames the app (or changes its icon) on the App Store, the
     stored values go stale. This pulls the current values from iTunes via the
-    app's track_id and writes them back to the App row — the single source of
-    truth every screen reads from — so the refresh propagates everywhere the
+    app's track_id and writes them back to the App row (the single source of
+    truth every screen reads from), so the refresh propagates everywhere the
     title is shown. Manual apps (no track_id) can't be refreshed.
+
+    It looks in the storefronts the app is known in (app_profiles.
+    known_storefronts: its link's, then those its profile was read in), up
+    to REFRESH_STOREFRONTS of them in turn while Apple has no listing. Until
+    2.28.1 it looked only in the United States and said "Couldn't reach the
+    App Store" for an app Apple lists only elsewhere. Apple having no
+    listing and Apple not answering are told apart (_refresh_problem).
     """
     app = get_object_or_404(App, id=app_id)
     if not app.track_id:
         return redirect("aso:apps")
 
-    fresh = ITunesSearchService().lookup_by_id(app.track_id)
+    itunes = ITunesSearchService()
+    asked = []
+    fresh = None
+    for country in app_profiles.known_storefronts(app)[:REFRESH_STOREFRONTS]:
+        asked.append(country)
+        # A person waits on the page: one call each, no retries (lookup_by_id).
+        try:
+            fresh = itunes.lookup_by_id(app.track_id, country=country, retry=False)
+        except ITunesAPIError:
+            return redirect(f"{reverse('aso:apps')}?refresh=unanswered&app={app.pk}")
+        if fresh:
+            break
     if not fresh:
-        return redirect(f"{reverse('aso:apps')}?refresh=failed")
+        return redirect(f"{reverse('aso:apps')}?refresh=missing&app={app.pk}&in={','.join(asked)}")
 
     old_name = app.name
     app.name = fresh.get("trackName") or app.name
@@ -1096,6 +1175,11 @@ def _delete_tracking_entries(pairs):
         id__in={keyword_id for keyword_id, _ in existing}, results__isnull=True
     ).delete()
 
+    # Features that follow some of these pairs (the Pro build's Rival
+    # Tracker) stop following them: the row the user deleted is the one
+    # they followed.
+    pair_hooks.pairs_removed(existing)
+
     return len(existing)
 
 
@@ -1150,6 +1234,63 @@ def results_bulk_delete_view(request):
     return JsonResponse({"success": True, "deleted": deleted})
 
 
+# --- Labels on keywords (aso/keyword_labels.py) ---
+# The Labels dialog of the Dashboard's multi-select bar and the x on a row's
+# chip. A label belongs to the keyword, so the ids are keyword ids.
+
+def _label_request(request):
+    """(keyword ids, label name) from a label request; ValueError when there
+    are no keyword ids."""
+    body = json.loads(request.body or b"{}")
+    ids = body.get("keyword_ids")
+    if not isinstance(ids, list) or not ids:
+        raise ValueError
+    return ids, body.get("name", "")
+
+
+def _label_request_invalid():
+    return JsonResponse({"success": False, "error": "Select at least one keyword first."}, status=400)
+
+
+@require_POST
+def keyword_labels_add_view(request):
+    """Put a label on keywords. POST body: {"keyword_ids": [int], "name": str}"""
+    try:
+        ids, name = _label_request(request)
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _label_request_invalid()
+    try:
+        name, added = keyword_labels.add(ids, name)
+    except keyword_labels.LabelError as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
+    return JsonResponse({"success": True, "name": name, "added": added})
+
+
+@require_POST
+def keyword_labels_remove_view(request):
+    """Take a label off keywords. POST body: {"keyword_ids": [int], "name": str}"""
+    try:
+        ids, name = _label_request(request)
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _label_request_invalid()
+    return JsonResponse({"success": True, "removed": keyword_labels.remove(ids, name)})
+
+
+@require_POST
+def keyword_labels_of_view(request):
+    """The labels these keywords carry, with how many of them carry each, and
+    every label in use, to suggest. POST body: {"keyword_ids": [int]}"""
+    try:
+        ids, _ = _label_request(request)
+    except (ValueError, AttributeError, json.JSONDecodeError):
+        return _label_request_invalid()
+    return JsonResponse({
+        "success": True,
+        "labels": keyword_labels.labels_of(ids),
+        "in_use": keyword_labels.names_in_use(),
+    })
+
+
 @require_POST
 def keywords_bulk_delete_view(request):
     """
@@ -1169,6 +1310,53 @@ def keywords_bulk_delete_view(request):
     return JsonResponse({"success": True, "deleted": count})
 
 
+@require_http_methods(["GET", "POST"])
+def history_selection_view(request):
+    """The Dashboard's ticked rows (aso/history_selection.py).
+
+    GET answers {"seq": n, "entries": [{"pair": "12:us", "kw": "..."}]}.
+    POST takes {"add": ["12:us"], "remove": [...], "clear": true}, any of
+    them, applies it and answers the same way.
+    """
+    if request.method == "GET":
+        return JsonResponse(history_selection.state(request))
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:  # json.JSONDecodeError and bad UTF-8 both are
+        body = None
+    lists = [body.get(name, []) for name in ("add", "remove")] if isinstance(body, dict) else None
+    if lists is None or not all(
+        isinstance(items, list) and all(isinstance(item, str) for item in items) for items in lists
+    ):
+        return JsonResponse(
+            {"error": "Send add and remove as lists of rows such as \"12:us\"."}, status=400,
+        )
+    add, remove = lists
+    return JsonResponse(history_selection.change(request, add=add, remove=remove, clear=bool(body.get("clear"))))
+
+
+@require_POST
+def ui_memory_view(request):
+    """Something the page asks the app to remember for this visitor
+    (aso/ui_memory.py), sent by static/js/ui-memory.js.
+
+    POST {"name": "app_summary_folded", "value": true} or
+    {"name": "countries.search", "value": ["us", "de"]}; answers
+    {"ok": true, "value": <as stored>}, or 400 with an error.
+    """
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:  # json.JSONDecodeError and bad UTF-8 both are
+        body = None
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "Send a name and a value."}, status=400)
+    try:
+        value = ui_memory.save(request, body.get("name"), body.get("value"))
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    return JsonResponse({"ok": True, "value": value})
+
+
 @require_POST
 def keyword_refresh_view(request, keyword_id):
     """
@@ -1181,14 +1369,18 @@ def keyword_refresh_view(request, keyword_id):
     country = request.POST.get("country", "us")
 
     try:
+        # The user asked for fresh numbers: Apple is asked again, and the
+        # new read replaces the day for this row and every twin.
         search_result = score_keyword_pair(
             keyword_obj, country,
             itunes_service=ITunesSearchService(),
             difficulty_calc=DifficultyCalculator(),
             download_est=DownloadEstimator(),
+            force=True,
         )
-    except SearchAPIUnavailableError as e:
-        return JsonResponse({"error": str(e)}, status=503)
+    except ITunesAPIError:
+        # Apple cannot be reached or is busy (a busy answer used to end in a 500).
+        return JsonResponse({"error": APP_STORE_UNAVAILABLE}, status=503)
 
     app = keyword_obj.app
     pop = search_result.popularity_resolution()
@@ -1215,67 +1407,18 @@ def export_history_csv_view(request):
     """
     Export search history as a CSV file.
 
-    Supports the same filters as the dashboard: app, country, insight,
-    pop_min, diff_max.  Only the latest result per keyword+country is
-    exported (matching the dashboard table).
+    The rows the Dashboard's table shows under the same filters (app,
+    country, search text, Insight, tags, popularity, difficulty), read and
+    applied by aso/history_filters.py: the latest result per keyword and
+    country, newest first.
     """
-    app_id = request.GET.get("app")
-    country = request.GET.get("country")
-    insight_filter = request.GET.getlist("insight")
-    pop_min_raw = request.GET.get("pop_min")
-    diff_max_raw = request.GET.get("diff_max")
-    search_q = request.GET.get("q", "").strip()
-
-    pop_min = int(pop_min_raw) if pop_min_raw and pop_min_raw.isdigit() else None
-    diff_max = int(diff_max_raw) if diff_max_raw and diff_max_raw.isdigit() else None
-
-    from django.db.models import Max
-
-    # Deduplicate: keep only the latest result per keyword+country
-    latest_filter = {}
-    if app_id:
-        latest_filter["keyword__app_id"] = app_id
-    if country:
-        latest_filter["country"] = country.lower()
-
-    latest_ids = list(
+    filters = HistoryFilters.from_query(request.GET)
+    results_qs = history_filters.narrow(
         SearchResult.objects
-        .filter(**latest_filter)
-        .values("keyword_id", "country")
-        .annotate(latest_id=Max("id"))
-        .values_list("latest_id", flat=True)
-    )
-
-    results_qs = (
-        SearchResult.objects
-        .filter(id__in=latest_ids)
-        .select_related("keyword", "keyword__app")
-    )
-
-    # Apply keyword text search
-    if search_q:
-        results_qs = results_qs.filter(keyword__keyword__icontains=search_q)
-
-    # Apply popularity / difficulty filters (on the EFFECTIVE popularity —
-    # the value the user sees, per their source selection)
-    results_qs = annotate_effective_popularity(results_qs)
-    if pop_min is not None:
-        results_qs = results_qs.filter(
-            effective_pop__isnull=False,
-            effective_pop__gte=pop_min,
-        )
-    if diff_max is not None:
-        results_qs = results_qs.filter(
-            difficulty_score__isnull=False,
-            difficulty_score__lte=diff_max,
-        )
-
-    # Apply insight filter using stored classification column
-    valid_insights = [i for i in insight_filter if i in CLASSIFICATION_LABELS]
-    if valid_insights:
-        results_qs = results_qs.filter(classification__in=valid_insights)
-
-    results_qs = results_qs.order_by("-searched_at")
+        .filter(id__in=history_filters.latest_ids(filters))
+        .select_related("keyword", "keyword__app"),
+        filters,
+    ).order_by("-searched_at")
 
     # Determine export mode: summary (default) or with competitor apps
     include_apps = request.GET.get("include_apps", "").strip().lower()
@@ -1292,7 +1435,7 @@ def export_history_csv_view(request):
     writer = csv.writer(response)
 
     base_columns = [
-        "Keyword", "App", "Country", "Popularity",
+        "Keyword", "App", "Labels", "Country", "Popularity",
         "Popularity (RespectASO)", "Popularity (Apple Ads)",
         "Popularity Source", "Popularity Fallback",
         "Apple Popularity Trend",
@@ -1311,6 +1454,7 @@ def export_history_csv_view(request):
 
     export_results = list(results_qs)
     _attach_apple_trends(export_results)
+    labels_by_keyword = keyword_labels.names_by_keyword({r.keyword_id for r in export_results})
     for r in export_results:
         # "Popularity" is the effective value (per the user's source
         # selection); the per-source columns carry both raw values.
@@ -1343,6 +1487,7 @@ def export_history_csv_view(request):
         base_row = [
             r.keyword.keyword,
             r.keyword.app.name if r.keyword.app else "",
+            "; ".join(labels_by_keyword.get(r.keyword_id, [])),
             r.country.upper() if r.country else "",
             pop,
             r.popularity_score if r.popularity_score is not None else "",
@@ -1361,7 +1506,7 @@ def export_history_csv_view(request):
             r.classification,
             r.app_rank if r.app_rank else "",
             len(r.competitors_data) if r.competitors_data else 0,
-            r.searched_at.strftime("%Y-%m-%d %H:%M") if r.searched_at else "",
+            timezone.localtime(r.searched_at).strftime("%Y-%m-%d %H:%M") if r.searched_at else "",
         ]
 
         if not apps_limit:
@@ -1403,48 +1548,24 @@ def keywords_bulk_refresh_view(request):
       - app_id=<int> → only keywords linked to that app
       - country=""   → all countries
       - country="fr"  → only that country
+
+    The pairs and the start come from aso/scheduler.py, which the Mac app's
+    menu bar Update All Tracked Keywords uses too.
     """
+    from .scheduler import bulk_refresh_pairs, start_bulk_refresh
+
     body = json.loads(request.body)
-    app_id = body.get("app_id")
-    country = (body.get("country") or "").strip().lower()
-
-    from django.db.models import Max
-
-    # Find every keyword+country pair that already has at least one
-    # SearchResult.  This prevents the bug where keywords from other
-    # countries get scored in the wrong country.
-    base_qs = SearchResult.objects.all()
-    if app_id:
-        base_qs = base_qs.filter(keyword__app_id=app_id)
-    # app_id=null means "all" — no app filter applied
-
-    if country:
-        base_qs = base_qs.filter(country=country)
-
-    pairs = list(
-        base_qs
-        .values("keyword_id", "country")
-        .annotate(_latest=Max("id"))
-        .values_list("keyword_id", "country")
+    pairs = bulk_refresh_pairs(
+        app_id=body.get("app_id"),
+        country=(body.get("country") or "").strip().lower(),
     )
-
-    if not pairs:
+    outcome, message = start_bulk_refresh(pairs)
+    if outcome == "nothing":
         return JsonResponse({"success": True, "started": False, "total": 0})
-
-    from .scheduler import get_status, run_manual_refresh
-
-    status = get_status()
-    if status["running"]:
-        return JsonResponse({"success": False, "error": "A refresh is already in progress."})
-    running = run_queue.running_run()
-    if running is not None:
-        return JsonResponse({
-            "success": False,
-            "error": f"{running[0].label} is running. Refresh when it finishes.",
-        }, status=400)
-
-    if not run_manual_refresh(pairs):
-        return JsonResponse({"success": False, "error": "A refresh is already in progress."})
+    if outcome == "run_busy":
+        return JsonResponse({"success": False, "error": message}, status=400)
+    if outcome == "refreshing":
+        return JsonResponse({"success": False, "error": message})
     return JsonResponse({"success": True, "started": True, "total": len(pairs)})
 
 
@@ -1459,9 +1580,10 @@ def version_check_view(request):
 
 
 def auto_refresh_status_view(request):
-    """Return the current auto-refresh progress as JSON."""
+    """The ranking refresh's progress, and the change count the Dashboard
+    compares with the one its sections were drawn from."""
     from .scheduler import get_status
-    return JsonResponse(get_status())
+    return JsonResponse({**get_status(), "history_revision": history_revision.current()})
 
 
 GITHUB_RELEASES_URL = "https://github.com/respectlytics/respectaso/releases/latest"
@@ -1495,9 +1617,11 @@ def keyword_trend_view(request, keyword_id):
 
     data_points = []
     for r in qs:
+        # The reader's own day (aso/local_day.py, activated per request).
+        read_at = timezone.localtime(r.searched_at)
         data_points.append({
-            "date": r.searched_at.strftime("%Y-%m-%d"),
-            "date_display": r.searched_at.strftime("%b %d"),
+            "date": read_at.strftime("%Y-%m-%d"),
+            "date_display": read_at.strftime("%b %d"),
             # "popularity" stays the effective value (primary chart line);
             # both raw series ride along for the secondary dashed line.
             "popularity": r.effective_popularity,
@@ -1518,8 +1642,11 @@ def keyword_trend_view(request, keyword_id):
 
 
 def pro_promo_researcher_view(request):
-    """Promotional page for AI Niche Researcher (free version)."""
-    return render(request, "aso/pro_promo/ai_researcher.html")
+    """Free edition: the AI Niche Researcher tab shows the result page with sample
+    data and the keywords locked (aso/ai_tools_preview.py)."""
+    from .ai_tools_preview import STATE_FREE, context
+
+    return render(request, "aso/ai_tool_preview.html", context("researcher", STATE_FREE))
 
 
 def pro_promo_top_terms_view(request):
@@ -1532,11 +1659,28 @@ def pro_promo_top_terms_view(request):
     )
 
 
+def pro_promo_rival_tracker_view(request):
+    """Free edition: the Rival Tracker tab shows what the Pro page looks
+    like, with sample data and the app names and keywords locked
+    (aso/rival_tracker_preview.py)."""
+    from .rival_tracker_preview import STATE_FREE, preview_context
+
+    return render(
+        request, "aso/rival_tracker_preview.html", preview_context(STATE_FREE)
+    )
+
+
 def pro_promo_competitor_view(request):
-    """Promotional page for AI Competitor Analyzer (free version)."""
-    return render(request, "aso/pro_promo/ai_competitor.html")
+    """Free edition: the AI Competitor Analyzer tab shows the result page with sample
+    data and the keywords locked (aso/ai_tools_preview.py)."""
+    from .ai_tools_preview import STATE_FREE, context
+
+    return render(request, "aso/ai_tool_preview.html", context("competitor", STATE_FREE))
 
 
 def pro_promo_simulator_view(request):
-    """Promotional page for ASO Score Simulator (free version)."""
-    return render(request, "aso/pro_promo/simulator.html")
+    """Free edition: the ASO Score Simulator tab shows the result page with sample
+    data and the keywords locked (aso/ai_tools_preview.py)."""
+    from .ai_tools_preview import STATE_FREE, context
+
+    return render(request, "aso/ai_tool_preview.html", context("simulator", STATE_FREE))

@@ -1,0 +1,8 @@
+{% comment %}
+The settings tab bar: the way back to where the reader was before Settings
+(partials/back_link.html), then the shared section tabs
+(partials/section_tabs.html, data in aso.context_processors.nav), above each
+settings page's title.
+{% endcomment %}
+{% include "aso/partials/back_link.html" %}
+{% include "aso/partials/section_tabs.html" with section="settings" %}

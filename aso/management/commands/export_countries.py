@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         payload = {
-            "generated": dt.date.today().isoformat(),
+            "generated": dt.datetime.now().astimezone().date().isoformat(),
             "total": len(countries.CODES),
             "regions": list(countries.REGIONS),
             "countries": [

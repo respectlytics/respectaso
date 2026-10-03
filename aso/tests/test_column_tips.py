@@ -7,6 +7,7 @@ public edition too.
 
 import os
 import re
+from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase
@@ -25,7 +26,7 @@ class ColumnTipsTest(SimpleTestCase):
                     if not name.endswith((".html", ".js")):
                         continue
                     path = os.path.join(folder, name)
-                    text = open(path, encoding="utf-8").read()
+                    text = Path(path).read_text(encoding="utf-8")
                     with self.subTest(file=path):
                         self.assertNotRegex(text, r"now (→|&rarr;) at #1|, now and at #1")
 
@@ -45,7 +46,7 @@ class ColumnTipsTest(SimpleTestCase):
         for root in ("aso/templates", "aso_pro/templates"):
             for folder, _dirs, files in os.walk(os.path.join(settings.BASE_DIR, root)):
                 for name in files:
-                    text = open(os.path.join(folder, name), encoding="utf-8").read()
+                    text = Path(os.path.join(folder, name)).read_text(encoding="utf-8")
                     used |= set(re.findall(r'{% column_info "(\w+)"', text))
         self.assertTrue(used)
         self.assertEqual(used - set(COLUMN_TIPS) - {"opportunity"}, set())
@@ -67,7 +68,7 @@ class EveryScoreIsColouredOnTheTagBarsTest(SimpleTestCase):
         from aso.scoring import DIFFICULTY_BANDS, DIFFICULTY_CHIP, difficulty_chip, difficulty_color
 
         self.assertEqual(set(DIFFICULTY_CHIP), {band[1] for band in DIFFICULTY_BANDS})
-        for score in range(0, 101):
+        for score in range(101):
             # The chip carries the band's own text colour; only Extreme's
             # darkest red is lifted one step, to read on its tint.
             text = difficulty_color(score)
@@ -83,7 +84,7 @@ class TheTooltipBelongsToOneElementTest(SimpleTestCase):
     three parts in place."""
 
     def setUp(self):
-        self.js = open(os.path.join(settings.BASE_DIR, "static/js/tooltip.js")).read()
+        self.js = Path(os.path.join(settings.BASE_DIR, "static/js/tooltip.js")).read_text()
 
     def test_it_never_catches_the_mouse(self):
         self.assertIn("tip.style.pointerEvents = 'none'", self.js)

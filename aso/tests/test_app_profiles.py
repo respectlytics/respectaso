@@ -6,7 +6,7 @@ age in that storefront. The profile is cached on the app so every row, tab
 and scan for the same app and storefront reads the same values.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 from django.test import TestCase
@@ -29,7 +29,7 @@ def lookup_returning(count, average=4.6, released=RELEASED, name="Calm Minutes: 
 
 
 def stale():
-    return (datetime.now(timezone.utc) - timedelta(hours=30)).isoformat()
+    return (datetime.now(UTC) - timedelta(hours=30)).isoformat()
 
 
 class CacheTest(TestCase):
@@ -161,8 +161,10 @@ class RowsFollowTheirAppTest(TestCase):
         self.assertGreater(strong_row.opportunity_score, new_row.opportunity_score)
         self.assertTrue(strong_row.opportunity_reach["label"].startswith("Calm Minutes: typically ~#"))
         self.assertTrue(new_row.opportunity_reach["label"].startswith("new app: typically ~#"))
-        self.assertIn("RespectASO has not read Sleepy's ratings",
-                      new_row.opportunity_reach["explanation"])
+        # Sleepy's ratings have not been read: named, and scored as a new app.
+        tip = new_row.opportunity_reach["tip"]
+        self.assertTrue(tip.startswith("Sleepy can expect "), tip)
+        self.assertTrue(tip.endswith(" here, scored as a new app."), tip)
 
     def test_a_real_rank_that_is_better_is_the_rank_used(self):
         row = self.row(self.new)
@@ -186,9 +188,9 @@ class BackfillTest(TestCase):
                                "averageUserRating": 4.4, "releaseDate": RELEASED}],
         )
         SearchResult.objects.filter(pk=older.pk).update(
-            searched_at=datetime.now(timezone.utc) - timedelta(days=5))
+            searched_at=datetime.now(UTC) - timedelta(days=5))
         SearchResult.objects.filter(pk=newer.pk).update(
-            searched_at=datetime.now(timezone.utc) - timedelta(days=1))
+            searched_at=datetime.now(UTC) - timedelta(days=1))
         self.assertEqual(app_profiles.backfill_from_history(), 1)
         app.refresh_from_db()
         profile = app_profiles.cached_profile(app, "us")

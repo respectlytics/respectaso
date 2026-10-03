@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from aso import ui_state
-from aso.keyword_cleanup import cleanup_suggestion, duration_text
+from aso.keyword_cleanup import cleanup_suggestion
 from aso.models import Keyword, SearchResult
 
 
@@ -49,7 +49,7 @@ class CleanupSuggestionTest(TestCase):
         data = cleanup_suggestion(self.latest(), app_id=3)
         self.assertEqual(data["pairs"], 800)
         self.assertEqual(data["candidates"], 50)
-        self.assertEqual(data["refresh_text"], "about 1 h 7 min")
+        self.assertEqual(data["refresh_text"], "about 1 hour 7 minutes")
         self.assertIn("insight=Low+Volume", data["filter_url"])
         self.assertNotIn("insight=Avoid", data["filter_url"])   # retired, round 4
         self.assertIn("app=3", data["filter_url"])
@@ -71,11 +71,5 @@ class CleanupSuggestionTest(TestCase):
         seed(800, 50)
         resp = self.client.get(reverse("aso:dashboard"))
         self.assertContains(resp, "Your daily refresh is getting long")
-        self.assertContains(resp, "re-checks 800 keyword and country pairs")
-        self.assertContains(resp, "50 of them are Low Volume.")
-
-    def test_duration_text(self):
-        self.assertEqual(duration_text(20), "less than a minute")
-        self.assertEqual(duration_text(48 * 60), "about 48 min")
-        self.assertEqual(duration_text(2 * 3600 + 10 * 60), "about 2 h 10 min")
-        self.assertEqual(duration_text(3 * 3600), "about 3 h")
+        self.assertContains(resp, "Updating rankings takes")
+        self.assertContains(resp, "50 keywords are Low Volume: remove those you don")

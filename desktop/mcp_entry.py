@@ -20,7 +20,6 @@ MCP client config example (Claude Desktop):
     }
 """
 
-import os
 import sys
 from pathlib import Path
 

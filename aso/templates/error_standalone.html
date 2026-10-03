@@ -4,7 +4,9 @@ The shell of the 400 and 500 pages (aso/error_views.py). Standalone on
 purpose: Django renders them without a request, and a 500 may come from the
 database, a context processor or the stylesheet the normal shell needs. So
 no context processors, no url or static tags: the styles are inline, in the
-app's own dark palette, and the way home is a plain "/".
+app's own dark palette, and the way home is a plain "/". It names the app's
+own font files by their plain address; when even those cannot load, the
+system fonts take over and the page still works.
 {% endcomment %}
 <html lang="en">
 <head>
@@ -13,23 +15,26 @@ app's own dark palette, and the way home is a plain "/".
     <meta name="robots" content="noindex">
     <title>{% block title %}{% endblock %} · RespectASO</title>
     <style>
-        :root { color-scheme: dark; }
+        @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("/static/fonts/inter/Inter-Regular.woff2") format("woff2"); }
+        @font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("/static/fonts/inter/Inter-Medium.woff2") format("woff2"); }
+        @font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("/static/fonts/inter/Inter-SemiBold.woff2") format("woff2"); }
+        :root { color-scheme: dark; font-synthesis: style; }
         * { box-sizing: border-box; }
         body {
             margin: 0; min-height: 100vh; display: flex; flex-direction: column;
             background: #0f172a; color: #f8fafc;
-            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+            font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
             font-size: 14px; line-height: 1.5;
         }
         header { padding: 16px 28px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        header a { color: #f8fafc; font-weight: 700; font-size: 16px; text-decoration: none; }
+        header a { color: #f8fafc; font-weight: 600; font-size: 16px; text-decoration: none; }
         main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: 64px 28px; }
         .card {
             background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px; padding: 28px;
         }
         .code { color: #94a3b8; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
-        h1 { font-size: 20px; font-weight: 700; margin: 6px 0 8px; }
+        h1 { font-size: 18px; font-weight: 600; line-height: 1.3; margin: 6px 0 10px; }
         p { color: #cbd5e1; margin: 0 0 8px; }
         .actions { display: flex; gap: 8px; margin-top: 20px; }
         .button {
@@ -51,7 +56,7 @@ app's own dark palette, and the way home is a plain "/".
             <h1>{% block heading %}{% endblock %}</h1>
             {% block message %}{% endblock %}
             <div class="actions">
-                <a class="button primary" href="/">Back to the Dashboard</a>
+                <a class="button primary" href="/">Back to Keywords</a>
                 {% block more_actions %}{% endblock %}
             </div>
         </section>

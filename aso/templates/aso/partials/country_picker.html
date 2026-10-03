@@ -1,4 +1,4 @@
-{% comment %}
+{% load aso_tags %}{% comment %}
 The country picker, used by the keyword search on the dashboard and by the
 Country Opportunity Finder. There is one of these, not one per page: two
 hand written copies inside dashboard.html and opportunity.html had already
@@ -8,10 +8,39 @@ Parameters, all passed with {% include ... with %}:
 
   picker_id      unique id on the page, e.g. "search-countries"
   label          the field label above the button
+  label_hidden   keep the label for screen readers only, where the card
+                 around the picker already says what it is
   max            maximum selectable, omitted or 0 means no limit
-  storage_key    localStorage key remembering the selection for this picker
-  preset         preset id selected the first time a browser opens it
+  memory_key     which picker this is for the memory of its last selection
+                 ("search" or "opportunity", aso/ui_memory.py COUNTRY_PICKERS);
+                 omitted, the picker remembers nothing
+  preset         preset id selected while nothing is remembered
   cost_per_country  seconds one country costs, drives the cost line
+  items_id       the id of a json_script of [{value, label, icon, hint,
+                 selected}]: the picker then chooses ONE of these items (the
+                 Rival Tracker setup's App) with the same button and panel,
+                 and the country parts (presets, bulk choices, cost and
+                 coverage lines) are left out
+  search_placeholder  the search field's placeholder in that case; an item
+                 may carry a "glyph" ("all" or "manage") in place of an icon
+  items_select   the id of a <select> on the page: its options are the items
+                 (data-icon, data-hint, data-glyph, data-placeholder on each),
+                 and the picker writes every choice back to it with a change
+                 event, so a form and the page's scripts keep using the
+                 select, hidden, as before; a script that refills it is
+                 followed by itself, one that sets its value calls
+                 CountryPicker.syncSelect(id)
+  header         the compact look of a page's own switcher beside the page
+                 title (the Keywords and Rival Tracker app switchers)
+  small          the look of a small filter beside other small filters
+  button_class   the size and colour of the fields beside it, when they
+                 differ from the default (the AI tabs' forms, a dialog)
+  highlight      an amber edge asking for a choice
+  align_right    the panel opens leftwards from the button's right edge,
+                 for a picker at the right of the page
+  compact        the button names the first country and how many more
+                 ("United States +2"), for a narrow slot like the Keywords
+                 search line
 
 The hidden input is the contract with the surrounding form: a plain
 new FormData(form) picks up countries=us,de,fr with no glue code.
@@ -21,55 +50,63 @@ base.html emits once, so this file carries no country data at all.
 {% endcomment %}
 <div class="cp-root relative" id="{{ picker_id }}"
      data-max="{{ max|default:'' }}"
-     data-storage-key="{{ storage_key }}"
+     data-memory-key="{{ memory_key|default:'' }}"
+     data-remembered="{% if memory_key %}{% remembered_countries memory_key %}{% else %}[]{% endif %}"
      data-default-preset="{{ preset|default:'' }}"
-     data-cost-per-country="{{ cost_per_country|default:'' }}">
+     data-cost-per-country="{{ cost_per_country|default:'' }}"{% if compact %}
+     data-compact="1"{% endif %}{% if items_id %}
+     data-items="{{ items_id }}"{% endif %}{% if items_select %}
+     data-select="{{ items_select }}"{% endif %}>
     {% if label %}
-    <label class="block text-xs font-medium text-slate-300 mb-1.5" for="{{ picker_id }}-button">
-        {{ label }}{% if max %} <span class="text-slate-500">(max {{ max }})</span>{% endif %}
+    <label class="{% if label_hidden %}sr-only{% else %}block text-xs font-medium text-slate-300 mb-1.5{% endif %}" for="{{ picker_id }}-button">
+        {{ label }}{% if max %} <span class="text-slate-400">(max {{ max }})</span>{% endif %}
     </label>
     {% endif %}
 
     <button type="button" id="{{ picker_id }}-button"
-            class="cp-button w-full flex items-center justify-between gap-2 bg-slate-700 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            class="cp-button {% if button_class %}{{ button_class }}{% elif header %}min-w-[14rem] max-w-[22rem] bg-slate-800 px-3 py-1.5 text-sm font-medium text-white{% elif small %}w-full bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200{% else %}w-full bg-slate-700 px-3 py-2.5 text-sm text-white{% endif %} flex items-center justify-between gap-2 border {% if highlight %}border-amber-400/70 ring-1 ring-amber-400/40{% else %}border-white/10{% endif %} rounded-lg hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500"
             aria-haspopup="true" aria-expanded="false">
-        <span class="cp-button-text truncate">Loading storefronts</span>
+        <span class="cp-button-text truncate">{% if items_id or items_select %}&nbsp;{% else %}Loading storefronts{% endif %}</span>
         <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
     </button>
 
-    <div class="cp-panel hidden absolute z-50 mt-1 w-full min-w-[22rem] bg-slate-800 border border-white/10 rounded-lg shadow-xl">
+    <div class="cp-panel hidden absolute z-50 mt-1 {% if align_right %}right-0{% else %}w-full{% endif %} min-w-[22rem] bg-slate-800 border border-white/10 rounded-lg shadow-xl">
         <div class="p-2 border-b border-white/5 space-y-2">
             <input type="search" class="cp-search w-full bg-slate-900/70 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                   placeholder="Search countries" autocomplete="off">
-            <div class="cp-presets flex flex-wrap gap-1"></div>
+                   placeholder="{{ search_placeholder|default:'Search countries' }}" autocomplete="off">
+            {% if not items_id and not items_select %}<div class="cp-presets flex flex-wrap gap-1"></div>{% endif %}
         </div>
 
-        <div class="cp-bulk flex items-center justify-between px-3 py-1.5 border-b border-white/5 text-[11px]">
+        {% if not items_id and not items_select %}
+        <div class="cp-bulk flex items-center justify-between px-3 py-1.5 border-b border-white/5 text-2xs">
             <span class="cp-count text-slate-400"></span>
             <span class="flex gap-3">
-                <button type="button" class="cp-select-all text-purple-300 hover:text-purple-200">Select all</button>
-                <button type="button" class="cp-select-none text-slate-400 hover:text-slate-200">Clear</button>
+                <button type="button" class="link cp-select-all">Select all</button>
+                <button type="button" class="link cp-select-none">Clear</button>
             </span>
         </div>
+        {% endif %}
 
         <div class="cp-list max-h-80 overflow-y-auto py-1"></div>
 
-        <p class="cp-empty hidden px-3 py-4 text-xs text-slate-500 text-center">No country matches that.</p>
+        <p class="cp-empty hidden px-3 py-4 text-xs text-slate-400 text-center">{% if items_id or items_select %}Nothing matches that.{% else %}No country matches that.{% endif %}</p>
 
+        {% if not items_id and not items_select %}
         <div class="px-3 py-2 border-t border-white/5">
-            <p class="cp-cost text-[11px] text-slate-400"></p>
-            <p class="text-[11px] text-slate-500 mt-1">
+            <p class="cp-cost text-2xs text-slate-400"></p>
+            <p class="text-2xs text-slate-400 mt-1">
                 Markers show what is different in a country.
-                <a href="{% url 'aso:methodology' %}#country-coverage" class="text-purple-300 hover:text-purple-200">How coverage works</a>
+                <a href="{% url 'aso:methodology' %}#country-coverage" class="link">How coverage works</a>
             </p>
         </div>
+        {% endif %}
     </div>
 
     {% comment %}The form attribute is what lets the picker live outside the
     <form> it belongs to, which is the case on the dashboard. Without it the
     selection never reaches the server and the search quietly falls back to
     the United States.{% endcomment %}
-    <input type="hidden" class="cp-value" name="{{ field_name|default:'countries' }}"{% if form_id %} form="{{ form_id }}"{% endif %}>
+    {% if not items_select %}<input type="hidden" class="cp-value" name="{{ field_name|default:'countries' }}"{% if form_id %} form="{{ form_id }}"{% endif %}>{% endif %}
 </div>

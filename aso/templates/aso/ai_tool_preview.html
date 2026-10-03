@@ -1,0 +1,121 @@
+{% extends "aso/base.html" %}
+{% comment %}
+AI Researcher, AI Competitor or the ASO Simulator without Pro
+(docs/development/PRO_PREVIEWS_PLAN.md): the real result page with sample
+results, the keywords locked, the feature's promise and two clear buttons,
+at the top, over the sample table and at the bottom. Context comes from
+aso.ai_tools_preview.context(feature, state). Nothing here is a live
+control: what looks clickable in the sample is a span.
+{% endcomment %}
+
+{% block title %}{{ page_title }} · RespectASO{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    {% include "aso/partials/back_link.html" %}
+    {% if feature != "simulator" %}{% include "aso/partials/section_tabs.html" with section="discover" %}{% endif %}
+
+    <div class="mb-4">
+        <h1 class="page-title">{{ page_title }}</h1>
+        <p class="page-lead">{{ page_lead }}</p>
+    </div>
+
+    {% include "aso/partials/preview_hero.html" %}
+
+    <div class="mb-3 flex items-center justify-between gap-4">
+        <span class="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+            <span class="h-1.5 w-1.5 rounded-full bg-amber-300"></span>
+            Preview with sample data · keywords locked
+        </span>
+        <span class="text-xs text-slate-400">The real page looks like this, with your own results.</span>
+    </div>
+
+    <div class="space-y-4 select-none">
+    {% if feature == "simulator" %}
+        {% with s=sample.simulator %}
+        <section class="card p-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="relative h-16 w-16 shrink-0">
+                        <svg viewBox="0 0 36 36" class="h-16 w-16 -rotate-90" aria-hidden="true">
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgb(52,211,153)" stroke-width="3" stroke-dasharray="{{ s.readiness }} 100" stroke-linecap="round"/>
+                        </svg>
+                        <span class="absolute inset-0 flex items-center justify-center text-base font-semibold text-white">{{ s.readiness }}</span>
+                    </div>
+                    <div>
+                        <p class="card-title">ASO Readiness</p>
+                        <p class="mt-1 text-sm text-slate-300">{{ s.readiness_label }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="relative h-16 w-16 shrink-0">
+                        <svg viewBox="0 0 36 36" class="h-16 w-16 -rotate-90" aria-hidden="true">
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgb(250,204,21)" stroke-width="3" stroke-dasharray="{{ s.ranking }} 100" stroke-linecap="round"/>
+                        </svg>
+                        <span class="absolute inset-0 flex items-center justify-center text-base font-semibold text-white">{{ s.ranking }}</span>
+                    </div>
+                    <div>
+                        <p class="card-title">Ranking Effectiveness</p>
+                        <p class="mt-1 text-sm text-slate-300">{{ s.ranking_label }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 rounded-lg border border-purple-400/30 bg-purple-500/10 px-4 py-3">
+                <p class="text-sm font-semibold text-purple-200">What this metadata can reach</p>
+                <p class="mt-1 text-sm text-slate-200">{{ s.reach }}</p>
+            </div>
+            <dl class="mt-4 grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt class="text-slate-400">Title</dt><dd class="text-white">{{ s.title }}</dd>
+                <dt class="text-slate-400">Subtitle</dt><dd class="text-white">{{ s.subtitle }}</dd>
+                <dt class="text-slate-400">Keyword field</dt><dd class="font-mono text-white blur-sm">{{ s.keyword_field }}</dd>
+            </dl>
+        </section>
+        {% endwith %}
+    {% else %}
+        {% include "aso/partials/verdict_card.html" with verdict=sample.verdict listing=sample.listing simulate_url="" competitor_name=sample.competitor_name locked=True %}
+    {% endif %}
+
+        <section class="card relative overflow-hidden">
+            <div class="flex items-center justify-between px-4 pt-4">
+                <h2 class="card-title">Keywords</h2>
+                <span class="text-xs text-slate-400">{{ sample.rows|length }} of {{ sample.verdict.total }} sample keywords</span>
+            </div>
+            <table class="mt-3 w-full text-sm">
+                <thead>
+                    <tr class="border-b border-white/10 text-xs text-slate-400">
+                        <th class="px-4 py-2 text-left font-medium">Keyword</th>
+                        <th class="px-3 py-2 text-center font-medium">Popularity</th>
+                        <th class="px-3 py-2 text-center font-medium">Difficulty</th>
+                        <th class="bg-cyan-500/5 px-3 py-2 text-center font-semibold text-cyan-300">Opportunity</th>
+                        <th class="px-3 py-2 text-center font-medium">Downloads at #1</th>
+                        <th class="px-3 py-2 text-left font-medium">Insight</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in sample.rows %}
+                    <tr class="border-b border-white/5">
+                        <td class="px-4 py-2.5"><span class="preview-term blur-sm font-medium text-white">{{ row.keyword }}</span></td>
+                        <td class="px-3 py-2.5 text-center font-semibold text-purple-400">{{ row.popularity }}</td>
+                        <td class="px-3 py-2.5 text-center text-slate-200">{{ row.difficulty }}</td>
+                        <td class="bg-cyan-500/5 px-3 py-2.5 text-center font-semibold text-cyan-300">{{ row.opportunity }}</td>
+                        <td class="px-3 py-2.5 text-center tabular-nums text-slate-300">{{ row.downloads }}</td>
+                        <td class="px-3 py-2.5">{% for chip in chips %}{% if chip.label == row.classification %}<span class="{{ chip.css }} inline-flex items-center gap-0.5 whitespace-nowrap rounded border px-1.5 py-0.5 text-2xs">{{ chip.icon }} {{ chip.label }}</span>{% endif %}{% endfor %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#1e293b] via-[#1e293b]/90 to-transparent"></div>
+            <div class="absolute inset-x-0 bottom-6 flex justify-center px-4">
+                <div class="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 shadow-xl">
+                    <p class="text-sm font-medium text-white">{{ cta.table_line }}</p>
+                    {% include "aso/partials/preview_buttons.html" %}
+                </div>
+            </div>
+        </section>
+    </div>
+
+    {% include "aso/partials/preview_footer.html" %}
+</div>
+{% endblock %}

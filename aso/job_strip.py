@@ -1,7 +1,10 @@
 """The global progress strip: one line about whatever long job is running.
 
 The app now has two of them, a keyword search and a country scan, and the
-strip shows whichever one is actually going. The sentence is composed HERE and
+strip shows whichever one is actually going. One that waits in the queue is
+not shown: the activity panel's Up next lists it, and drawn here with a
+spinner it read as the running task (the owner, 2026-10-02: a waiting
+country scan took the place of the Simulator run that was going). The sentence is composed HERE and
 not in JavaScript, because it depends on data: how many countries, how many
 keywords, what state. static/js/keyword-search-job.js already said as much in
 its own docstring while composing the strip sentence itself; this fixes that.
@@ -14,6 +17,7 @@ from __future__ import annotations
 from django.urls import reverse
 
 from . import opportunity_scans, search_jobs
+from .models import KeywordSearchJob, OpportunityScan
 
 
 def _keyword_line(job) -> tuple[str, str, str]:
@@ -21,17 +25,14 @@ def _keyword_line(job) -> tuple[str, str, str]:
     done = search_jobs.fmt(job.keywords_done)
     total = search_jobs.fmt(job.total_keywords)
     if job.status == "running":
-        return f"Keyword research running: {done} of {total} keywords", "Open", "spinner"
-    if job.status == "queued":
-        return (f"Keyword research queued: {search_jobs.keywords_text(job.total_keywords)}",
-                "Open", "spinner")
+        return f"Keyword search running: {done} of {total} keywords", "Open", "spinner"
     if job.status == "completed":
-        return (f"Keyword research finished: {search_jobs.keywords_text(job.total_keywords)}",
+        return (f"Keyword search finished: {search_jobs.keywords_text(job.total_keywords)}",
                 "See results", "done")
     if job.status == "cancelled":
-        return (f"Keyword research stopped at {done} of {total} keywords",
+        return (f"Keyword search stopped at {done} of {total} keywords",
                 "See results", "done")
-    return (f"Keyword research paused at {done} of {total} keywords",
+    return (f"Keyword search paused at {done} of {total} keywords",
             "Open" if job.auto_resume else "Resume", "pause")
 
 
@@ -42,8 +43,6 @@ def _scan_line(scan) -> tuple[str, str, str]:
     noun = "country" if scan.total_countries == 1 else "countries"
     if scan.status == "running":
         return f"Country scan running: {done} of {total} {noun}", "Open", "spinner"
-    if scan.status == "queued":
-        return f"Country scan queued: {total} {noun}", "Open", "spinner"
     if scan.status == "completed":
         return f"Country scan finished: {total} {noun}", "See results", "done"
     if scan.status == "cancelled":
@@ -53,7 +52,15 @@ def _scan_line(scan) -> tuple[str, str, str]:
 
 
 def _is_active(row) -> bool:
-    return row.status in ("running", "queued") or bool(row.auto_resume)
+    return row.status == "running" or bool(row.auto_resume)
+
+
+def _shown(active, finished):
+    """The row of one kind the strip shows: the running or paused one, else
+    the newest finished one not dismissed. Never a queued one."""
+    if active is not None and active.status != "queued":
+        return active
+    return finished()
 
 
 def strip_state() -> dict | None:
@@ -61,9 +68,14 @@ def strip_state() -> dict | None:
 
     The running row wins whichever feature it belongs to, then the newest
     active row, then the newest finished row the user has not dismissed.
+    While a keyword search or a country scan waits in the queue the state is
+    ``active``, so the page keeps asking and shows it the moment it starts;
+    with nothing else to show it is ``{"shown": False, "active": True}``.
     """
-    job = search_jobs.strip_job()
-    scan = opportunity_scans.strip_scan()
+    job = _shown(search_jobs.panel_job(), search_jobs.finished_job)
+    scan = _shown(opportunity_scans.panel_scan(), opportunity_scans.finished_scan)
+    waiting = (KeywordSearchJob.objects.filter(status="queued").exists()
+               or OpportunityScan.objects.filter(status="queued").exists())
 
     candidates = []
     if job is not None:
@@ -71,7 +83,7 @@ def strip_state() -> dict | None:
     if scan is not None:
         candidates.append(("opportunity_scan", scan))
     if not candidates:
-        return None
+        return {"shown": False, "active": True} if waiting else None
 
     def rank(entry):
         _kind, row = entry
@@ -92,6 +104,7 @@ def strip_state() -> dict | None:
         percent = row.progress_percent
 
     return {
+        "shown": True,
         "kind": kind,
         "text": text,
         "link_label": link_label,
@@ -99,5 +112,5 @@ def strip_state() -> dict | None:
         "icon": icon,
         "progress_percent": percent,
         "show_bar": row.status == "running",
-        "active": _is_active(row),
+        "active": _is_active(row) or waiting,
     }

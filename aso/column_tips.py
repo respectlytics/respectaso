@@ -26,42 +26,26 @@ OPPORTUNITY_SUBJECTS = {
     "finder": "for a new app",
 }
 
-_OPPORTUNITY_SCALE = (
-    " 50 is about one download a day, and every tenfold change moves it 20 points."
-)
-_UPSIDE = " What #1 pays is in the Downloads at #1 column."
-_HOVER = " Hover a score for how it is worked out."
-
 OPPORTUNITY_TIPS = {
     "new_app": (
-        "What each keyword is worth to a brand new app: the downloads a day it can "
-        "expect with the keyword in its title, from where new apps actually land in "
-        "App Store searches." + _HOVER + _UPSIDE + _OPPORTUNITY_SCALE
+        "What the keyword is worth to a brand new app: the downloads a day it can "
+        "expect with the keyword in its title."
     ),
     "app": (
-        "What each keyword is worth to the app being simulated, judged by its "
-        "ratings, average stars and age in this storefront: its real rank when it "
-        "already ranks well, otherwise where apps as strong land with the keyword in "
-        "their title." + _HOVER + _UPSIDE + _OPPORTUNITY_SCALE
+        "What the keyword is worth to the simulated app, at the rank an app this "
+        "strong can reach."
     ),
     "picked": (
-        "What each keyword is worth to the app you picked, judged by its "
-        "ratings, average stars and age in this storefront: where apps as "
-        "strong land with the keyword in their title." + _HOVER + _UPSIDE
-        + _OPPORTUNITY_SCALE
+        "What the keyword is worth to the app you picked, at the rank an app this "
+        "strong can reach."
     ),
     "tracked": (
-        "The one to act on: what the keyword is worth in this storefront to the app "
-        "named under it, at the rank that app can realistically reach, judged by its "
-        "own ratings there. A keyword not tied to an app is scored for a brand new "
-        "app, and says so." + _HOVER + _UPSIDE + _OPPORTUNITY_SCALE
+        "The one to act on: what the keyword is worth to the app named under it, "
+        "or a new app, at a rank it can reach."
     ),
     "finder": (
-        "The one to act on, and what this table is sorted by: what the keyword is "
-        "worth in each storefront to the app you picked, or to a brand new app if you "
-        "picked none, at the rank that app can realistically reach there, judged by "
-        "its own ratings in that storefront." + _HOVER + _UPSIDE + _OPPORTUNITY_SCALE
-        + " That scale is why countries compare fairly."
+        "The one to act on: what the keyword is worth in each storefront to the app "
+        "you picked, or a new app."
     ),
 }
 
@@ -72,51 +56,36 @@ COLUMN_TIPS = {
         "the way Apple matches it against searches."
     ),
     "source": (
-        "Where the keyword comes from: your seed keyword, the AI's suggestions, the "
-        "fields of the metadata, or a combination of words across fields (Title + "
-        "KF, for example). Hover a badge for its exact meaning."
+        "Where the keyword comes from: your seed, the AI, a metadata field or words "
+        "combined across fields."
     ),
     "popularity": (
-        "How sought after this keyword is, on Apple's 1 to 100 scale. It is an "
-        "index, not a number of searches: the same 41 means far more searches in a "
-        "large storefront than in a small one. For what it is worth in this "
-        "country, read Opportunity."
+        "How sought after the keyword is. It is an index, not a number of searches: "
+        "compare countries by Opportunity."
     ),
     "difficulty": (
-        "How hard it is to rank, from 0 to 100, from 7 signals across the apps "
-        "already ranking: their ratings, how fast they grow, brand strength, title "
-        "relevance, rating quality, market maturity and how many publishers share "
-        "the results."
+        "How hard it is to rank, 0 to 100, judged by the apps already ranking: their "
+        "ratings, growth, brands and titles."
     ),
     "downloads": (
-        "What this keyword pays per day to whichever app holds #1 in the search "
-        "results here: the size of the prize, not what a given app would get. "
-        "What an app can realistically expect is the Opportunity score, with its "
-        "rank on the line underneath. Hover a cell for #1, #5 and #10. Shown as a "
-        "range from a tenth of the estimate to the estimate: real downloads depend "
-        "on how many people really search the term and on how many who see the app "
-        "install it, which RespectASO cannot measure."
+        "What the #1 app gets here in downloads a day: the prize, not what a given "
+        "app gets. Hover for #1, #5 and #10."
     ),
     "classification": (
-        "What to do with the keyword. Low Volume: skip it, because even #1 brings "
-        "under one download a day (the estimate at the top of Downloads at #1). Otherwise the "
-        "Opportunity score decides: Sweet Spot from 10 downloads a day, Good Target "
-        "from 1, Supporting from one every 10 days, and below that Worth Climbing. "
-        "Hover a tag for what it means for that row."
+        "What to do with the keyword, from its Opportunity; Low Volume means even #1 "
+        "brings under one download a day."
     ),
     "competitor_rank": (
-        "Where the competitor's app ranks for this keyword in this storefront, from "
-        "a live App Store search of the top 200 results. A dash means it is not in "
-        "them."
+        "Where the competitor ranks here among the App Store's top 200 results. A "
+        "dash means it is not in them."
     ),
     "app_rank": (
-        "Where the app ranks for this keyword in this storefront today, from a live "
-        "App Store search of the top 200 results. A dash means it is not in them."
+        "Where the app ranks here today among the App Store's top 200 results. A "
+        "dash means it is not in them."
     ),
     "status": (
-        "Covered: already scored in the keyword table above. New: a term the AI "
-        "brought into the metadata that was not in that table, searched on the App "
-        "Store to check it has real search volume."
+        "Covered: already in the keyword table above. New: a term the AI added, "
+        "checked on the App Store for real demand."
     ),
 }
 

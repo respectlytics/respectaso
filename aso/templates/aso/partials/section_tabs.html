@@ -1,0 +1,22 @@
+{% comment %}
+A section's tabs, above the page title (UI_REDESIGN_PLAN.md 3.2). section is
+"discover" or "settings"; the tabs, their addresses and which one is shown
+come from aso.context_processors.nav. Without Pro, a Pro feature's tab
+carries the Pro lock and says on hover what it does for the reader. Settings
+shows no bar when it has one tab (the free edition in Docker).
+{% endcomment %}
+{% if section == "discover" %}
+<nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="discover" aria-label="Discover">
+    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Discover</span>
+    {% for tab in discover_tabs %}
+    <a href="{{ tab.url }}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %} inline-flex items-center{% if tab.locked %} pro-lock{% endif %}"{% if tab.benefit %} data-tip="{{ tab.benefit }}"{% endif %}{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+</nav>
+{% elif section == "settings" and settings_tabs|length > 1 %}
+<nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="settings" aria-label="Settings">
+    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Settings</span>
+    {% for tab in settings_tabs %}
+    <a href="{{ tab.url }}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+</nav>
+{% endif %}

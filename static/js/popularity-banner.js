@@ -12,8 +12,10 @@
  *     settings page after sign-in / sign-out / test / source switches).
  *
  * The swapped HTML must stay script-free (innerHTML never executes
- * scripts) - all behavior, including the dismissible staleness notice,
- * lives here.
+ * scripts): all behavior, including dismissing the staleness notice,
+ * lives here. Whether that notice shows is the server's to say: a
+ * dismissal is kept per install (aso/ui_state.py) and the partial leaves a
+ * dismissed notice out.
  */
 (function () {
     'use strict';
@@ -24,24 +26,15 @@
         return document.getElementById('popularity-banner-region');
     }
 
-    /** Reveal the soft staleness notice unless THIS expiry was dismissed. */
-    function initStaleNotice() {
-        var banner = document.getElementById('apple-stale-banner');
-        if (!banner) return;
-        var key = 'aso_dismiss_apple_expired_' + (banner.dataset.expiredAt || 'unknown');
-        try {
-            if (!localStorage.getItem(key)) banner.classList.remove('hidden');
-        } catch (e) {
-            banner.classList.remove('hidden');
-        }
-    }
-
     window.dismissAppleStaleBanner = function () {
         var banner = document.getElementById('apple-stale-banner');
-        if (!banner) return;
-        var key = 'aso_dismiss_apple_expired_' + (banner.dataset.expiredAt || 'unknown');
-        try { localStorage.setItem(key, '1'); } catch (e) { /* still hide */ }
-        banner.classList.add('hidden');
+        var el = region();
+        if (!banner || !el) return;
+        banner.remove();
+        fetch(el.dataset.staleDismissUrl, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': el.dataset.csrf }
+        }).catch(function () { /* gone from this page; the next one asks again */ });
     };
 
     window.refreshPopularityBanner = function () {
@@ -53,7 +46,6 @@
                 if (html === null) return;
                 if (html.trim() !== el.innerHTML.trim()) {
                     el.innerHTML = html;
-                    initStaleNotice();
                 }
             })
             .catch(function () { /* transient - next tick retries */ });
@@ -61,7 +53,6 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         if (!region()) return;
-        initStaleNotice();
         setInterval(window.refreshPopularityBanner, REFRESH_INTERVAL_MS);
         document.addEventListener('visibilitychange', function () {
             if (!document.hidden) window.refreshPopularityBanner();

@@ -7,7 +7,7 @@
  * fetches a country's full detail only when a row is expanded.
  *
  * It used to be a loop in the page: one fetch per country with a fixed pause,
- * partial results in sessionStorage, and a warning that leaving would cancel
+ * partial results kept in the browser tab, and a warning that leaving would cancel
  * the scan. At 175 storefronts that is not a feature anyone could use.
  *
  * Generic pieces (formatting, the poll loop) come from job-polling.js, which
@@ -91,17 +91,17 @@
             const barColor = tierBarColor(score);
             const txtColor = tierTextColor(score);
             const highlightItems = (t.highlights || []).map(h =>
-                `<li class="flex items-start gap-1.5"><span class="text-slate-600 mt-0.5">•</span><span>${h}</span></li>`
+                `<li class="flex items-start gap-1.5"><span class="text-slate-500 mt-0.5">•</span><span>${h}</span></li>`
             ).join('');
             cards += `
                 <div class="bg-slate-900/60 border border-white/5 rounded-lg p-3">
                     <div class="flex items-center justify-between mb-1">
                         <div class="flex items-center gap-2">
-                            <span class="text-sm font-bold text-white">${label}</span>
-                            <span class="text-lg font-bold ${txtColor}">${score}</span>
-                            <span class="text-slate-600 text-xs">/100</span>
+                            <span class="text-sm font-semibold text-white">${label}</span>
+                            <span class="text-lg font-semibold ${txtColor}">${score}</span>
+                            <span class="text-slate-500 text-xs">/100</span>
                         </div>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold ${lc}">${t.label}</span>
+                        <span class="text-2xs px-1.5 py-0.5 rounded font-semibold ${lc}">${t.label}</span>
                     </div>
                     <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2.5">
                         <div class="h-1.5 rounded-full ${barColor}" style="width:${Math.min(score,100)}%"></div>
@@ -112,7 +112,7 @@
         if (!cards) return '';
         return `
             <div class="mb-4">
-                <h4 class="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">How Hard Is It to Rank?</h4>
+                <h4 class="section-label mb-2">How Hard Is It to Rank?</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">${cards}</div>
             </div>`;
     }
@@ -252,22 +252,22 @@
         var rank = index + 1;
         var flag = r.country_flag || '';
         var popularity = (r.popularity === null || r.popularity === undefined)
-            ? '<span class="text-slate-500">N/A</span>'
+            ? '<span class="text-slate-400">N/A</span>'
             : formatPopularityCell(r);
         return '<tr class="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors" ' +
             'data-country="' + JP.esc(r.country) + '" data-index="' + index + '">' +
             '<td class="px-3 py-2 text-center" onclick="event.stopPropagation()">' +
             '<input type="checkbox" class="opp-row-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" ' +
             'value="' + JP.esc(r.country) + '"' + (selected[r.country] ? ' checked' : '') + '></td>' +
-            '<td class="px-3 py-2 text-center text-slate-500 text-xs">' + rank + '</td>' +
+            '<td class="px-3 py-2 text-center text-slate-400 text-xs">' + rank + '</td>' +
             '<td class="px-3 py-2 text-white whitespace-nowrap">' + flag + ' ' + JP.esc(r.country_name) +
-            '<span class="text-slate-500 text-xs ml-1">' + JP.esc((r.country || '').toUpperCase()) + '</span></td>' +
+            '<span class="text-slate-400 text-xs ml-1">' + JP.esc((r.country || '').toUpperCase()) + '</span></td>' +
             '<td class="px-3 py-2 text-center bg-cyan-500/5" data-sort-value="' + r.opportunity + '"><span class="' +
-            JP.esc(r.opportunity_css || 'text-slate-400') + ' text-base font-bold cursor-help" data-tip="' +
+            JP.esc(r.opportunity_css || 'text-slate-400') + ' text-base font-semibold cursor-help" data-tip="' +
             JP.esc(r.opportunity_tip || '') + '">' + r.opportunity + '</span></td>' +
             '<td class="px-3 py-2 text-center">' + popularity + '</td>' +
             '<td class="px-3 py-2 text-center"><span class="' + JP.esc(r.difficulty_color) + '">' +
-            r.difficulty + '</span><span class="text-slate-600 text-xs ml-1">' +
+            r.difficulty + '</span><span class="text-slate-500 text-xs ml-1">' +
             JP.esc(r.difficulty_label) + '</span></td>' +
             atFirstCell(r) +
             '<td class="px-3 py-2" data-sort-value="' + window.ClassificationBadge.rank(r.classification) + '">' +
@@ -276,7 +276,7 @@
             '<td class="px-3 py-2 text-slate-400 text-xs max-w-[14rem] truncate">' +
             JP.esc(r.top_competitor || '') + '</td>' +
             (hasApp ? '<td class="px-3 py-2 text-center text-slate-400" data-sort-value="' + (r.app_rank || '') + '">' +
-            (r.app_rank ? '#' + r.app_rank : '<span class="text-slate-600">not ranked</span>') + '</td>' : '') +
+            (r.app_rank ? '#' + r.app_rank : '<span class="text-slate-500">not ranked</span>') + '</td>' : '') +
             '</tr>';
     }
 
@@ -284,9 +284,9 @@
     // by the high end, like the other tables.
     function atFirstCell(r) {
         var range = r.downloads_at_first || [0, 0];
-        return '<td class="px-3 py-2 text-center text-slate-300 whitespace-nowrap font-mono text-xs" data-sort-value="' +
+        return '<td class="px-3 py-2 text-center text-slate-300 whitespace-nowrap tabular-nums" data-sort-value="' +
             range[1] + '">' + fmt(range[0]) + '\u2013' + fmt(range[1]) +
-            '<span class="text-slate-500">/day</span></td>';
+            '<span class="text-slate-400">/day</span></td>';
     }
 
     function renderBest(r) {
@@ -295,8 +295,8 @@
         if (!r) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
         box.innerHTML =
-            '<p class="text-[10px] uppercase tracking-wide text-green-400/70 mb-1">Best opportunity</p>' +
-            '<p class="text-2xl font-bold text-white">' + (r.country_flag || '') + ' ' +
+            '<p class="text-2xs uppercase tracking-wide text-green-400/70 mb-1">Best opportunity</p>' +
+            '<p class="text-lg font-semibold text-white">' + (r.country_flag || '') + ' ' +
             JP.esc(r.country_name) + '</p>' +
             '<p class="text-sm text-slate-300 mt-1">Opportunity <span class="' +
             JP.esc(r.opportunity_css || 'text-slate-400') + ' font-semibold cursor-help" data-tip="' +
@@ -395,19 +395,19 @@
         if (competitors.length) {
             compRows = competitors.map((app, i) => {
                 const stars = app.averageUserRating ? '⭐ ' + app.averageUserRating.toFixed(1) : '—';
-                const ratings = app.userRatingCount ? app.userRatingCount.toLocaleString() : '0';
+                const ratings = app.ratings_text || '0';  // aso.scoring.fmt_count, from the server
                 const releaseDate = app.releaseDate ? new Date(app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
                 const updatedDate = (app.currentVersionReleaseDate || app.releaseDate) ? new Date(app.currentVersionReleaseDate || app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
                 const highlighted = highlightKeyword(app.trackName, lastKeyword);
                 return `
                     <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td class="px-2 py-1.5 text-slate-500 text-sm whitespace-nowrap">${i + 1}</td>
+                        <td class="px-2 py-1.5 text-slate-400 text-sm whitespace-nowrap">${i + 1}</td>
                         <td class="px-2 py-1.5">
                             <div class="flex items-center gap-2">
                                 ${app.artworkUrl100 ? `<img src="${app.artworkUrl100}" alt="" class="w-7 h-7 rounded-lg flex-shrink-0" onerror="this.style.display='none'">` : ''}
                                 <div class="min-w-0">
-                                    <a href="${app.trackViewUrl}" target="_blank" rel="noopener" class="text-white text-sm hover:text-purple-400 transition-colors">${highlighted}</a>
-                                    <span class="text-slate-500 block text-xs">${app.sellerName || ''}</span>
+                                    <a href="${app.trackViewUrl}" target="_blank" rel="noopener" class="link text-sm">${highlighted}</a>
+                                    <span class="text-slate-400 block text-xs">${app.sellerName || ''}</span>
                                 </div>
                             </div>
                         </td>
@@ -415,26 +415,26 @@
                         <td class="px-2 py-1.5 text-sm text-slate-300 whitespace-nowrap">${ratings}</td>
                         <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${app.primaryGenreName || ''}</td>
                         <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${app.formattedPrice || ''}</td>
-                        <td class="px-2 py-1.5 text-sm text-slate-500 whitespace-nowrap">${releaseDate}</td>
-                        <td class="px-2 py-1.5 text-sm text-slate-500 whitespace-nowrap">${updatedDate}</td>
+                        <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${releaseDate}</td>
+                        <td class="px-2 py-1.5 text-sm text-slate-400 whitespace-nowrap">${updatedDate}</td>
                     </tr>`;
             }).join('');
         }
 
         const compTableHtml = competitors.length ? `
             <div class="overflow-x-auto">
-                <h4 class="text-xs font-medium text-slate-400 mb-2">Top ${competitors.length} Competitors</h4>
+                <h4 class="section-label mb-2">Top ${competitors.length} Competitors</h4>
                 <table class="w-full text-sm text-left">
                     <thead>
                         <tr class="border-b border-white/10">
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">#</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500">App</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Rating</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Ratings</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Genre</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Price</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Released</th>
-                            <th class="px-2 py-1.5 text-xs text-slate-500 whitespace-nowrap">Updated</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">#</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400">App</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Rating</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Ratings</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Genre</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Price</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Released</th>
+                            <th class="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">Updated</th>
                         </tr>
                     </thead>
                     <tbody>${compRows}</tbody>
@@ -462,7 +462,7 @@
                     `<div class="flex items-start gap-2 text-xs">
                         <span class="flex-shrink-0">${sig.icon}</span>
                         <div><span class="text-green-300 font-medium">${sig.signal}</span>
-                        <span class="text-slate-500 ml-1">(${sig.strength})</span>
+                        <span class="text-slate-400 ml-1">(${sig.strength})</span>
                         <p class="text-slate-400 mt-0.5">${sig.detail}</p></div>
                     </div>`
                 ).join('')}</div>
@@ -474,26 +474,26 @@
                 <div class="lg:w-1/3 space-y-2">
                     <div class="bg-slate-800 rounded-lg p-2.5">
                         <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Popularity</p>
-                        <span class="text-2xl font-bold text-purple-400">${r.popularity ?? 'N/A'}</span>
-                        ${r.popularity ? '<span class="text-slate-500 text-xs ml-1">/ 100</span> ' + formatPopularityBadge(r) : ''}
+                        <span class="text-lg font-semibold text-purple-400">${r.popularity ?? 'N/A'}</span>
+                        ${r.popularity ? '<span class="text-slate-400 text-xs ml-1">/ 100</span> ' + formatPopularityBadge(r) : ''}
                     </div>
                     <div class="bg-slate-800 rounded-lg p-2.5">
                         <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Overall Difficulty</p>
-                        <span class="text-2xl font-bold ${r.difficulty_color}">${r.difficulty}</span>
-                        <span class="text-slate-500 text-xs ml-1">/ 100</span>
+                        <span class="text-lg font-semibold ${r.difficulty_color}">${r.difficulty}</span>
+                        <span class="text-slate-400 text-xs ml-1">/ 100</span>
                         <p class="${r.difficulty_color} text-xs mt-0.5 font-medium">${r.difficulty_label}</p>
                     </div>
                     ${r.app_rank ? `<div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-2.5">
                         <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Your App Rank</p>
-                        <span class="text-2xl font-bold text-yellow-400">#${r.app_rank}</span>
+                        <span class="text-lg font-semibold text-yellow-400">#${r.app_rank}</span>
                     </div>` : ''}
                     ${adviceHtml}
                 </div>
                 <div class="flex-1 overflow-x-auto">
                     ${tiersHtml}
-                    ${dlHtml}
+                    ${dlHtml ? `<div class="mb-4">${dlHtml}</div>` : ''}
                     <details class="mb-4">
-                        <summary class="text-xs text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">Difficulty breakdown &amp; insights</summary>
+                        <summary class="disclosure text-xs">Difficulty breakdown &amp; insights</summary>
                         <div class="mt-2 space-y-3">
                             ${insightsHtml}
                             ${oppSigHtml}
@@ -520,7 +520,7 @@
         btn.disabled = n === 0;
         btn.classList.toggle('opacity-50', n === 0);
         btn.classList.toggle('cursor-not-allowed', n === 0);
-        JP.setText('add-selected-text', n ? 'Save ' + n + ' to history' : 'Save selected to history');
+        JP.setText('add-selected-text', n ? 'Track ' + n : 'Track selected');
     }
 
     function save(body) {
@@ -534,7 +534,7 @@
         }); }).then(function (data) {
             var banner = JP.byId('opp-saved-banner');
             JP.setText('opp-saved-text', data.saved + ' ' +
-                JP.plural(data.saved, 'country', 'countries') + ' saved to Search History.');
+                JP.plural(data.saved, 'country', 'countries') + ' added to Tracked Keywords.');
             if (banner) { banner.classList.remove('hidden'); }
         }).catch(function (err) {
             showAlert(err.message);
@@ -571,7 +571,7 @@
             ].concat(hasApp ? [r.app_rank || ''] : []).join(','));
         });
         var csv = lines.join('\n');
-        var name = 'opportunity-' + (state ? state.keyword.replace(/[^a-z0-9]+/gi, '-') : 'scan') + '.csv';
+        var name = 'opportunity-' + (state ? state.keyword.replace(/[^\p{L}\p{M}\p{N}]+/gu, '-') : 'scan') + '.csv';
         if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file) {
             window.pywebview.api.save_file(name, csv);
             return;
@@ -645,9 +645,18 @@
                 }).then(function (r) { return r.json().then(function (d) {
                     if (!r.ok) { throw new Error(d.error || 'Could not start the scan'); }
                     return d;
-                }); }).then(function () {
+                }); }).then(function (d) {
                     heavyCache = {};
                     selected = {};
+                    if (window.ActivityIndicator && ActivityIndicator.announce && d) {
+                        var scan = d.scan || {};
+                        ActivityIndicator.announce({
+                            queued: scan.status === 'queued',
+                            label: 'Country scan: ' + (scan.keyword || body.get('keyword') || ''),
+                            current: d.queued_behind || '',
+                            eta: scan.status === 'queued' ? d.eta_seconds : scan.eta_seconds
+                        });
+                    }
                     poll.start();
                 }).catch(function (err) { showAlert(err.message); });
             });
@@ -703,14 +712,6 @@
 
         if (cfg.bootstrap) { apply({ scan: cfg.bootstrap }); }
         poll.start();
-
-        // A pre-upgrade session may still hold a half finished scan here.
-        // The row is the only state now, so clear it once and never again.
-        try {
-            sessionStorage.removeItem('opp_results');
-            sessionStorage.removeItem('opp_keyword');
-            sessionStorage.removeItem('opp_app_id');
-        } catch (e) { /* private mode */ }
     }
 
     function initWhenReady(options) {

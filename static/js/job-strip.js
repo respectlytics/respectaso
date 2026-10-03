@@ -19,16 +19,29 @@
         if (el) { el.classList.toggle('hidden', !show); }
     }
 
-    // The strip is fixed to the bottom of the window; while it shows, the page
-    // keeps that much room free at its end, so the footer is never under it.
-    function reserveRoom(strip) {
-        document.body.style.paddingBottom = strip.classList.contains('hidden') ? '' : strip.offsetHeight + 'px';
+    var SHORT = {keyword_search: 'Keyword search', opportunity_scan: 'Country scan'};
+
+    // Tell the activity indicator in the top bar (static/js/activity-indicator.js).
+    function report(state) {
+        if (!window.ActivityIndicator) { return; }
+        // Not shown: nothing to say, or a search or scan that waits in the
+        // queue, which the queue's Up next lists and counts (aso/job_strip.py).
+        if (!state || !state.shown) { window.ActivityIndicator.report('job', null); return; }
+        var label = SHORT[state.kind] || 'Search';
+        if (state.icon === 'spinner') {
+            window.ActivityIndicator.report('job', {running: {label: label, pct: state.show_bar ? (state.progress_percent || 0) : null}});
+        } else if (state.icon === 'done') {
+            window.ActivityIndicator.report('job', {done: {label: label}});
+        } else {
+            window.ActivityIndicator.report('job', {done: {text: label + ' paused', failed: true}});
+        }
     }
 
     function render(state) {
         var strip = byId('search-job-strip');
-        if (!strip) { return; }
-        if (!state) { strip.classList.add('hidden'); reserveRoom(strip); return; }
+        if (!strip) { report(state); return; }
+        report(state);
+        if (!state || !state.shown) { strip.classList.add('hidden'); return; }
 
         var text = byId('sjs-text');
         if (text) { text.textContent = state.text; }
@@ -44,7 +57,6 @@
         var fill = byId('sjs-fill');
         if (fill && state.show_bar) { fill.style.width = (state.progress_percent || 0) + '%'; }
         strip.classList.remove('hidden');
-        reserveRoom(strip);
     }
 
     function refresh() {

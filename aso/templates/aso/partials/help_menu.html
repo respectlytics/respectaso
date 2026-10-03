@@ -1,0 +1,22 @@
+{% load aso_tags %}{% comment %}
+The Help menu (UI_REDESIGN_PLAN.md 3.3): the in-app help pages, then the
+outside links that used to fill the footer. Opened by static/js/menu.js.
+{% endcomment %}
+<div class="relative">
+    <button type="button" data-menu-button aria-expanded="false" aria-haspopup="true" title="Help" aria-label="Help"
+            class="relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/5 hover:text-white">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        {% if show_whats_new_notice %}<span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400" data-whats-new-dot></span>{% endif %}
+    </button>
+    <div data-menu role="menu" class="menu hidden w-96">
+        <a role="menuitem" href="{% url 'aso:methodology' %}" class="menu-item">{% menu_icon "scores" %}How the scores work</a>
+        <a role="menuitem" href="{% url 'aso:whats_new' %}" class="menu-item">{% menu_icon "whats_new" %}What's new{% if show_whats_new_notice %}<span class="ml-auto h-2 w-2 rounded-full bg-purple-400"></span>{% endif %}</a>
+        <a role="menuitem" href="{{ setup_guide_url }}" class="menu-item">{% menu_icon "install" %}Install and update</a>
+        <div class="my-1.5 border-t border-white/10"></div>
+        <a role="menuitem" href="{{ links.x }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "x" %}Follow on X{% menu_icon "external" %}</a>
+        <a role="menuitem" href="{{ links.github }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "github" %}Source code on GitHub{% menu_icon "external" %}</a>
+        <a role="menuitem" href="mailto:{{ links.contact }}" class="menu-item">{% menu_icon "contact" %}Contact us</a>
+        <a role="menuitem" href="{{ links.respectlytics }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "privacy" %}Respectlytics: privacy-first app analytics{% menu_icon "external" %}</a>
+        <p class="px-3 pb-1 pt-2 pl-[2.375rem] text-xs text-slate-400">RespectASO {{ VERSION }}</p>
+    </div>
+</div>

@@ -1,0 +1,25 @@
+{% comment %}
+The top of every Pro preview (docs/development/PRO_PREVIEWS_PLAN.md,
+PRO_AND_CLICKABLE_TEXT_PLAN.md 6): one compact row, so the sample page below
+it is what fills the screen. Left, what the feature does for the reader's
+app (the benefit, as a card title, well below the page title) and that this is sample
+data; right, the two buttons and the demo. cta comes from
+aso.pro_preview_words; its primary_tone tints the row: pro green to buy,
+amber to renew, sky for the Apple Ads connection.
+{% endcomment %}
+<section class="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border px-4 py-3 {% if cta.primary_tone == 'sky' %}border-sky-500/25 bg-gradient-to-r from-sky-950/60 to-[#1e293b]{% elif cta.primary_tone == 'renew' %}border-amber-500/25 bg-gradient-to-r from-amber-950/50 to-[#1e293b]{% else %}border-emerald-400/25 bg-gradient-to-r from-emerald-950/60 to-[#1e293b]{% endif %}" data-preview-hero>
+    <div class="min-w-0">
+        <p class="inline-flex items-center text-2xs font-semibold uppercase tracking-wider {% if cta.primary_tone == 'sky' %}text-sky-300{% elif cta.primary_tone == 'renew' %}text-amber-300 pro-lock{% else %}text-emerald-300 pro-lock{% endif %}">{{ cta.eyebrow }}</p>
+        <h2 class="card-title mt-0.5" data-preview-benefit>{{ cta.headline }}</h2>
+        <p class="text-sm text-slate-300">{{ cta.body }}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+        {% include "aso/partials/preview_buttons.html" %}
+        {% if cta.video_url %}
+        <a href="{{ cta.video_url }}" target="_blank" rel="noopener" class="btn-quiet text-red-300 hover:bg-red-500/10 hover:text-red-200">
+            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            Watch the demo
+        </a>
+        {% endif %}
+    </div>
+</section>

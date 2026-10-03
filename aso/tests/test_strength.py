@@ -6,16 +6,18 @@ app. These tests pin that moving the curves there moved no difficulty, and
 that every curve, and strength itself, changes smoothly with its input.
 """
 
+import itertools
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from unittest import mock
 
 from django.test import SimpleTestCase
 
 from aso import strength
 from aso.services import DifficultyCalculator
-from aso.strength import AppProfile, NEW_APP
+from aso.strength import NEW_APP, AppProfile
 from aso.tests.difficulty_fixture import FIELDS, FIXED_NOW, build
 
 
@@ -30,7 +32,7 @@ class DifficultyUnchangedTest(SimpleTestCase):
 
     def test_every_fixture_field_scores_as_before(self):
         path = os.path.join(os.path.dirname(__file__), "difficulty_before_strength.json")
-        before = json.load(open(path))
+        before = json.loads(Path(path).read_text())
         with mock.patch("aso.services.datetime", _FrozenDatetime), \
                 mock.patch("aso.strength._utcnow", lambda: FIXED_NOW):
             for keyword, apps, publishers in FIELDS:
@@ -47,7 +49,7 @@ class DifficultyUnchangedTest(SimpleTestCase):
 
 
 def _worst_step(values):
-    return max(abs(b - a) for a, b in zip(values, values[1:]))
+    return max(abs(b - a) for a, b in itertools.pairwise(values))
 
 
 def _geometric(a, b, f=1.02):
@@ -87,7 +89,7 @@ class AppStrengthTest(SimpleTestCase):
         self.assertAlmostEqual(NEW_APP.strength(), 100 * 0.10 / 0.70, places=6)
 
     def test_more_of_anything_is_never_weaker(self):
-        base = dict(name="A", ratings=1_000, average=4.2, released="2023-09-22T00:00:00Z")
+        base = {"name": "A", "ratings": 1_000, "average": 4.2, "released": "2023-09-22T00:00:00Z"}
         with mock.patch("aso.strength._utcnow", lambda: FIXED_NOW):
             reference = AppProfile(**base).strength()
             self.assertGreater(AppProfile(**{**base, "ratings": 5_000}).strength(), reference)
@@ -169,7 +171,7 @@ class RankModelIsSmoothTest(SimpleTestCase):
 
         slopes = [
             (math.log(r1) - math.log(r0)) / (g1 - g0)
-            for (g0, r0), (g1, r1) in zip(RANK_BY_GAP, RANK_BY_GAP[1:])
+            for (g0, r0), (g1, r1) in itertools.pairwise(RANK_BY_GAP)
         ]
         self.assertLessEqual(max(slopes), self.STEEPEST_LOG_RANK_PER_POINT)
 

@@ -7,6 +7,7 @@ from django.utils.safestring import mark_safe
 
 from aso import countries
 from aso.services import compound_form
+from aso.words import word_spans
 
 register = template.Library()
 
@@ -20,6 +21,21 @@ APPLE_TREND_MIN_DELTA = 3
 def to_json(value):
     """Serialize a Python value to a JSON string (safe for embedding in <script>)."""
     return mark_safe(json.dumps(value))
+
+
+@register.filter
+def ago(value):
+    """"3 hours ago", or "just now" under a minute, where "0 minutes ago"
+    read like a fault. The twin of TimeAgo.ago in static/js/time-ago.js,
+    which redraws it inside <time data-time-ago> as time passes."""
+    from django.utils import timezone
+    from django.utils.timesince import timesince
+
+    if not value:
+        return ""
+    if (timezone.now() - value).total_seconds() < 60:
+        return "just now"
+    return f"{timesince(value)} ago"
 
 
 @register.filter
@@ -98,11 +114,11 @@ def get_tier(d, key):
 
 @register.filter
 def format_number(value):
-    """Format an integer with comma separators. Usage: {{ num|format_number }}"""
-    try:
-        return f"{int(value):,}"
-    except (ValueError, TypeError):
-        return value
+    """A count with comma separators, "0" when there is none
+    (aso.scoring.fmt_count). Usage: {{ num|format_number }}"""
+    from aso.scoring import fmt_count
+
+    return fmt_count(value)
 
 
 def _fmt_dl(n):
@@ -113,8 +129,20 @@ def _fmt_dl(n):
     return fmt_downloads(n)
 
 
-INFO_ICON_CLASS = "w-3.5 h-3.5 text-slate-500 cursor-help inline-block align-[-2px] shrink-0"
+INFO_ICON_CLASS = "w-3.5 h-3.5 text-slate-400 cursor-help inline-block align-[-2px] shrink-0"
 INFO_ICON_PATH = "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+
+
+@register.simple_tag(takes_context=True)
+def remembered_countries(context, picker):
+    """The countries a picker last held for this visitor, as JSON for the
+    picker's data-remembered (aso/ui_memory.py). "[]" without a session."""
+    from aso import ui_memory
+
+    request = context.get("request")
+    if request is None or not hasattr(request, "session"):
+        return "[]"
+    return json.dumps(ui_memory.remembered_countries(request, picker))
 
 
 @register.simple_tag
@@ -123,15 +151,62 @@ def column_info(column, subject="new_app"):
     (aso.column_tips). A click on it does not re-sort the table."""
     from aso.column_tips import column_tip
 
-    return format_html(
-        '<svg class="{}" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="{}" '
-        'data-column="{}" onclick="event.stopPropagation()"><path stroke-linecap="round" '
-        'stroke-linejoin="round" stroke-width="2" d="{}"/></svg>',
-        INFO_ICON_CLASS, column_tip(column, subject), column, INFO_ICON_PATH,
+    return _info_icon(
+        column_tip(column, subject),
+        format_html(' data-column="{}" onclick="event.stopPropagation()"', column),
     )
 
 
-OPPORTUNITY_SUBLINE_CLASS = "opp-subline block text-[9px] font-normal normal-case text-slate-500 whitespace-nowrap"
+def _info_icon(tip, extra=""):
+    """The (i) icon with a hover tip (static/js/tooltip.js); ``extra`` is
+    escaped markup for more attributes."""
+    return format_html(
+        '<svg class="{}" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-tip="{}"{}>'
+        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{}"/></svg>',
+        INFO_ICON_CLASS, tip, extra, INFO_ICON_PATH,
+    )
+
+
+@register.simple_tag
+def info_tip(text):
+    """The (i) beside a card title, holding what the card's one line leaves
+    out. Reachable by keyboard; the tip reads the same on focus."""
+    return _info_icon(text, format_html(' tabindex="0" role="img" aria-label="{}"', text))
+
+
+# The icons of the menus (the Help menu and the ⋯ menus), one set for all of
+# them so no menu mixes styles: 24px outline paths drawn at 16px with a 1.75
+# stroke, and the brand marks of X and GitHub filled. name: (path, filled)
+MENU_ICONS = {
+    "scores": ("M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z", False),
+    "whats_new": ("M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z", False),
+    "install": ("M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3", False),
+    "x": ("M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z", True),
+    "github": ("M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12", True),
+    "contact": ("M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75", False),
+    "privacy": ("M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z", False),
+    "refresh": ("M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99", False),
+    "export": ("M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z", False),
+    "guide": ("M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25", False),
+    "delete": ("M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0", False),
+    "copy": ("M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25", False),
+    "save": ("M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3", False),
+    "external": ("M7 17L17 7M8 7h9v9", False),
+}
+_MENU_STROKE = 'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"'
+
+
+@register.simple_tag
+def menu_icon(name):
+    """A menu row's icon (.menu-icon), or the small arrow at the end of a row
+    that opens another site (.menu-icon-external)."""
+    path, filled = MENU_ICONS[name]
+    paint = mark_safe('fill="currentColor"' if filled else _MENU_STROKE)   # both constants of this module
+    css = "menu-icon-external" if name == "external" else "menu-icon"
+    return format_html('<svg class="{}" viewBox="0 0 24 24" {} aria-hidden="true"><path d="{}"/></svg>', css, paint, path)
+
+
+OPPORTUNITY_SUBLINE_CLASS ="opp-subline block text-2xs font-normal normal-case text-slate-400 text-balance"
 
 
 @register.simple_tag
@@ -157,10 +232,10 @@ def download_cell(estimates, idx=0, total=0):
     header; bottom-half rows show it above. Mirrors the JS module.
     """
     if not isinstance(estimates, dict):
-        return mark_safe('<span class="text-xs text-slate-500">—</span>')
+        return mark_safe('<span class="text-xs text-slate-400">—</span>')
     positions = estimates.get("positions") or []
     if len(positions) < 10:
-        return mark_safe('<span class="text-xs text-slate-500">—</span>')
+        return mark_safe('<span class="text-xs text-slate-400">—</span>')
     show_below = total > 0 and idx < total / 2
     if estimates.get("below_threshold"):
         return _tiny_market_cell(show_below)
@@ -174,14 +249,14 @@ def download_cell(estimates, idx=0, total=0):
         # "group" would also respond to the parent <tr class="... group">, making
         # the tooltip appear on row-hover instead of cell-hover.
         '<div class="group/dl relative inline-block">'
-        '<span class="text-xs font-mono text-slate-300 cursor-help border-b border-dotted border-slate-600">'
-        f'{p1_lo}–{p1_hi}<span class="text-slate-500">/day</span></span>'
+        '<span class="text-sm tabular-nums text-slate-300 cursor-help border-b border-dotted border-slate-600">'
+        f'{p1_lo}–{p1_hi}<span class="text-slate-400">/day</span></span>'
         f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
-        '<p class="text-[10px] text-slate-500 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
+        '<p class="text-2xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
         '<div class="space-y-1.5">'
-        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 font-mono">{p1_lo}–{p1_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 font-mono">{p5_lo}–{p5_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 font-mono">{p10_lo}–{p10_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">{p1_lo}–{p1_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">{p5_lo}–{p5_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">{p10_lo}–{p10_hi}</span></div>'
         '</div>'
         f'{_derived_market_note(estimates)}'
         '</div></div>'
@@ -203,7 +278,7 @@ def _derived_market_note(estimates) -> str:
     if estimates.get("market_source") != "derived":
         return ""
     return (
-        '<p class="text-[10px] text-slate-500 leading-snug mt-2 pt-2 '
+        '<p class="text-2xs text-slate-400 leading-snug mt-2 pt-2 '
         'border-t border-white/5">' + DERIVED_MARKET_NOTE + '</p>'
     )
 
@@ -222,7 +297,7 @@ def _tiny_market_cell(show_below: bool) -> str:
         f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} '
         'left-1/2 -translate-x-1/2 w-52 bg-slate-800 border border-white/10 '
         'rounded-lg p-3 shadow-xl text-left">'
-        '<p class="text-[11px] text-slate-300 leading-snug">'
+        '<p class="text-2xs text-slate-300 leading-snug">'
         + TINY_MARKET_NOTE + '</p>'
         '</div></div>'
     )
@@ -237,7 +312,7 @@ _BADGE_ASA_CLS = "bg-sky-900/40 text-sky-300 border border-sky-500/30"
 
 
 def _badge_popover(badge_cls, label, heading, paragraphs, note="",
-                   idx=0, total=0):
+                   idx=0, total=0, trigger_html=None):
     """Source badge + hover popover. Mirror of badgeHtml() in the JS twin.
 
     `idx`/`total` flip the popover below for top-half rows (avoids
@@ -247,25 +322,28 @@ def _badge_popover(badge_cls, label, heading, paragraphs, note="",
     show_below = total > 0 and idx < total / 2
     pos = "top-full mt-2" if show_below else "bottom-full mb-2"
     paras = "".join(
-        f'<p class="text-[11px] leading-relaxed text-slate-300'
+        f'<p class="text-2xs leading-relaxed text-slate-300'
         f'{" mt-1.5" if i else ""}">{escape(p)}</p>'
         for i, p in enumerate(paragraphs)
     )
     note_html = (
-        '<p class="text-[10px] leading-relaxed text-slate-500 mt-2 pt-1.5 '
+        '<p class="text-2xs leading-relaxed text-slate-400 mt-2 pt-1.5 '
         f'border-t border-white/5">{escape(note)}</p>'
         if note
         else ""
     )
+    trigger = trigger_html or (
+        '<span class="text-2xs font-semibold uppercase tracking-wide rounded '
+        f'px-0.5 py-px {badge_cls} cursor-help">{label}</span>'
+    )
     return (
         '<span class="group/pop relative inline-flex">'
-        '<span class="text-[8px] font-semibold uppercase tracking-wide rounded '
-        f'px-0.5 py-px {badge_cls} cursor-help">{label}</span>'
+        f'{trigger}'
         f'<div class="hidden group-hover/pop:block absolute z-20 {pos} '
         'left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 '
         'rounded-lg p-3 shadow-xl text-left normal-case font-normal '
         'tracking-normal whitespace-normal">'
-        '<p class="text-[10px] text-slate-500 mb-1.5 font-medium uppercase '
+        '<p class="text-2xs text-slate-400 mb-1.5 font-medium uppercase '
         f'tracking-wider">{escape(heading)}</p>'
         f"{paras}{note_html}"
         "</div></span>"
@@ -273,40 +351,44 @@ def _badge_popover(badge_cls, label, heading, paragraphs, note="",
 
 
 def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
-                      apple_configured, idx=0, total=0):
+                      apple_configured, idx=0, total=0, number_html=None, active="internal"):
     """Badge + popover for a resolved popularity row. Mirror of
-    resolveTip() in the JS twin - same cases, same copy."""
+    resolveTip() in the JS twin - same cases, same copy.
+
+    A row from the source the column header names (``active``) shows no
+    badge: ``number_html`` itself opens the popover (isPlain() in the twin,
+    KEYWORDS_PAGE_PLAN.md M1.5). EST* and a row from the other source keep
+    their badge.
+    """
     if is_fallback:
         if cap is None:
             return _badge_popover(
                 _BADGE_EST_CLS, "EST*", "No Apple data for this storefront",
-                ["Apple publishes no search-popularity data for this "
-                 "storefront, so RespectASO's estimate powers the score "
-                 "directly."],
+                [("Apple publishes no search-popularity data for this "
+                  "storefront, so RespectASO's estimate powers the score "
+                  "directly.")],
                 idx=idx, total=total,
             )
         where = f"the {genre} category" if genre else "its category"
         absent_para = (
-            "Apple lists each category's ~500 most-searched terms, and "
-            f"this keyword is not among them for {where} in this "
-            "storefront this week."
+            "This keyword is not among Apple's most-searched terms for "
+            f"{where} here this week."
         )
         if internal is not None and internal > cap:
             return _badge_popover(
                 _BADGE_EST_CLS, "EST*", "Not in Apple's top terms: capped",
                 [absent_para,
-                 "It cannot score above Apple's lowest reported value "
-                 f"there ({cap + 1}), so RespectASO's estimate of "
-                 f"{internal} is scored as {cap}."],
+                 (f"RespectASO's estimate of {internal} is scored as {cap}, "
+                  f"below Apple's lowest reported value there ({cap + 1}).")],
                 idx=idx, total=total,
             )
         est_ref = f" ({internal})" if internal is not None else ""
         return _badge_popover(
             _BADGE_EST_CLS, "EST*", "Not in Apple's top terms",
             [absent_para,
-             f"RespectASO's estimate{est_ref} already sits below Apple's "
-             f"lowest reported value there ({cap + 1}), so it powers the "
-             "score unchanged."],
+             (f"RespectASO's estimate{est_ref} already sits below Apple's "
+              f"lowest reported value there ({cap + 1}), so it powers the "
+              "score unchanged.")],
             idx=idx, total=total,
         )
     if source == "apple":
@@ -316,9 +398,10 @@ def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
         )
         return _badge_popover(
             _BADGE_ASA_CLS, "ASA", "Apple Ads popularity",
-            ["Apple's official search popularity for this storefront, "
-             "updated weekly: the active source powering your scores."],
+            [("Apple's official search popularity for this storefront, "
+              "updated weekly: the active source powering your scores.")],
             note=note, idx=idx, total=total,
+            trigger_html=number_html if active == "apple" else None,
         )
     if apple is not None:
         note = f"Apple's official value for comparison: {apple}"
@@ -329,9 +412,10 @@ def _popularity_badge(internal, apple, source, is_fallback, cap, genre,
         note = ""
     return _badge_popover(
         _BADGE_EST_CLS, "EST", "RespectASO estimate",
-        ["RespectASO's own estimate, calibrated to Apple's official 1-100 "
-         "popularity scale, the active source powering your scores."],
+        [("RespectASO's own estimate, calibrated to Apple's official 1-100 "
+          "popularity scale, the active source powering your scores.")],
         note=note, idx=idx, total=total,
+        trigger_html=number_html if active != "apple" else None,
     )
 
 
@@ -360,16 +444,18 @@ def popularity_cell(result, extra_html="", idx=0, total=0):
     `idx`/`total` (0-based row index, row count) flip the popover away
     from the nearest table edge - pass them in loops.
     """
+    from ..apple_ads.genres import genre_label
     from ..apple_ads.storage import load_apple_settings
     from ..popularity import absent_cap
-    from ..apple_ads.genres import genre_label
 
     effective = result.effective_popularity
     internal = result.popularity_score
     apple = result.apple_popularity_score
     source = result.popularity_source_used
     is_fallback = result.popularity_is_fallback
-    apple_configured = bool(load_apple_settings()["apple_ads"]["tested_ok"])
+    apple_settings = load_apple_settings()
+    apple_configured = bool(apple_settings["apple_ads"]["tested_ok"])
+    active = "apple" if apple_settings["popularity_source"] == "apple" else "internal"
     inferred_genre = getattr(result, "inferred_genre", "") or ""
     cap = (
         absent_cap(result.country, inferred_genre) if is_fallback else None
@@ -380,7 +466,7 @@ def popularity_cell(result, extra_html="", idx=0, total=0):
         arrow = "▲" if trend > 0 else "▼"
         tone = "text-emerald-400" if trend > 0 else "text-red-400"
         extra_html = (
-            f'<span class="text-[9px] {tone} cursor-help" '
+            f'<span class="text-2xs {tone} cursor-help" '
             f'title="Apple popularity vs previous week: {trend:+d}">'
             f"{arrow}</span>" + (extra_html or "")
         )
@@ -389,16 +475,20 @@ def popularity_cell(result, extra_html="", idx=0, total=0):
         idx, total = int(idx), int(total)
     except (TypeError, ValueError):
         idx, total = 0, 0
+    effective_txt = str(effective) if effective is not None else "—"
+    plain_number = f'<span class="text-sm font-semibold text-purple-400 cursor-help">{effective_txt}</span>'
     badge = _popularity_badge(
         internal, apple, source, is_fallback, cap,
         genre_label(inferred_genre), apple_configured, idx=idx, total=total,
+        number_html=plain_number, active=active,
     )
-    effective_txt = str(effective) if effective is not None else "—"
+    # The number opens the popover itself on a row from the header's source;
+    # otherwise it stands beside its badge.
+    number = "" if plain_number in badge else f'<span class="text-sm font-semibold text-purple-400">{effective_txt}</span>'
     return mark_safe(
         '<div class="leading-tight inline-block text-center">'
         '<span class="inline-flex items-center justify-center gap-1.5">'
-        f'<span class="text-sm font-semibold text-purple-400">{effective_txt}</span>'
-        f'{badge}{extra_html}'
+        f'{number}{badge}{extra_html}'
         "</span>"
         "</div>"
     )
@@ -479,7 +569,7 @@ def format_release_date(value):
         return "\u2014"
     try:
         from datetime import datetime
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(str(value))
         return dt.strftime("%b %Y")
     except (ValueError, TypeError):
         return str(value)[:10]
@@ -498,9 +588,9 @@ def _compound_span(title, compound):
     word of the title ("ScrollLess" for "scroll less"), or None."""
     if not compound:
         return None
-    for m in re.finditer(r"[^\W_]+", title):
-        if m.group().lower().startswith(compound):
-            return (m.start(), m.start() + len(compound))
+    for start, end in word_spans(title):
+        if title[start:end].lower().startswith(compound):
+            return (start, start + len(compound))
     return None
 
 
@@ -619,3 +709,12 @@ def scored_for_note(reason=""):
 
     return scored_for(reason="competitor" if reason == "competitor" else None)
 
+
+
+@register.filter
+def app_short(name):
+    """An app's name as a sentence uses it: "Pausely: Reduce Screen Time"
+    reads "Pausely" (aso.scoring.sentence_app_name)."""
+    from ..scoring import sentence_app_name
+
+    return sentence_app_name(name)

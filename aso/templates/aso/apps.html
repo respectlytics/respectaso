@@ -1,13 +1,15 @@
 {% extends "aso/base.html" %}
+{% load aso_tags %}
 
 {% block title %}Apps · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-5">
+<div class="max-w-4xl mx-auto space-y-4">
+    {% include "aso/partials/back_link.html" with back_class="-mb-2" %}
     <!-- Header -->
     <div>
-        <h1 class="text-xl font-bold text-white">Apps</h1>
-        <p class="text-slate-400 text-sm mt-0.5">Add your apps to track keyword rankings and organize research by project.</p>
+        <h1 class="page-title">Apps</h1>
+        <p class="page-lead">Add your apps to track keyword rankings and organize research by project.</p>
     </div>
 
     <!-- Messages -->
@@ -18,13 +20,13 @@
     {% endif %}
 
     <!-- Add App -->
-    <div id="apps-add" class="bg-[#1e293b] border border-white/10 rounded-xl p-4">
-        <h2 class="text-base font-semibold text-white mb-3">Add App</h2>
+    <div id="apps-add" class="card p-4">
+        <h2 class="card-title mb-3">Add an app</h2>
 
         <!-- App Store Search -->
         <div class="mb-4">
             <label class="block text-xs font-medium text-slate-300 mb-1.5">
-                Search App Store <span class="text-slate-500">(or paste App Store URL)</span>
+                Search App Store <span class="text-slate-400">(or paste App Store URL)</span>
             </label>
             <div class="relative">
                 <input type="text" id="app-search-input"
@@ -43,7 +45,7 @@
         <!-- Divider -->
         <div class="flex items-center gap-3 mb-4">
             <div class="flex-1 border-t border-white/5"></div>
-            <span class="text-xs text-slate-500">or add manually</span>
+            <span class="text-xs text-slate-400">or add manually</span>
             <div class="flex-1 border-t border-white/5"></div>
         </div>
 
@@ -53,24 +55,24 @@
             <div class="flex flex-col sm:flex-row gap-3">
                 <div class="flex-1">
                     <label for="{{ form.name.id_for_label }}" class="block text-xs font-medium text-slate-300 mb-1.5">
-                        App Name
+                        App name
                     </label>
                     {{ form.name }}
                 </div>
                 <div class="flex-1">
                     <label for="{{ form.bundle_id.id_for_label }}" class="block text-xs font-medium text-slate-300 mb-1.5">
-                        Bundle ID <span class="text-slate-500">(optional)</span>
+                        Bundle ID <span class="text-slate-400">(optional)</span>
                     </label>
                     {{ form.bundle_id }}
                 </div>
                 <div class="flex items-end">
                     <button type="submit"
-                            class="bg-slate-600 hover:bg-slate-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap">
-                        Add Manually
+                            class="btn-secondary whitespace-nowrap">
+                        Add manually
                     </button>
                 </div>
             </div>
-            <p class="text-[11px] text-slate-500">
+            <p class="text-2xs text-slate-400">
                 Manual apps can't track keyword rankings. Use App Store search above for rank tracking.
             </p>
         </form>
@@ -79,9 +81,9 @@
     <!-- App List (swapped in place after an add, a refresh or a delete) -->
     <div id="apps-list">
     {% if apps %}
-    <div class="bg-[#1e293b] border border-white/10 rounded-xl overflow-hidden">
+    <div class="card overflow-hidden">
         <div class="px-4 py-3 border-b border-white/10">
-            <h2 class="text-base font-semibold text-white">Your Apps</h2>
+            <h2 class="card-title">Your apps</h2>
         </div>
         <ul class="divide-y divide-white/5">
             {% for app in apps %}
@@ -91,27 +93,31 @@
                     <img src="{{ app.icon_url }}" alt="" class="w-10 h-10 rounded-xl flex-shrink-0">
                     {% else %}
                     <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center flex-shrink-0">
-                        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
                         </svg>
                     </div>
                     {% endif %}
                     <div>
-                        <h3 class="text-white text-sm font-medium">{{ app.name }}</h3>
+                        <h3 class="item-title">{{ app.name }}</h3>
                         {% if app.seller_name %}
-                        <p class="text-slate-500 text-xs">{{ app.seller_name }}</p>
+                        <p class="text-slate-400 text-xs">{{ app.seller_name }}</p>
                         {% endif %}
                         <div class="flex items-center gap-2 mt-0.5">
                             {% if app.bundle_id %}
-                            <span class="text-slate-600 text-xs">{{ app.bundle_id }}</span>
+                            <span class="text-slate-500 text-xs">{{ app.bundle_id }}</span>
                             {% endif %}
                             {% if app.track_id %}
-                            <span class="text-purple-400/60 text-[10px] bg-purple-500/10 px-1.5 py-0.5 rounded">Rank tracking</span>
+                            <span class="text-purple-400/60 text-2xs bg-purple-500/10 px-1.5 py-0.5 rounded">Rank tracking</span>
                             {% endif %}
                         </div>
-                        <p class="text-slate-600 text-xs mt-0.5">
-                            {{ app.keywords.count }} keyword{{ app.keywords.count|pluralize }}
-                        </p>
+                        {% with count=app.keywords.count %}
+                        {% if count %}
+                        <p class="text-slate-500 text-xs mt-0.5">{{ count }} keyword{{ count|pluralize }}</p>
+                        {% else %}
+                        <a href="{% url 'aso:dashboard' %}?app={{ app.pk }}" class="btn-quiet mt-0.5 -ml-2">Track keywords for {{ app.name|app_short }} →</a>
+                        {% endif %}
+                        {% endwith %}
                     </div>
                 </div>
                 <div class="flex items-center gap-1 flex-shrink-0">
@@ -119,7 +125,7 @@
                     <form method="post" action="{% url 'aso:app_refresh' app.id %}" class="app-refresh-form">
                         {% csrf_token %}
                         <button type="submit"
-                                class="text-slate-500 hover:text-purple-400 transition-colors p-2 rounded-lg hover:bg-purple-900/20"
+                                class="text-slate-400 hover:text-purple-400 transition-colors p-2 rounded-lg hover:bg-purple-900/20"
                                 title="Refresh title &amp; icon from the App Store">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -130,7 +136,7 @@
                     <form method="post" action="{% url 'aso:app_delete' app.id %}" class="app-delete-form" data-app-name="{{ app.name }}">
                         {% csrf_token %}
                         <button type="submit"
-                                class="text-slate-500 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-900/20"
+                                class="text-slate-400 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-900/20"
                                 title="Delete app">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -144,11 +150,11 @@
     </div>
     {% else %}
     <!-- Empty State -->
-    <div class="bg-[#1e293b] border border-white/10 rounded-xl p-8 text-center">
-        <svg class="w-10 h-10 text-slate-600 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="card p-8 text-center">
+        <svg class="w-10 h-10 text-slate-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
         </svg>
-        <h3 class="text-white text-sm font-medium mt-3">No apps yet</h3>
+        <h3 class="item-title mt-3">No apps yet</h3>
         <p class="text-slate-400 text-xs mt-1.5">Search the App Store above to add your app and start tracking keyword rankings.</p>
     </div>
     {% endif %}
@@ -178,10 +184,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     spinner.classList.add('hidden');
                     if (data.apps.length === 0) {
-                        resultsDiv.innerHTML = `
-                            <div class="px-3 py-3 text-slate-500 text-sm text-center">
-                                No apps found. Try a different name or paste an App Store URL.
-                            </div>`;
+                        // Apple not answering is said as such, never as "no apps".
+                        const note = document.createElement('div');
+                        note.className = 'px-3 py-3 text-sm text-center ' + (data.error ? 'text-red-400' : 'text-slate-400');
+                        note.textContent = data.error || 'No apps found. Try a different name or paste an App Store URL.';
+                        resultsDiv.replaceChildren(note);
                         resultsDiv.classList.remove('hidden');
                         return;
                     }
@@ -201,10 +208,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <img src="${app.artworkUrl100}" alt="" class="w-10 h-10 rounded-xl flex-shrink-0">
                                 <div class="min-w-0 flex-1">
                                     <p class="text-white text-sm font-medium truncate">${app.trackName}</p>
-                                    <p class="text-slate-500 text-xs truncate">${app.sellerName}</p>
-                                    <p class="text-slate-600 text-[10px] truncate">${app.bundleId}</p>
+                                    <p class="text-slate-400 text-xs truncate">${app.sellerName}</p>
+                                    <p class="text-slate-500 text-2xs truncate">${app.bundleId}</p>
                                 </div>
-                                <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
                             </button>`;

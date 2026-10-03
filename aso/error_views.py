@@ -40,7 +40,7 @@ _BARE_500 = (
     "<meta name=\"robots\" content=\"noindex\"><title>Something went wrong</title></head>"
     "<body style=\"background:#0f172a;color:#f8fafc;font-family:system-ui,sans-serif;padding:48px\">"
     "<h1>Something went wrong</h1><p>" + SERVER_ERROR + "</p>"
-    "<p><a href=\"/\" style=\"color:#c084fc\">Back to the Dashboard</a></p></body></html>"
+    "<p><a href=\"/\" style=\"color:#38bdf8\">Back to Keywords</a></p></body></html>"
 )
 
 
@@ -53,7 +53,7 @@ def wants_page(request) -> bool:
         if mode:
             return mode == "navigate"
         return "text/html" in request.headers.get("Accept", "")
-    except Exception:  # a malformed request still gets an answer
+    except Exception:  # noqa: BLE001 (a malformed request still gets an answer)
         return True
 
 

@@ -15,9 +15,9 @@ time. Typical flows:
     manage.py apple_ads_diagnose --impression-share
 """
 
-import datetime as dt
 import math
 import time
+from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -91,7 +91,7 @@ class Command(BaseCommand):
         credentials = self._credentials(options)
         self._banner("Token")
         started = time.monotonic()
-        token, expires_at = api.fetch_access_token(credentials)
+        _token, expires_at = api.fetch_access_token(credentials)
         self._ok(f"Access token obtained in {time.monotonic() - started:.2f}s "
                  f"(expires in {int(expires_at - time.time())}s).")
 
@@ -179,7 +179,7 @@ class Command(BaseCommand):
 
     def _credentials(self, options) -> dict:
         if options["key_file"]:
-            private_key_pem = open(options["key_file"], encoding="ascii").read()
+            private_key_pem = Path(options["key_file"]).read_text(encoding="ascii")
         else:
             self._require_key()
             private_key_pem = keys.load_private_key_pem()

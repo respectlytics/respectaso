@@ -15,7 +15,7 @@ def whats_new(request):
 
     try:
         return {"show_whats_new_notice": should_show_notice()}
-    except Exception:  # The notice must never break a page render.
+    except Exception:  # noqa: BLE001 (the notice must never break a page)
         return {"show_whats_new_notice": False}
 
 
@@ -48,6 +48,14 @@ def popularity_source(request):
 
     apple_ready = storage.apple_source_ready()
 
+    # The soft notice below, unless the reader dismissed this rejection
+    # (aso.ui_state, per install: it stays dismissed after a restart).
+    apple_secondary_stale = (
+        source == storage.SOURCE_INTERNAL
+        and bool(block["credentials_rejected"])
+        and not _stale_notice_dismissed(block["credentials_rejected_at"])
+    )
+
     return {
         "popularity_source": source,
         # "" | "upgrade_reconnect" | "not_connected" | "credential_rejected"
@@ -66,12 +74,8 @@ def popularity_source(request):
         ),
         # Internal source selected but the previously working credentials
         # got rejected: the secondary "ASA: n" values stopped refreshing
-        # (soft dismissible notice keyed by the rejection timestamp).
-        "apple_secondary_stale": (
-            source == storage.SOURCE_INTERNAL
-            and bool(block["credentials_rejected"])
-        ),
-        "apple_credentials_rejected_at": block["credentials_rejected_at"],
+        # (soft notice, dismissible per rejection).
+        "apple_secondary_stale": apple_secondary_stale,
         # True once the Apple Ads integration passed verification.
         # Display code uses this to decide whether "below Apple's
         # threshold" is a meaningful statement (integration active) or
@@ -83,15 +87,24 @@ def popularity_source(request):
     }
 
 
-def ui_state(request):
-    """Dismissed-notice flags for templates (see aso.ui_state)."""
+def _stale_notice_dismissed(rejected_at) -> bool:
+    """Whether the Apple staleness notice of this rejection was dismissed
+    (ui_state reads an unreadable file as nothing dismissed)."""
     from . import ui_state as state
 
+    return state.is_dismissed(state.apple_stale_banner_key(rejected_at))
+
+
+def ui_state(request):
+    """The time zone days are counted in, which base.html compares with the
+    browser's (aso.local_day)."""
+    from . import local_day
+
     try:
-        dismissed = state.is_dismissed(state.RESPECTLYTICS_BANNER)
-    except Exception:  # A dismissal flag must never break a page render.
-        dismissed = False
-    return {"respectlytics_banner_dismissed": dismissed}
+        zone = local_day.zone_name()
+    except Exception:  # noqa: BLE001 (an unreadable time zone must never break a page)
+        zone = ""
+    return {"USER_TIME_ZONE": zone}
 
 
 def job_strip(request):
@@ -102,9 +115,11 @@ def job_strip(request):
 
     try:
         state = strip.strip_state()
-    except Exception:  # e.g. the table does not exist yet on first migrate
+    except Exception:  # noqa: BLE001 (the table may not exist yet, on the first migrate)
         state = None
-    return {"job_strip": state}
+    # The run queue shows in the activity panel in every edition: it holds
+    # keyword searches and country scans too (the owner, 2026-10-02).
+    return {"job_strip": state, "run_queue_enabled": True}
 
 
 def country_catalog(request):
@@ -130,64 +145,171 @@ def country_catalog(request):
                 apple_source=apple_source,
             )
         }
-    except Exception:  # e.g. the table does not exist yet on first migrate
+    except Exception:  # noqa: BLE001 (the table may not exist yet, on the first migrate)
         return {"country_catalog": country_picker.catalog()}
 
-# Pages that already carry their own Pro call to action, where the button
-# under the navbar would only repeat it.
-PRO_INVITE_HIDDEN_ON = {
-    "pro_promo_researcher", "pro_promo_competitor", "pro_promo_simulator",
-    "pro_promo_top_terms", "top_terms", "ai_researcher", "ai_competitor",
-    "simulator", "settings_license",
-}
-PRO_INVITE_MAC = "Go Pro: let AI find your best keywords"
-PRO_INVITE_DOCKER = "Automate your ASO with Pro for Mac"
+def pro_button(request):
+    """The one Pro button in the top bar (docs/development/APP_SHELL_PLAN.md,
+    UI_REDESIGN_PLAN.md 11.2).
 
-
-def _pro_or_expired() -> bool:
-    """Pro works here, or it did: an expired license has its own banner with
-    its own button, so the invite stays out of the way."""
-    from django.apps import apps as django_apps
-
-    from .pro_access import has_pro_license
-
-    if has_pro_license():
-        return True
-    if not django_apps.is_installed("licensing"):
-        return False
-    from licensing.decorators import get_license_info
-
-    info = get_license_info()
-    return info is not None and info.is_expired
-
-
-def pro_invite(request):
-    """The button under the navbar that invites a free user to Pro.
-
-    In the Mac app without a license it points to the pricing page; in
-    Docker, where Pro cannot run, it points to the Pro page with the Mac
-    download. Hidden for Pro users, for an expired license (which has its own
-    banner) and on pages that already make the offer. ``pricing_url`` is the
-    one pricing address every template links to.
+    In the Mac app without a license it says Get Pro and opens the pricing
+    page; with an expired license it says Renew Pro; licensed, there is none.
+    In Docker, where Pro cannot run, it says Get Pro for Mac and opens the Pro
+    page with the Mac download. ``pricing_url`` and ``renew_url`` are the one
+    pricing and renewal addresses every template links to.
     """
     from django.conf import settings
 
-    from .links import PRICING_URL, PRO_PAGE_URL
+    from .links import PRICING_URL, PRO_PAGE_URL, RENEW_URL
+    from .pro_access import has_pro_license, license_expired
 
-    context = {"pricing_url": PRICING_URL, "pro_invite": None}
+    context = {"pricing_url": PRICING_URL, "renew_url": RENEW_URL, "pro_button": None}
     try:
-        match = getattr(request, "resolver_match", None)
-        if match is not None and match.url_name in PRO_INVITE_HIDDEN_ON:
-            return context
-        if getattr(settings, "IS_NATIVE_APP", False):
-            if not _pro_or_expired():
-                context["pro_invite"] = {"text": PRO_INVITE_MAC, "url": PRICING_URL}
-        else:
-            context["pro_invite"] = {"text": PRO_INVITE_DOCKER, "url": PRO_PAGE_URL}
-    except Exception:
-        # A button must never break a page.
-        context["pro_invite"] = None
+        if not getattr(settings, "IS_NATIVE_APP", False):
+            context["pro_button"] = {"label": "Get Pro for Mac", "url": PRO_PAGE_URL}
+        elif license_expired():
+            context["pro_button"] = {"label": "Renew Pro", "url": RENEW_URL}
+        elif not has_pro_license():
+            context["pro_button"] = {"label": "Get Pro", "url": PRICING_URL}
+    except Exception:  # noqa: BLE001 (a button must never break a page)
+        context["pro_button"] = None
     return context
+
+
+# The four sections of the top bar and the pages each one lights
+# (UI_REDESIGN_PLAN.md 3.1). Pages listed nowhere (Apps, the Help pages)
+# light none.
+NAV_SECTIONS = {
+    "keywords": {"dashboard"},
+    "discover": {"ai_researcher", "ai_competitor", "top_terms", "opportunity",
+                 "pro_promo_researcher", "pro_promo_competitor", "pro_promo_top_terms"},
+    "metadata": {"simulator", "pro_promo_simulator"},
+    "rivals": {"rival_tracker", "rival_setup", "pro_promo_rival_tracker"},
+    "settings": {"settings_ai", "settings_license", "settings_popularity",
+                 "settings_mcp", "settings_mac_app", "apple_ads_setup"},
+}
+
+# Discover's tabs, in order: key, label, the Pro edition's url, the free
+# edition's url (UI_REDESIGN_PLAN.md 3.2).
+DISCOVER_TABS = (
+    ("ai_researcher", "AI Researcher", "aso_pro:ai_researcher", "aso:pro_promo_researcher"),
+    ("ai_competitor", "AI Competitor", "aso_pro:ai_competitor", "aso:pro_promo_competitor"),
+    ("top_terms", "Top Terms", "aso_pro:top_terms", "aso:pro_promo_top_terms"),
+    ("opportunity", "Countries", "aso:opportunity", "aso:opportunity"),
+)
+# The Pro features behind a tab or a section, by aso.pro_preview_words key:
+# without Pro they carry a lock and say what they do for the reader.
+PRO_TABS = {"ai_researcher": "researcher", "ai_competitor": "competitor", "top_terms": "top_terms"}
+PRO_SECTIONS = {"metadata": "simulator", "rivals": "rival_tracker"}
+
+
+def pro_benefit(feature: str) -> str:
+    """The one line a locked Pro tab says on hover: what it does for the
+    reader, the headline of its preview."""
+    from .pro_preview_words import HEADLINES
+
+    return f"Pro: {HEADLINES[feature]}."
+
+
+# A free edition page belongs to the tab of the feature it shows.
+_DISCOVER_TAB_OF = {
+    "ai_researcher": "ai_researcher", "pro_promo_researcher": "ai_researcher",
+    "ai_competitor": "ai_competitor", "pro_promo_competitor": "ai_competitor",
+    "top_terms": "top_terms", "pro_promo_top_terms": "top_terms",
+    "opportunity": "opportunity",
+}
+
+
+def nav(request):
+    """What the top bar, the Help menu and the section tabs need on every page.
+
+    nav_section: which of the four sections (or settings) the page is in;
+    discover_url: the Discover tab used last, remembered for the visitor
+    (aso.ui_memory.DISCOVER_TAB), the first tab the first time;
+    discover_tabs and settings_tabs: each tab's label, url and whether it is
+    the page shown; a Discover tab of a Pro feature also says, without Pro,
+    that it is locked and what it does (``locked``, ``benefit``), and
+    section_locks does the same for the Metadata and Rivals sections; links:
+    the outside addresses the bar and the Help menu open. Never breaks a
+    page render.
+    """
+    from django.urls import reverse
+
+    from . import links, ui_memory
+    from .desktop_bridge import is_desktop_app
+    from .pro_access import has_pro_license
+
+    context = {
+        "nav_section": "", "nav_tab": "", "discover_url": "", "discover_tabs": [],
+        "settings_tabs": [], "settings_url": "", "setup_guide_url": "", "section_locks": {},
+        "links": {
+            "youtube": links.YOUTUBE_URL, "x": links.X_URL, "github": links.GITHUB_URL,
+            "respectlytics": links.RESPECTLYTICS_URL, "contact": links.CONTACT_EMAIL,
+        },
+    }
+    try:
+        pro = django_apps.is_installed("aso_pro")
+        match = getattr(request, "resolver_match", None)
+        name = (match.url_name or "") if match is not None else ""
+        section = next((key for key, names in NAV_SECTIONS.items() if name in names), "")
+        tab = _DISCOVER_TAB_OF.get(name, "")
+        session = getattr(request, "session", None)
+        if (tab and session is not None and ui_memory.is_full_page_load(request)
+                and session.get(ui_memory.DISCOVER_TAB) != tab):
+            session[ui_memory.DISCOVER_TAB] = tab
+        remembered = (session.get(ui_memory.DISCOVER_TAB) if session is not None else "") or "ai_researcher"
+
+        locked = not has_pro_license()   # always, in the free edition
+        discover_tabs = []
+        for key, label, pro_url, free_url in DISCOVER_TABS:
+            url = reverse(pro_url if pro else free_url)
+            tab_locked = locked and key in PRO_TABS
+            discover_tabs.append({"key": key, "label": label, "url": url, "active": key == tab,
+                                  "locked": tab_locked,
+                                  "benefit": pro_benefit(PRO_TABS[key]) if tab_locked else ""})
+            if key == remembered:
+                context["discover_url"] = url
+        if not context["discover_url"]:
+            context["discover_url"] = discover_tabs[0]["url"]
+
+        settings_tabs = []
+        if pro:
+            settings_tabs.append(("settings_ai", "AI", reverse("aso_pro:settings_ai")))
+        settings_tabs.append(("settings_popularity", "Apple Ads", reverse("aso:settings_popularity")))
+        if pro:
+            settings_tabs.append(("settings_license", "License", reverse("aso_pro:settings_license")))
+            settings_tabs.append(("settings_mcp", "MCP", reverse("aso_pro:settings_mcp")))
+        if is_desktop_app():
+            settings_tabs.append(("settings_mac_app", "Mac App", reverse("aso:settings_mac_app")))
+
+        context.update({
+            "nav_section": section,
+            "nav_tab": name,
+            "discover_tabs": discover_tabs,
+            "section_locks": ({key: pro_benefit(feature) for key, feature in PRO_SECTIONS.items()}
+                              if locked else {}),
+            "settings_tabs": [
+                {"key": key, "label": label, "url": url,
+                 "active": key == name or (key == "settings_popularity" and name == "apple_ads_setup")}
+                for key, label, url in settings_tabs
+            ],
+            "settings_url": settings_tabs[0][2],
+            "setup_guide_url": reverse("aso_pro:settings_setup") if pro else reverse("aso:setup"),
+        })
+    except Exception:  # noqa: BLE001 (the top bar must never break a page)
+        return context
+    return context
+
+
+def back(request):
+    """The page's "Back to ..." (aso/back_link.py), or None at the top level.
+    Never breaks a page render."""
+    from .back_link import back_link
+
+    try:
+        return {"back_link": back_link(request)}
+    except Exception:  # noqa: BLE001 (a way back must never break a page)
+        return {"back_link": None}
 
 
 def difficulty_factors(request):
@@ -200,7 +322,7 @@ def difficulty_factors(request):
 
     try:
         return {"difficulty_factors": difficulty_factor_legend()}
-    except Exception:
+    except Exception:  # noqa: BLE001 (the legend must never break a page)
         return {"difficulty_factors": []}
 
 
@@ -215,5 +337,5 @@ def classification_legend(request):
 
     try:
         return {"classification_legend": legend()}
-    except Exception:
+    except Exception:  # noqa: BLE001 (the legend must never break a page)
         return {"classification_legend": []}

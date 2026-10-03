@@ -16,11 +16,20 @@ import logging
 import math
 import re
 import time
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import ClassVar
 
 import requests
 
 from aso import countries
+
+# The rating volume curve lives in aso/strength.py with every other factor
+# curve, shared by difficulty (the field) and the opportunity score (your
+# app). rating_volume_score stays importable from here.
+from .strength import volume_score as rating_volume_score
+from .throttle import BASE_DELAY, AdaptiveITunesRateLimiter
+from .words import tokenize_words
 
 logger = logging.getLogger(__name__)
 
@@ -31,26 +40,52 @@ logger = logging.getLogger(__name__)
 
 
 class ITunesAPIError(Exception):
-    """Base class for App Store data retrieval errors."""
-    pass
+    """Base class for App Store data retrieval errors: Apple could not be
+    reached or is busy. Never "Apple has no such app": a lookup says that by
+    returning None."""
 
 
 class SearchAPIUnavailableError(ITunesAPIError):
-    """Both primary (iTunes API) and fallback (SSR) search are down."""
-    pass
+    """Apple's App Store could not be reached, did not answer in time,
+    answered with an error or sent an answer that could not be read. For a
+    search: both the iTunes API and the App Store page (SSR) failed."""
+
+
+# What a person reads when Apple's App Store does not answer: what happened
+# and what to do, never which of Apple's services failed (the owner's rule:
+# screens show value, not mechanics). The logs keep the detail.
+APP_STORE_UNAVAILABLE = "Apple's App Store is not answering right now. Try again in a few minutes."
+
+
+# Why a request was turned away when Apple said it is busy: the reason a failed
+# run's report gives (aso_pro/run_failures.py). The logs keep the status.
+APP_STORE_BUSY = "Apple's App Store asked RespectASO to wait before asking again."
+
+# What a person, or an assistant over MCP, reads when Apple says it is busy:
+# the twin of APP_STORE_UNAVAILABLE, with the same next step.
+APP_STORE_BUSY_NOW = "Apple's App Store is busy right now. Try again in a few minutes."
 
 
 class ITunesRateLimited(ITunesAPIError):
-    """The iTunes API returned a rate-limit signal (429 or 503 with Retry-After).
+    """The iTunes API returned a rate-limit signal (429 or 503 with Retry-After;
+    the Lookup also answers a burst with 403, LOOKUP_BUSY_STATUSES).
 
     `retry_after` is the server-suggested wait in seconds, or None if the
     server didn't include the header. Runners feed this into the adaptive
     rate limiter so the next call waits at least this long before retrying.
     """
 
-    def __init__(self, message: str = "iTunes API rate-limited", retry_after: float | None = None):
+    def __init__(self, message: str = APP_STORE_BUSY, retry_after: float | None = None):
         super().__init__(message)
         self.retry_after = retry_after
+
+
+# The statuses with which Apple's Lookup says it is busy: it answers a burst
+# with 403 as well as 429 and 503 (docs/development/COUNTRY_COVERAGE_PLAN.md).
+LOOKUP_BUSY_STATUSES = (403, 429, 503)
+# A lookup a background run depends on is asked up to this many times while
+# Apple cannot be reached or is busy, paced by aso/throttle.py's limiter.
+LOOKUP_ATTEMPTS = 3
 
 
 _FINANCE_INTENT_TOKENS = {
@@ -99,10 +134,10 @@ _TOKEN_NORMALIZATION = {
 def _tokenize(text: str) -> list[str]:
     r"""Tokenize into lowercase words for robust title matching.
 
-    Uses ``[^\W_]+`` (Unicode-aware \w minus underscore) so accented
-    characters like é, ü, ñ are preserved as part of the token.
+    Words as everywhere else in RespectASO (aso/words.py): accents, other
+    scripts and their combining marks stay part of the token.
     """
-    raw_tokens = re.findall(r"[^\W_]+", (text or "").lower())
+    raw_tokens = tokenize_words(text)
     return [_TOKEN_NORMALIZATION.get(tok, tok) for tok in raw_tokens]
 
 
@@ -114,9 +149,7 @@ def _has_finance_context(title_tokens: set[str], genre: str) -> bool:
     genre_lower = (genre or "").lower()
     if "finance" in genre_lower:
         return True
-    if title_tokens & _FINANCE_STRONG_CONTEXT_TOKENS:
-        return True
-    return False
+    return bool(title_tokens & _FINANCE_STRONG_CONTEXT_TOKENS)
 
 
 def compound_form(tokens: list[str]) -> str:
@@ -368,7 +401,7 @@ class PopularityEstimator:
     # 0.71 (previous hand-tuned weights: 0.09); head-vs-tail AUC 0.98.
     # NEVER hand-tune these: refit with the study command under its
     # pre-registered gates (see scoring-principles instructions).
-    V2_WEIGHTS = {
+    V2_WEIGHTS: ClassVar[dict[str, float]] = {
         "intercept": 3.6672,
         "f_result": 1.0404,
         "f_leader": -1.9714,
@@ -401,7 +434,7 @@ class PopularityEstimator:
             for name, weight in self.V2_WEIGHTS.items()
             if name != "intercept"
         )
-        return int(round(max(1, min(100, raw))))
+        return round(max(1, min(100, raw)))
 
     def signal_components(self, competitors: list[dict], keyword: str) -> dict | None:
         """Observable signal components feeding estimate() - and the ONLY
@@ -594,6 +627,30 @@ class PopularityEstimator:
 # --------------------------------------------------------------------------- #
 
 
+# One App Store search per keyword (aso/day_reads.py): its first SCORING_POOL
+# apps are the competitors every score reads, and the order of all of them is
+# every app's rank.
+RANKED_SEARCH_LIMIT = 200
+SCORING_POOL = 25
+
+
+@dataclass(frozen=True)
+class RankedSearch:
+    """One App Store search for a keyword in a storefront.
+
+    ranked_ids    every app's trackId in Apple's order, up to 200
+    apps          the first SCORING_POOL of them as full app dicts, in the
+                  same order: apps[i] is the app at ranked_ids[i]
+    result_count  how many apps the search returned (len(ranked_ids))
+    source        "itunes", or "appstore_ssr" when the fallback answered
+    """
+
+    ranked_ids: list
+    apps: list
+    result_count: int
+    source: str
+
+
 class ITunesSearchService:
     """
     Searches for iOS apps by keyword.
@@ -613,7 +670,7 @@ class ITunesSearchService:
     LOOKUP_URL = "https://itunes.apple.com/lookup"
     SSR_SEARCH_URL = "https://apps.apple.com/{country}/iphone/search"
 
-    _SSR_HEADERS = {
+    _SSR_HEADERS: ClassVar[dict[str, str]] = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -627,37 +684,62 @@ class ITunesSearchService:
     _last_ssr_request: float = 0.0
 
     def lookup_by_id(
-        self, track_id: int, country: str = "us", timeout: int = 30
+        self, track_id: int, country: str = "us", timeout: int = 30, *, retry: bool = True,
     ) -> dict | None:
         """
-        Look up a single app by its iTunes trackId.
+        Look up a single app by its iTunes trackId. The one lookup of one app
+        that every feature uses (lookup_full_description reads it too).
 
-        Pass a shorter ``timeout`` when the caller is on a request path and
-        would rather give up than keep the user waiting.
+        Returns the app dict, or None when Apple answered and has no app with
+        this ID in this storefront. Raises ITunesRateLimited when Apple says
+        it is busy and SearchAPIUnavailableError when it cannot be reached,
+        does not answer in time or answers with an error, so no caller takes
+        a moment of trouble at Apple for a missing app. Until 2.28.1 every
+        failure returned None, and the AI Competitor reported a valid ID
+        (Forest, 866450515) as "not found" and blamed the AI service.
 
-        Returns app dict or None.
+        ``retry`` (the default, for background runs): a failed call is asked
+        again, up to LOOKUP_ATTEMPTS calls in all, paced by the adaptive
+        limiter every App Store loop uses (aso/throttle.py, which honours
+        Retry-After), and an empty answer is asked again once after a short
+        pause, because Apple's Lookup sometimes answers empty for a moment
+        for an app it lists. ``retry=False`` is for a request a person waits
+        on: one call, with a shorter ``timeout`` when the caller would rather
+        give up than keep the user waiting.
         """
-        try:
-            response = requests.get(
-                self.LOOKUP_URL,
-                params={"id": track_id, "country": country},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            results = response.json().get("results", [])
-            if results:
-                r = results[0]
-                return self._parse_app(r)
-            return None
-        except Exception as e:
-            logger.error(f"iTunes lookup failed for id {track_id}: {e}")
-            return None
+        attempts = LOOKUP_ATTEMPTS if retry else 1
+        empty_asks = 1 if retry else 0
+        limiter = AdaptiveITunesRateLimiter()
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                found = self.lookup_raw_chunk([track_id], country=country, timeout=timeout)
+            except ITunesAPIError as exc:
+                if attempt >= attempts:
+                    logger.warning("iTunes lookup of %s (%s) failed: %s", track_id, country, exc)
+                    raise
+                limiter.record_failure(retry_after=getattr(exc, "retry_after", None))
+                logger.info("iTunes lookup of %s (%s) failed (%s), asking again in %.1fs",
+                            track_id, country, exc, limiter.current_delay)
+                limiter.wait()
+                continue
+            raw = found.get(int(track_id))
+            if raw is not None:
+                return self._parse_app(raw)
+            if empty_asks <= 0:
+                return None
+            empty_asks -= 1
+            logger.info("iTunes lookup of %s (%s) answered empty, asking once more", track_id, country)
+            time.sleep(BASE_DELAY)
 
     def lookup_full_description(self, track_id: int, country: str = "us") -> dict:
         """Look up an app and return its description, genre, and context metadata.
 
         Returns a dict with keys: description, genre, rating, rating_count,
-        release_date, update_date, price, version, seller.
+        release_date, update_date, price, version, seller. The description is
+        optional for its callers, so when Apple has no such app or cannot be
+        reached (after lookup_by_id's retries) the defaults stand in.
         """
         defaults = {
             "description": "",
@@ -671,29 +753,104 @@ class ITunesSearchService:
             "seller": "",
         }
         try:
+            app = self.lookup_by_id(track_id, country=country)
+        except ITunesAPIError:
+            return defaults
+        if not app:
+            return defaults
+        return {
+            "description": app.get("description", ""),
+            "genre": app.get("primaryGenreName", ""),
+            "rating": app.get("averageUserRating", 0),
+            "rating_count": app.get("userRatingCount", 0),
+            "release_date": app.get("releaseDate", ""),
+            "update_date": app.get("currentVersionReleaseDate", ""),
+            "price": app.get("formattedPrice", "Free"),
+            "version": app.get("version", ""),
+            "seller": app.get("sellerName", ""),
+        }
+
+    def lookup_raw_chunk(self, track_ids, country: str = "us", timeout: int = 30) -> dict[int, dict]:
+        """One Lookup API call for up to 50 apps: {trackId: Apple's result as
+        Apple sent it}, with every field (version, release notes, screenshots,
+        the full description). The one call to Apple's Lookup behind every
+        lookup in the app.
+
+        An app Apple does not list is left out. Raises ITunesRateLimited when
+        Apple says it is busy (LOOKUP_BUSY_STATUSES, with its Retry-After),
+        and SearchAPIUnavailableError when it cannot be reached, does not
+        answer in time, answers with another error or sends something that
+        is not its JSON: a caller with a rate limiter paces itself, and no
+        caller takes a failure for an empty answer.
+        """
+        ids = [int(t) for t in track_ids][:50]
+        if not ids:
+            return {}
+        try:
             response = requests.get(
                 self.LOOKUP_URL,
-                params={"id": track_id, "country": country},
-                timeout=30,
+                params={"id": ",".join(str(t) for t in ids), "country": country},
+                timeout=timeout,
             )
+        except requests.Timeout as exc:
+            raise SearchAPIUnavailableError("Apple's App Store did not answer in time.") from exc
+        except requests.RequestException as exc:
+            raise SearchAPIUnavailableError("Apple's App Store could not be reached.") from exc
+        if response.status_code in LOOKUP_BUSY_STATUSES:
+            logger.info("Lookup API answered %s (Retry-After=%s)",
+                        response.status_code, response.headers.get("Retry-After"))
+            raise ITunesRateLimited(
+                retry_after=self._parse_retry_after(response.headers.get("Retry-After")),
+            )
+        try:
             response.raise_for_status()
+        except requests.HTTPError as exc:
+            logger.warning("Lookup API answered %s", response.status_code)
+            raise SearchAPIUnavailableError("Apple's App Store answered with an error.") from exc
+        try:
             results = response.json().get("results", [])
-            if results:
-                r = results[0]
-                return {
-                    "description": r.get("description", ""),
-                    "genre": r.get("primaryGenreName", ""),
-                    "rating": r.get("averageUserRating", 0),
-                    "rating_count": r.get("userRatingCount", 0),
-                    "release_date": r.get("releaseDate", ""),
-                    "update_date": r.get("currentVersionReleaseDate", ""),
-                    "price": r.get("formattedPrice", "Free"),
-                    "version": r.get("version", ""),
-                    "seller": r.get("sellerName", ""),
-                }
-            return defaults
-        except Exception:
-            return defaults
+        except (ValueError, AttributeError) as exc:
+            raise SearchAPIUnavailableError(
+                "Apple's App Store sent an answer that could not be read.",
+            ) from exc
+        found: dict[int, dict] = {}
+        for raw in results:
+            track_id = raw.get("trackId") if isinstance(raw, dict) else None
+            if track_id:
+                found[int(track_id)] = raw
+        return found
+
+    _APP_STORE_ID = re.compile(r"/id(\d+)")
+    _APP_STORE_COUNTRY = re.compile(r"apps\.apple\.com/([a-z]{2})/", re.IGNORECASE)
+
+    @classmethod
+    def storefront_in_link(cls, text: str) -> str | None:
+        """The storefront an App Store link names ("se" for
+        apps.apple.com/se/app/...), or None when it names none."""
+        match = cls._APP_STORE_COUNTRY.search(text or "")
+        return match.group(1).lower() if match else None
+
+    def find_apps(self, query: str, country: str = "us", limit: int = 5) -> list[dict]:
+        """The apps a person means by what they typed. An App Store link or
+        a bare App Store ID finds that one app (in the link's own storefront
+        when it names one); anything else is an App Store search. Parsed app
+        dicts, best match first; [] when nothing matches.
+
+        A person waits on the answer, so a lookup is one call (no retries).
+        Raises ITunesAPIError (SearchAPIUnavailableError or ITunesRateLimited)
+        when Apple cannot be reached or is busy, never [] for that.
+        """
+        text = (query or "").strip()
+        if len(text) < 2:
+            return []
+        match = self._APP_STORE_ID.search(text)
+        if match or text.isdigit():
+            track_id = int(match.group(1) if match else text)
+            found = self.lookup_by_id(
+                track_id, country=self.storefront_in_link(text) or country, retry=False,
+            )
+            return [found] if found else []
+        return self.search_apps(text, country=country, limit=limit)
 
     # ── Primary: iTunes Search API ──────────────────────────────────────
 
@@ -719,13 +876,10 @@ class ITunesSearchService:
         # waiting Retry-After (or 5s default) before retrying. Permanent
         # errors (4xx) raise immediately so SSR fallback can take over.
         for attempt in range(2):
-            try:
-                response = requests.get(self.SEARCH_URL, params=params, timeout=15)
-            except requests.Timeout:
-                # Tighter timeout failed — let caller try SSR fallback.
-                # No second attempt: timeouts here usually mean Apple's API
-                # is overloaded and SSR may be more responsive.
-                raise
+            # A timeout raises at once, with no second attempt: it usually
+            # means Apple's API is overloaded, and the caller's SSR fallback
+            # may answer sooner.
+            response = requests.get(self.SEARCH_URL, params=params, timeout=15)
 
             status = response.status_code
             if status in (429, 503):
@@ -740,11 +894,11 @@ class ITunesSearchService:
                     )
                     time.sleep(wait)
                     continue
-                # Second attempt also rate-limited — surface it so the runner
-                # can record the failure on the limiter and consider SSR.
-                raise ITunesRateLimited(
-                    f"iTunes API rate-limited ({status})", retry_after=retry_after,
-                )
+                # Second attempt also rate-limited: surface it so the runner
+                # can record the failure on the limiter and consider SSR. The
+                # message is the plain one a failed run's report gives.
+                logger.info("iTunes API returned %d again (keyword=%r)", status, keyword)
+                raise ITunesRateLimited(retry_after=retry_after)
 
             # Any other 5xx: retry once with a brief pause; otherwise raise.
             if 500 <= status < 600:
@@ -758,7 +912,7 @@ class ITunesSearchService:
             return [self._parse_app(r) for r in data.get("results", [])]
 
         # Should be unreachable — both attempts return or raise above.
-        raise SearchAPIUnavailableError("iTunes API exhausted retries")
+        raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE)
 
     @staticmethod
     def _parse_retry_after(value: str | None) -> float | None:
@@ -895,21 +1049,12 @@ class ITunesSearchService:
 
         for start in range(0, len(track_ids), chunk_size):
             chunk = track_ids[start : start + chunk_size]
-            ids_str = ",".join(str(tid) for tid in chunk)
             try:
-                resp = requests.get(
-                    self.LOOKUP_URL,
-                    params={"id": ids_str, "country": country},
-                    timeout=30,
-                )
-                resp.raise_for_status()
-                for r in resp.json().get("results", []):
-                    tid = r.get("trackId")
-                    if tid:
-                        result[tid] = self._parse_app(r)
-            except Exception as e:
+                for track_id, raw in self.lookup_raw_chunk(chunk, country=country).items():
+                    result[track_id] = self._parse_app(raw)
+            except Exception as e:  # noqa: BLE001 (one failed chunk must not lose the others)
                 logger.warning(f"Batch lookup failed for chunk: {e}")
-                # Continue with next chunk — partial data is better than none
+                # Continue with next chunk: partial data is better than none
 
         return result
 
@@ -937,11 +1082,7 @@ class ITunesSearchService:
         lookup_map = self._batch_lookup(target_ids, country=country)
 
         if not lookup_map:
-            raise SearchAPIUnavailableError(
-                "App Store search data is temporarily unavailable. "
-                "Both the iTunes Search API and the Lookup API failed. "
-                "Please try again in a few minutes."
-            )
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE)
 
         # Return in ranking order, only apps that Lookup returned
         apps = []
@@ -955,11 +1096,89 @@ class ITunesSearchService:
 
     # ── Public API ──────────────────────────────────────────────────────
 
+    def search_ranked(self, keyword: str, country: str = "us") -> RankedSearch:
+        """The one App Store search behind every keyword score and rank.
+
+        Asks the iTunes Search API for up to RANKED_SEARCH_LIMIT apps. The
+        first SCORING_POOL are the competitors every score reads; the order
+        of all of them is every app's rank, so a row's rank and its
+        competitor list come from one list and never disagree. Asking Apple
+        for 25 and for 200 returns different orders, and the 200 list is the
+        one closer to the App Store's own (probe of 2026-09-30,
+        docs/development/ONE_READ_PER_DAY_PLAN.md).
+
+        Only aso/day_reads.py calls this: every other path reads through it,
+        so a keyword costs Apple one search per storefront per day.
+
+        Falls back to the App Store search page (ordered ids) plus one Lookup
+        call for the first SCORING_POOL ids when the iTunes API fails. An id
+        among those that the Lookup does not return is dropped from the
+        order too, so apps[i] is always the app at ranked_ids[i].
+
+        Raises ITunesRateLimited (no fallback: Apple would throttle the page
+        too) and SearchAPIUnavailableError when both sources fail.
+        """
+        try:
+            results = self._search_itunes(keyword, country=country, limit=RANKED_SEARCH_LIMIT)
+        except ITunesRateLimited:
+            raise
+        except Exception as e:  # noqa: BLE001 (any failure of the API falls back to the App Store page)
+            logger.warning(
+                f"iTunes Search API failed for '{keyword}' ({country}), "
+                f"falling back to SSR: {e}"
+            )
+        else:
+            seen = set()
+            ordered = []
+            for app in results:
+                track_id = app.get("trackId")
+                if track_id and track_id not in seen:
+                    seen.add(track_id)
+                    ordered.append(app)
+            apps = ordered[:SCORING_POOL]
+            for app in apps:
+                app["_data_source"] = "itunes"
+            return RankedSearch(
+                ranked_ids=[int(app["trackId"]) for app in ordered],
+                apps=apps,
+                result_count=len(ordered),
+                source="itunes",
+            )
+
+        try:
+            page_ids = self._extract_ssr_app_ids(self._fetch_ssr_page(keyword, country=country))
+        except Exception as e:
+            logger.error(f"SSR fallback also failed for '{keyword}' ({country}): {e}")
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE) from e
+        page_ids = [int(track_id) for track_id in page_ids[:RANKED_SEARCH_LIMIT]]
+        if not page_ids:
+            return RankedSearch(ranked_ids=[], apps=[], result_count=0, source="appstore_ssr")
+        head = page_ids[:SCORING_POOL]
+        lookup_map = self._batch_lookup(head, country=country)
+        if not lookup_map:
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE)
+        apps = []
+        for track_id in head:
+            app = lookup_map.get(track_id)
+            if app is not None:
+                app["_data_source"] = "appstore_ssr"
+                apps.append(app)
+        ranked_ids = [int(app["trackId"]) for app in apps] + page_ids[SCORING_POOL:]
+        logger.info(f"SSR fallback returned {len(ranked_ids)} apps for '{keyword}' ({country})")
+        return RankedSearch(
+            ranked_ids=ranked_ids, apps=apps, result_count=len(ranked_ids), source="appstore_ssr",
+        )
+
     def search_apps(
         self, keyword: str, country: str = "us", limit: int = 10
     ) -> list[dict]:
         """
         Search for iOS apps matching a keyword.
+
+        Not for keyword scores or ranks: those read through
+        aso.day_reads.get_or_fetch (one search per keyword, storefront and
+        day). This serves the app name search (views.app_lookup_view), the
+        storefront probe and the rank calibration study.
 
         Tries the iTunes Search API first.  If it fails (HTTP error,
         timeout, etc.), falls back to App Store SSR scraping + Lookup
@@ -976,6 +1195,7 @@ class ITunesSearchService:
 
         Raises:
             SearchAPIUnavailableError: When both data sources are down.
+            ITunesRateLimited: When Apple says it is busy (no fallback).
         """
         # Try primary source: iTunes Search API
         try:
@@ -989,7 +1209,7 @@ class ITunesSearchService:
             # the next call. SSR isn't a sensible fallback here — Apple
             # would rate-limit the SSR endpoint too.
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 (any failure of the API falls back to the App Store page)
             logger.warning(
                 f"iTunes Search API failed for '{keyword}' ({country}), "
                 f"falling back to SSR: {e}"
@@ -1008,82 +1228,16 @@ class ITunesSearchService:
             logger.error(
                 f"SSR fallback also failed for '{keyword}' ({country}): {e}"
             )
-            raise SearchAPIUnavailableError(
-                "App Store search data is temporarily unavailable. "
-                "Both the iTunes Search API and the App Store website "
-                "returned errors. Please try again in a few minutes."
-            ) from e
-
-    def find_app_rank(
-        self, keyword: str, track_id: int, country: str = "us"
-    ) -> int | None:
-        """
-        Find where a specific app ranks for a keyword.
-
-        Searches up to 200 results (iTunes API max) and returns the
-        1-based position of the app, or None if not found.
-
-        If the iTunes API fails, falls back to checking the position
-        in the SSR ordered ID list (200+ apps, no full hydration needed).
-
-        Args:
-            keyword: The search term.
-            track_id: The iTunes trackId to look for.
-            country: Two-letter country code.
-
-        Returns:
-            1-based rank position, or None if not in top 200.
-
-        Raises:
-            SearchAPIUnavailableError: When both data sources are down.
-        """
-        # Try primary: iTunes Search API
-        try:
-            results = self._search_itunes(
-                keyword, country=country, limit=200
-            )
-            for i, app in enumerate(results):
-                if app.get("trackId") == track_id:
-                    return i + 1
-            return None
-        except Exception as e:
-            logger.warning(
-                f"iTunes API failed for rank lookup '{keyword}' ({country}), "
-                f"falling back to SSR: {e}"
-            )
-
-        # Fallback: SSR ID list (no full hydration — lightweight)
-        try:
-            return self._find_rank_in_ssr(keyword, track_id, country=country)
-        except SearchAPIUnavailableError:
-            raise
-        except Exception as e:
-            logger.error(
-                f"SSR rank fallback also failed for '{keyword}' ({country}): {e}"
-            )
-            raise SearchAPIUnavailableError(
-                "App Store search data is temporarily unavailable. "
-                "Cannot determine app ranking."
-            ) from e
-
-    def _find_rank_in_ssr(
-        self, keyword: str, track_id: int, country: str = "us"
-    ) -> int | None:
-        """Check app rank using the ordered SSR ID list.
-
-        No full app hydration — just position in the list.
-        """
-        ssr_data = self._fetch_ssr_page(keyword, country=country)
-        all_ids = self._extract_ssr_app_ids(ssr_data)
-        try:
-            return all_ids.index(track_id) + 1
-        except ValueError:
-            return None
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE) from e
 
     @staticmethod
     def _parse_app(result: dict) -> dict:
-        """Parse an iTunes API result into a standardized app dict."""
-        desc = result.get("description", "")
+        """Parse an iTunes API result into a standardized app dict.
+
+        The description stays whole, because the AI tabs read it. The one
+        place that shortens it is ``display_snippet``, which makes the form
+        stored beside keywords for the screens.
+        """
         return {
             "trackId": result.get("trackId"),
             "trackName": result.get("trackName", ""),
@@ -1096,11 +1250,67 @@ class ITunesSearchService:
             ),
             "primaryGenreName": result.get("primaryGenreName", ""),
             "formattedPrice": result.get("formattedPrice", "Free"),
-            "description": (desc[:200] + "...") if len(desc) > 200 else desc,
+            "description": result.get("description", ""),
+            "version": result.get("version", ""),
             "sellerName": result.get("sellerName", ""),
             "bundleId": result.get("bundleId", ""),
             "trackViewUrl": result.get("trackViewUrl", ""),
         }
+
+
+# --------------------------------------------------------------------------- #
+# Display form of an app, for storage beside keywords
+# --------------------------------------------------------------------------- #
+
+# The keys a stored app dict has always carried: the fields _parse_app
+# returned until it kept the full description, plus the "_data_source" tag
+# search_apps adds. Keys the parser gains (such as "version") stay out of
+# storage unless a screen needs them.
+STORED_APP_KEYS = (
+    "trackId",
+    "trackName",
+    "artworkUrl100",
+    "averageUserRating",
+    "userRatingCount",
+    "releaseDate",
+    "currentVersionReleaseDate",
+    "primaryGenreName",
+    "formattedPrice",
+    "description",
+    "sellerName",
+    "bundleId",
+    "trackViewUrl",
+    "_data_source",
+)
+
+DESCRIPTION_SNIPPET_CHARS = 200
+
+
+def display_snippet(app):
+    """The form of ``app`` that is stored beside a keyword for the screens.
+
+    A new dict with the ``STORED_APP_KEYS`` of ``app`` and its description
+    cut to ``DESCRIPTION_SNIPPET_CHARS`` characters plus "...". No screen
+    shows a stored description, and 25 full descriptions per keyword per day
+    would grow the database about twentyfold, so storage keeps the form it
+    always had while the AI reads every word. Never changes ``app``;
+    applying it twice gives the same result as once; anything that is not a
+    dict comes back as it is.
+    """
+    if not isinstance(app, dict):
+        return app
+    snippet = {key: app[key] for key in STORED_APP_KEYS if key in app}
+    description = snippet.get("description")
+    if isinstance(description, str) and len(description) > DESCRIPTION_SNIPPET_CHARS:
+        snippet["description"] = description[:DESCRIPTION_SNIPPET_CHARS] + "..."
+    return snippet
+
+
+def display_snippets(apps):
+    """``display_snippet`` for every app of a list; an empty list or None comes back as it is."""
+    if not apps:
+        return apps
+    return [display_snippet(app) for app in apps]
 
 
 # --------------------------------------------------------------------------- #
@@ -1165,7 +1375,7 @@ class DownloadEstimator:
     #
     # Decay follows a power-law: steep drop from #1 to #5 (all on
     # first screen), then gradual tail for positions requiring scroll.
-    _TTR = {
+    _TTR: ClassVar[dict[int, float]] = {
         1: 0.30,
         2: 0.18,
         3: 0.12,
@@ -1230,7 +1440,7 @@ class DownloadEstimator:
         if rank <= 1:
             return cls._TTR[1]
         if rank <= 20:
-            low = int(math.floor(rank))
+            low = math.floor(rank)
             if low >= 20:
                 return cls._TTR[20]
             fraction = rank - low
@@ -1351,13 +1561,6 @@ class DownloadEstimator:
 # --------------------------------------------------------------------------- #
 # Keyword Difficulty Calculator
 # --------------------------------------------------------------------------- #
-
-
-# The rating volume curve lives in aso/strength.py with every other factor
-# curve, shared by difficulty (the field) and the opportunity score (your
-# app). These names stay importable from here.
-from .strength import VOLUME_BANDS as RATING_VOLUME_BANDS  # noqa: E402
-from .strength import volume_score as rating_volume_score  # noqa: E402
 
 
 # The weak leader cap: a #1 app with few reviews means the keyword is easy,
@@ -1559,11 +1762,11 @@ class DifficultyCalculator:
 
         # --- Publisher Diversity (10%) — 0-100 normalized ---
         unique_publishers = len(
-            set(
+            {
                 c.get("sellerName", "").lower()
                 for c in competitors
                 if c.get("sellerName")
-            )
+            }
         )
         publisher_diversity = min(100, (unique_publishers / max(n, 1)) * 100)
 
@@ -1578,9 +1781,7 @@ class DifficultyCalculator:
                 c.get("primaryGenreName", ""),
             )
             relevance_sum += float(evidence["evidence"])
-            if evidence["exact_phrase"]:
-                title_match_count += 1
-            elif evidence["all_words"]:
+            if evidence["exact_phrase"] or evidence["all_words"]:
                 title_match_count += 1
         title_relevance = min(100, (title_match_count / max(n, 1)) * 100)
 
@@ -1676,7 +1877,6 @@ class DifficultyCalculator:
 
         n = len(competitors)
         kw_lower = keyword.lower().strip()
-        kw_words = set(kw_lower.split()) if kw_lower else set()
 
         # --- Core difficulty (same algo used for tiers) ---
         raw_total, sub_scores = self._compute_raw_difficulty(
@@ -1792,7 +1992,6 @@ class DifficultyCalculator:
         if override_reason and raw_total != total:
             if override_reason == "small_result_set":
                 override_text = (
-                    f"Score adjusted from {raw_total} → {total}. "
                     f"Only {n} app{'s' if n > 1 else ''} found for this "
                     f"keyword: very little competition exists."
                 )
@@ -1802,7 +2001,6 @@ class DifficultyCalculator:
                     # Many competitors target this keyword — not backfill,
                     # just a weak leader in a competitive field.
                     override_text = (
-                        f"Score adjusted from {raw_total} → {total}. "
                         f"The #1 app ({leader_name}) has only "
                         f"{leader_reviews:,} "
                         f"rating{'s' if leader_reviews != 1 else ''}, "
@@ -1811,7 +2009,6 @@ class DifficultyCalculator:
                     )
                 else:
                     override_text = (
-                        f"Score adjusted from {raw_total} → {total}. "
                         f"The #1 app ({leader_name}) has only "
                         f"{leader_reviews:,} "
                         f"rating{'s' if leader_reviews != 1 else ''}. "
@@ -1971,9 +2168,8 @@ class DifficultyCalculator:
           - label: Easy / Moderate / Hard / Very Hard
           - highlights: list of plain-English bullet strings
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         kw_lower = keyword.lower().strip()
-        kw_words = set(kw_lower.split()) if kw_lower else set()
         tiers = {}
 
         for tier_name, tier_size in [("top_5", 5), ("top_10", 10), ("top_20", 20)]:
@@ -2055,7 +2251,7 @@ class DifficultyCalculator:
                 if release_date:
                     try:
                         released = datetime.fromisoformat(
-                            release_date.replace("Z", "+00:00")
+                            release_date
                         )
                         if (now - released).days < 365:
                             fresh += 1
@@ -2090,9 +2286,8 @@ class DifficultyCalculator:
         # this floor, tiers can appear inconsistently easier than the
         # overall score (e.g. overall "Very Hard" but tiers "Moderate").
         if overall_score > 0:
-            for tier_key in tiers:
-                if tiers[tier_key]["tier_score"] < overall_score:
-                    tiers[tier_key]["tier_score"] = overall_score
+            for tier in tiers.values():
+                tier["tier_score"] = max(tier["tier_score"], overall_score)
 
         # Re-label after floor enforcement
         def _score_to_label(s):
@@ -2108,10 +2303,8 @@ class DifficultyCalculator:
                 return "Very Hard"
             return "Extreme"
 
-        for tier_key in tiers:
-            tiers[tier_key]["label"] = _score_to_label(
-                tiers[tier_key]["tier_score"]
-            )
+        for tier in tiers.values():
+            tier["label"] = _score_to_label(tier["tier_score"])
 
         # --- Enforce monotonicity: larger tiers can never be harder ---
         # If Top 5 is Hard, Top 10 and Top 20 must also be Hard-or-easier.
@@ -2127,14 +2320,12 @@ class DifficultyCalculator:
             return label
 
         if "top_5" in tiers and "top_10" in tiers:
-            if tiers["top_10"]["tier_score"] > tiers["top_5"]["tier_score"]:
-                tiers["top_10"]["tier_score"] = tiers["top_5"]["tier_score"]
+            tiers["top_10"]["tier_score"] = min(tiers["top_10"]["tier_score"], tiers["top_5"]["tier_score"])
             tiers["top_10"]["label"] = _cap_label(
                 tiers["top_10"]["label"], tiers["top_5"]["label"]
             )
         if "top_10" in tiers and "top_20" in tiers:
-            if tiers["top_20"]["tier_score"] > tiers["top_10"]["tier_score"]:
-                tiers["top_20"]["tier_score"] = tiers["top_10"]["tier_score"]
+            tiers["top_20"]["tier_score"] = min(tiers["top_20"]["tier_score"], tiers["top_10"]["tier_score"])
             tiers["top_20"]["label"] = _cap_label(
                 tiers["top_20"]["label"], tiers["top_10"]["label"]
             )
@@ -2398,14 +2589,14 @@ class DifficultyCalculator:
             )
 
         # Fresh entrants (released in last 12 months)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         fresh_apps = []
         for c in competitors:
             release_date = c.get("releaseDate", "")
             if release_date:
                 try:
                     released = datetime.fromisoformat(
-                        release_date.replace("Z", "+00:00")
+                        release_date
                     )
                     if (now - released).days < 365:
                         fresh_apps.append(c)
@@ -2428,11 +2619,11 @@ class DifficultyCalculator:
             )
 
         # Niche genre diversity
-        genres = set(
+        genres = {
             c.get("primaryGenreName", "")
             for c in competitors
             if c.get("primaryGenreName")
-        )
+        }
         if len(genres) >= 3:
             genre_list = ", ".join(sorted(genres)[:3])
             suffix = "..." if len(genres) > 3 else ""

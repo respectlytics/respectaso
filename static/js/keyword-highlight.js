@@ -42,7 +42,8 @@
     // [start, end] of the compound where it starts a word of the title.
     function compoundSpan(title, compound) {
         if (!compound) return null;
-        const wordRe = /[\p{L}\p{N}]+/gu;
+        // The words of aso/words.py: letters, combining marks, digits.
+        const wordRe = /[\p{L}\p{M}\p{N}]+/gu;
         let m;
         while ((m = wordRe.exec(title)) !== null) {
             if (m[0].toLowerCase().startsWith(compound)) {

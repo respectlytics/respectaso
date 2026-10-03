@@ -91,18 +91,16 @@
             }
             var where = row.popularity_genre
                 ? 'the ' + row.popularity_genre + ' category' : 'its category';
-            var absentPara = 'Apple lists each category\'s ~500 most-searched terms, '
-                + 'and this keyword is not among them for ' + where
-                + ' in this storefront this week.';
+            var absentPara = 'This keyword is not among Apple\'s most-searched terms for '
+                + where + ' here this week.';
             if (hasInternal && internal > cap) {
                 return {
                     badge: BADGES.fallback,
                     heading: 'Not in Apple\'s top terms: capped',
                     paragraphs: [
                         absentPara,
-                        'It cannot score above Apple\'s lowest reported value there ('
-                        + (cap + 1) + '), so RespectASO\'s estimate of ' + internal
-                        + ' is scored as ' + cap + '.',
+                        'RespectASO\'s estimate of ' + internal + ' is scored as ' + cap
+                        + ', below Apple\'s lowest reported value there (' + (cap + 1) + ').',
                     ],
                     note: '',
                 };
@@ -152,23 +150,23 @@
      * below for top-half rows (avoids clipping against the table header)
      * and above otherwise - same rule as formatDownloadCell.
      */
-    function badgeHtml(tip, idx, total) {
+    function badgeHtml(tip, idx, total, triggerHtml) {
         var showBelow = total > 0 && idx < total / 2;
         var pos = showBelow ? 'top-full mt-2' : 'bottom-full mb-2';
         return '<span class="group/pop relative inline-flex">'
-            + '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px '
-            + tip.badge.cls + ' cursor-help">' + tip.badge.label + '</span>'
+            + (triggerHtml || ('<span class="text-2xs font-semibold uppercase tracking-wide rounded px-0.5 py-px '
+                + tip.badge.cls + ' cursor-help">' + tip.badge.label + '</span>'))
             + '<div class="hidden group-hover/pop:block absolute z-20 ' + pos
             + ' left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 rounded-lg p-3 '
             + 'shadow-xl text-left normal-case font-normal tracking-normal whitespace-normal">'
-            + '<p class="text-[10px] text-slate-500 mb-1.5 font-medium uppercase tracking-wider">'
+            + '<p class="text-2xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">'
             + tip.heading + '</p>'
             + tip.paragraphs.map(function (p, i) {
-                return '<p class="text-[11px] leading-relaxed text-slate-300'
+                return '<p class="text-2xs leading-relaxed text-slate-300'
                     + (i ? ' mt-1.5' : '') + '">' + p + '</p>';
             }).join('')
             + (tip.note
-                ? '<p class="text-[10px] leading-relaxed text-slate-500 mt-2 pt-1.5 border-t border-white/5">'
+                ? '<p class="text-2xs leading-relaxed text-slate-400 mt-2 pt-1.5 border-t border-white/5">'
                     + tip.note + '</p>'
                 : '')
             + '</div></span>';
@@ -184,7 +182,7 @@
         var arrow = delta > 0 ? '▲' : '▼';
         var tone = delta > 0 ? 'text-emerald-400' : 'text-red-400';
         var signed = (delta > 0 ? '+' : '') + delta;
-        return '<span class="text-[9px] ' + tone + ' cursor-help" '
+        return '<span class="text-2xs ' + tone + ' cursor-help" '
             + 'title="Apple popularity vs previous week: ' + signed + '">' + arrow + '</span>';
     }
 
@@ -194,12 +192,23 @@
      * Pass `idx`/`total` (0-based row index, row count) so the popover
      * flips away from the nearest table edge.
      */
+    // A row from the source the column header names needs no badge: the
+    // number itself opens the popover (KEYWORDS_PAGE_PLAN.md M1.5). Only a
+    // row that differs (EST*, or the other source) keeps its badge.
+    function isPlain(tip) {
+        var active = global.POPULARITY_SOURCE === 'apple' ? 'apple' : 'internal';
+        return (tip.badge === BADGES.asa && active === 'apple')
+            || (tip.badge === BADGES.est && active === 'internal');
+    }
+
     function formatPopularityCell(row, extraHtml, idx, total) {
         var tip = resolveTip(row);
+        var number = '<span class="text-sm font-semibold text-purple-400' + (isPlain(tip) ? ' cursor-help' : '') + '">'
+            + esc(row.popularity) + '</span>';
         return '<div class="leading-tight inline-block text-center">'
             + '<span class="inline-flex items-center justify-center gap-1.5">'
-            + '<span class="text-sm font-semibold text-purple-400">' + esc(row.popularity) + '</span>'
-            + badgeHtml(tip, idx || 0, total || 0)
+            + (isPlain(tip) ? badgeHtml(tip, idx || 0, total || 0, number)
+                            : number + badgeHtml(tip, idx || 0, total || 0))
             + trendHtml(row)
             + (extraHtml || '')
             + '</span>'
@@ -214,8 +223,9 @@
     function formatPopularityChipCell(row, chipHtml) {
         var tip = resolveTip(row);
         return '<div class="leading-tight inline-block text-center">'
-            + '<span class="inline-flex items-center justify-center gap-1">' + chipHtml
-            + badgeHtml(tip, 0, 0)
+            + '<span class="inline-flex items-center justify-center gap-1">'
+            + (isPlain(tip) ? badgeHtml(tip, 0, 0, '<span class="cursor-help">' + chipHtml + '</span>')
+                            : chipHtml + badgeHtml(tip, 0, 0))
             + '</span>'
             + '</div>';
     }
@@ -244,11 +254,11 @@
         var used = usedApple ? 'apple' : 'internal';
         var label = usedApple ? 'Apple Ads popularity' : 'RespectASO estimate';
         var current = global.POPULARITY_SOURCE || 'internal';
-        var html = '<span class="text-slate-500">Popularity source used in this analysis:</span> '
+        var html = '<span class="text-slate-400">Popularity source used in this analysis:</span> '
             + '<span class="text-slate-300 font-medium">' + label + '</span>';
         if (current !== used) {
             var currentLabel = current === 'apple' ? 'Apple Ads popularity' : 'the RespectASO estimate';
-            html += ' <span class="ml-1.5 text-[10px] text-amber-300/90 bg-amber-900/25 border border-amber-500/25 rounded px-1.5 py-px">'
+            html += ' <span class="ml-1.5 text-2xs text-amber-300/90 bg-amber-900/25 border border-amber-500/25 rounded px-1.5 py-px">'
                 + 'differs from your current selection. New runs use ' + currentLabel + '</span>';
         }
         return '<p class="text-xs mb-2">' + html + '</p>';
@@ -263,9 +273,32 @@
         if (source !== 'apple' && source !== 'internal') return '';
         var badge = source === 'apple' ? BADGES.asa : BADGES.est;
         var label = source === 'apple' ? 'Apple Ads popularity' : 'RespectASO estimate';
-        return '<span class="text-[8px] font-semibold uppercase tracking-wide rounded px-0.5 py-px '
+        return '<span class="text-2xs font-semibold uppercase tracking-wide rounded px-0.5 py-px '
             + badge.cls + ' cursor-help" title="Popularity source used in this analysis: '
             + label + '">' + badge.label + '</span>';
+    }
+
+    /**
+     * Keeps the badge popovers of cells drawn inside a scrolling box (a
+     * dialog's list) in view: a popover opens below its badge in the box's
+     * upper half and above it in the lower half, wherever the box is
+     * scrolled to. `idx`/`total` cannot know that for a list taller than
+     * its box.
+     */
+    function keepPopoversIn(box) {
+        if (!box) return;
+        box.addEventListener('mouseover', function (e) {
+            var holder = e.target instanceof Element ? e.target.closest('.group\\/pop') : null;
+            var popover = holder && box.contains(holder) ? holder.querySelector('div') : null;
+            if (!popover) return;
+            var badge = holder.getBoundingClientRect();
+            var area = box.getBoundingClientRect();
+            var below = badge.top + badge.height / 2 < area.top + area.height / 2;
+            popover.classList.toggle('top-full', below);
+            popover.classList.toggle('mt-2', below);
+            popover.classList.toggle('bottom-full', !below);
+            popover.classList.toggle('mb-2', !below);
+        });
     }
 
     /** Compact single-line variant for tickers and tight layouts: "48 ASA". */
@@ -322,19 +355,12 @@
             var paras = [
                 '<strong class="text-amber-100">' + fallbackRows.length + ' of the ' + rows.length
                     + ' keywords in this analysis are outside Apple\'s published top '
-                    + 'terms.</strong> Apple publishes each category\'s 500 most-searched terms '
-                    + 'per storefront; keywords outside that group are scored with '
-                    + 'RespectASO\'s estimate, calibrated against Apple\'s official values and '
-                    + 'aligned to the same 1-100 scale: one consistent ruler across the '
-                    + 'whole analysis.',
-                'A modest aggregate score under the Apple source therefore reflects where '
-                    + 'these keywords sit against Apple\'s reporting bar, not necessarily '
-                    + 'misaligned metadata.',
+                    + 'terms,</strong> so they use RespectASO\'s estimate on the same 1-100 scale.',
+                'A modest score here can reflect Apple\'s reporting bar rather than weak metadata.',
             ];
             var altA = altReadinessSentence(opts, 'the RespectASO estimate');
             if (altA) paras.push(altA);
-            paras.push('To analyze under the estimate, switch the source in Settings. New runs '
-                + 'and re-simulations use your current selection.');
+            paras.push('To use the estimate instead, switch the source in Settings before the next run.');
             return advisoryHtml(paras);
         }
 
@@ -347,18 +373,14 @@
         if (divergent.length < ADVISORY_MIN_ROWS
             || divergent.length / dualRows.length < DIVERGENCE_SHARE) return '';
         var parasB = [
-            '<strong class="text-amber-100">Apple Ads reports substantially different popularity for '
+            '<strong class="text-amber-100">Apple Ads reports quite different popularity for '
                 + divergent.length + ' of the ' + dualRows.length
                 + ' keywords with Apple data in this analysis.</strong> '
-                + 'Under the Apple Ads source, opportunity and aggregate scores would '
-                + 'look different. Hover a keyword\'s source badge to see both values; where they '
-                + 'disagree strongly, neither is automatically right. Such keywords are worth '
-                + 'checking by hand.',
+                + 'Hover a source badge to see both values, and check those keywords by hand.',
         ];
         var altB = altReadinessSentence(opts, 'Apple Ads popularity');
         if (altB) parasB.push(altB);
-        parasB.push('To analyze under Apple Ads popularity, switch the source in Settings. New '
-            + 'runs and re-simulations use your current selection.');
+        parasB.push('To use Apple Ads popularity instead, switch the source in Settings before the next run.');
         return advisoryHtml(parasB);
     }
 
@@ -396,6 +418,7 @@
     global.formatPopularityChipCell = formatPopularityChipCell;
     global.formatPopularityBadge = formatPopularityBadge;
     global.formatPopularityCompact = formatPopularityCompact;
+    global.keepPopoversIn = keepPopoversIn;
     global.formatSourceContextAdvisory = formatSourceContextAdvisory;
     global.formatCoverageAdvisory = formatCoverageAdvisory;
 })(window);

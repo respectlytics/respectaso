@@ -5,30 +5,29 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
+    {% include "aso/partials/back_link.html" %}
 
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold text-white mb-1">Connect Apple Ads</h1>
-        <p class="text-sm text-slate-400">
-            A one-time setup (about 5 minutes) that unlocks Apple's official search popularity as a source in
-            RespectASO, through the Apple Ads Platform API. Free, no campaigns, no spend required.
-            Works in every edition: desktop, browser, and Docker.
+    <div class="mb-4">
+        <h1 class="page-title mb-1">Connect Apple Ads</h1>
+        <p class="page-lead">
+            A one-time, 5-minute setup that adds Apple's own search popularity. Free, no campaigns or ad spend.
         </p>
     </div>
 
     <!-- Step 1 -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-bold flex items-center justify-center">1</span>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-2 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-semibold flex items-center justify-center">1</span>
             Get an Apple Ads account (skip if you have one)
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
             <p>
-                Go to <a href="https://ads.apple.com" target="_blank" rel="noopener" class="text-sky-400 hover:text-sky-300">ads.apple.com</a>
+                Go to <a href="https://ads.apple.com" target="_blank" rel="noopener" class="link">ads.apple.com</a>
                 and sign up with your Apple Account. Choose the <span class="text-white font-medium">Advanced</span> plan when asked: it's the
                 free self-service tier, and creating the account costs nothing. You need the
                 <span class="text-white font-medium">Admin</span> role in it (you have it automatically on your own account).
             </p>
-            <p class="text-xs text-slate-500">
+            <p class="text-xs text-slate-400">
                 You do NOT need to create a campaign or spend anything. The connection only lets RespectASO read
                 Apple's search-popularity data on your behalf.
             </p>
@@ -36,9 +35,9 @@
     </section>
 
     <!-- Step 2 -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-bold flex items-center justify-center">2</span>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-2 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-semibold flex items-center justify-center">2</span>
             Give your account an API user (one time)
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
@@ -60,14 +59,14 @@
     </section>
 
     <!-- Step 3 -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-bold flex items-center justify-center">3</span>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-2 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-semibold flex items-center justify-center">3</span>
             Generate your key in RespectASO and upload it at Apple
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
             <p>
-                In <a href="{% url 'aso:settings_popularity' %}" class="text-sky-400 hover:text-sky-300">Settings → Popularity Source</a>,
+                In <a href="{% url 'aso:settings_popularity' %}" class="link">Settings → Apple Ads</a>,
                 click <span class="text-white font-medium">"Generate my key pair"</span>. RespectASO creates a secure key on
                 this computer and shows you the <span class="text-white">public</span> half.
             </p>
@@ -75,7 +74,7 @@
                 Signed in as the API user, open <span class="text-white">Account Settings → API</span> at Apple, paste the
                 public key into the <span class="text-white">Public Key</span> field (including the BEGIN/END lines), and save.
             </p>
-            <p class="text-xs text-slate-500">
+            <p class="text-xs text-slate-400">
                 The private key stays in your local data folder with owner-only permissions and never leaves this
                 computer. Apple only ever receives the public key and signed requests.
             </p>
@@ -83,9 +82,9 @@
     </section>
 
     <!-- Step 4 -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-bold flex items-center justify-center">4</span>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-2 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-sky-600/30 text-sky-300 text-xs font-semibold flex items-center justify-center">4</span>
             Paste the three ids and verify
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-2">
@@ -93,8 +92,9 @@
                 After saving, Apple shows three values right above the key field: <span class="text-white font-mono text-xs">clientId</span>,
                 <span class="text-white font-mono text-xs">teamId</span>, and <span class="text-white font-mono text-xs">keyId</span>
                 (Client ID and Team ID are often identical, and that's normal). Paste them into RespectASO and click
-                <span class="text-white font-medium">"Save &amp; verify connection"</span>. Verification makes a real API call,
-                picks your ad account, and starts the first data sync immediately.
+                <span class="text-white font-medium">"Save &amp; verify connection"</span>. RespectASO checks the connection
+                with Apple, asks which ad account to use if you have several, and starts bringing in Apple's
+                data at once.
             </p>
             <p>
                 That's it, forever: the key does not expire, weekly data refreshes automatically, and you only ever return
@@ -104,13 +104,13 @@
     </section>
 
     <!-- What to expect -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-3">What to expect</h2>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3">What to expect</h2>
         <ul class="text-sm text-slate-300 space-y-2">
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Weekly, automatic:</span> Apple publishes each completed week on
-                Mondays; RespectASO picks it up in the background (just keep the app running) and backfills up to
-                65 weeks of history for keyword trends.
+                Mondays, and RespectASO brings it in while the app is running, with up to 65 weeks of history
+                for keyword trends.
             </span></li>
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Top terms only:</span> Apple reports each category's top 500
@@ -124,20 +124,20 @@
             </span></li>
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Extras included:</span> the
-                <a href="{% if pro_edition %}{% url 'aso_pro:top_terms' %}{% else %}{% url 'aso:pro_promo_top_terms' %}{% endif %}" class="text-sky-400 hover:text-sky-300">Top Terms</a> browser
+                <a href="{% if pro_edition %}{% url 'aso_pro:top_terms' %}{% else %}{% url 'aso:pro_promo_top_terms' %}{% endif %}" class="link">Top Terms</a> browser
                 (Apple's full ranking, with movers, part of RespectASO Pro), weekly trend arrows on your keywords, and, if you run Apple Ads
-                campaigns, your ads' impression share per search term on the dashboard.
+                campaigns, your ads' impression share per search term on the Keywords page.
             </span></li>
         </ul>
     </section>
 
     <!-- Troubleshooting -->
-    <section class="bg-[#1e293b] border border-white/10 rounded-xl p-5 mb-4">
-        <h2 class="text-base font-semibold text-white mb-3">Troubleshooting</h2>
+    <section class="card p-4 mb-4">
+        <h2 class="card-title mb-3">Troubleshooting</h2>
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead>
-                    <tr class="text-left text-slate-500 border-b border-white/10">
+                    <tr class="text-left text-slate-400 border-b border-white/10">
                         <th class="py-2 pr-4 font-medium">Symptom</th>
                         <th class="py-2 font-medium">What it means / what to do</th>
                     </tr>
@@ -164,13 +164,13 @@
                     </tr>
                     <tr class="border-b border-white/5">
                         <td class="py-2.5 pr-4 align-top text-slate-400">A storefront shows no Apple data</td>
-                        <td class="py-2.5">Apple Ads doesn't operate there (e.g. Russia), or its first sync hasn't run yet.
-                            Storefronts sync automatically once you track keywords in them.</td>
+                        <td class="py-2.5">Apple Ads doesn't operate there (e.g. Russia), or its Apple data has not arrived
+                            yet. It arrives by itself once you track keywords in that storefront.</td>
                     </tr>
                     <tr>
                         <td class="py-2.5 pr-4 align-top text-slate-400">What does Disconnect do?</td>
-                        <td class="py-2.5">Deletes the key from this computer and stops syncing. Your scores keep the
-                            last-synced Apple data; reconnecting later needs the full setup again (Apple-side key upload included).</td>
+                        <td class="py-2.5">Deletes the key from this computer, and no new Apple data arrives. Your scores keep
+                            the Apple data you already have; reconnecting later needs the full setup again (Apple-side key upload included).</td>
                     </tr>
                 </tbody>
             </table>
@@ -179,7 +179,7 @@
 
     <a href="{% url 'aso:settings_popularity' %}"
        class="inline-block text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-lg px-4 py-2 transition-colors">
-        Open Popularity Source settings
+        Back to Apple Ads settings
     </a>
 </div>
 {% endblock %}

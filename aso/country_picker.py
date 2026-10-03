@@ -81,6 +81,9 @@ def catalog(*, tracked=(), apple_source=False) -> dict:
         entries.append({
             "code": country.code,
             "name": country.name,
+            # "the App Store in the Netherlands": the server's phrase, so no
+            # script decides which names take "the".
+            "store": countries.store_phrase(country.code),
             "flag": country.flag,
             "region": country.region,
             "search": _search_text(country),

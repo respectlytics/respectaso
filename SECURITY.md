@@ -43,11 +43,11 @@ Out of scope:
 
 RespectASO is designed as a **local-only tool** running on the user's machine (native macOS app or Docker):
 
-- **No remote access** — binds to localhost only
-- **No authentication** — single-user tool, no auth needed
-- **No credentials stored** — all data comes from the public iTunes Search API, no API keys needed
-- **No data exfiltration** — all API calls go directly from the user's machine to Apple/iTunes
-- **No telemetry** — no data is sent to Respectlytics or any third party
+- **No remote access**: binds to localhost only
+- **No authentication**: single-user tool, no auth needed
+- **No credentials stored**: all data comes from the public iTunes Search API, no API keys needed
+- **No data exfiltration**: all API calls go directly from the user's machine to Apple/iTunes
+- **No telemetry**: no data is sent to Respectlytics or any third party
 
 ## Supported Versions
 
