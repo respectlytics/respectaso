@@ -300,6 +300,8 @@ OVERCLAIMS = {
         r"|\baccurate (?:keyword data|data|downloads?|download (?:estimates|numbers)|search volumes?|"
         r"popularity|rankings?|ranks|scores?|estimates?|metadata|results?)\b"
         r"|\bnever (?:wrong|inaccurate|hallucinates?|makes (?:anything|things|facts) up)\b"
+        r"|\b(?:not|no|without|instead of|won'?t|doesn'?t|don'?t) hallucinat(?:es?|ed|ing|ions?)\b|\banswers? accurately\b"
+        r"|\bverified (?:results?|data|numbers|scores?|answers?|keywords?|metadata)\b"
         r"|\b(?:error|hallucination|mistake)[ -]free\b|\bfact[ -]?checked\b",
         re.IGNORECASE),
     "promises more downloads or higher ranks": re.compile(
