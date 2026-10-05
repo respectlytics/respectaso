@@ -9,9 +9,9 @@
 [![Version](https://img.shields.io/github/v/release/respectlytics/respectaso?color=purple&label=version)](https://github.com/respectlytics/respectaso/releases/latest)
 [![Website](https://img.shields.io/badge/Website-respectaso.com-purple)](https://respectaso.com)
 
-**Free, open-source ASO keyword research tool for macOS. No API keys. No accounts. No data leaves your machine.**
+**Free, open-source ASO keyword research tool for macOS. No API keys. No accounts. Your research stays on your Mac.**
 
-RespectASO helps iOS developers research App Store keywords privately. Download the `.dmg`, drag to Applications, and get keyword popularity scores, difficulty analysis, competitor breakdowns, and download estimates, all without sending your research data to third-party services.
+RespectASO helps iOS developers research App Store keywords privately. Download the `.dmg`, drag to Applications, and get keyword popularity scores, difficulty analysis, competitor breakdowns, and download estimates, and your research is stored on your Mac, never on a server of ours.
 
 **Website:** [respectaso.com](https://respectaso.com) has the docs, the scoring methodology and RespectASO Pro.
 
@@ -22,8 +22,8 @@ RespectASO helps iOS developers research App Store keywords privately. Download 
 Most ASO tools require paid subscriptions, API keys, and send your keyword research to their servers. RespectASO takes a different approach:
 
 - **No API keys or credentials needed**: works out of the box with the public iTunes Search API; connecting Apple Ads for official popularity data is optional
-- **Runs entirely on your machine**: App Store data comes from Apple straight to your computer
-- **No telemetry, no analytics, no tracking**: zero data sent to any third party
+- **Runs on your Mac**: App Store data comes from Apple straight to your computer, never through a server of ours
+- **No telemetry, no analytics, no tracking**: the app reports nothing about you or your research to us or anyone else
 - **Free and open-source**: AGPL-3.0 licensed, forever
 - **Native Mac app**: download the `.dmg`, drag to Applications, done
 
@@ -171,12 +171,12 @@ The `.private` TLD is reserved by [RFC 6762](https://www.rfc-editor.org/rfc/rfc6
 
 RespectASO is designed with privacy as a core principle:
 
-- **100% local**: the tool runs entirely on your machine as a native app
+- **A native Mac app**: it runs on your machine and keeps your research there
 - **No accounts**: no registration, no login, no user tracking
-- **No telemetry**: zero analytics, zero phone-home, zero data collection
-- **No API keys required**: the public iTunes Search API needs no credentials; the optional Apple Ads connection uses your own key, which never leaves your machine
+- **No telemetry**: no analytics and no data collection. The app's only calls go to Apple, for App Store data, and to GitHub, to see whether a new version is out
+- **No API keys required**: the public iTunes Search API needs no credentials; the optional Apple Ads connection uses your own key, which stays on your Mac
 - **No middleman**: App Store data comes straight from Apple to your machine, never through a RespectASO server
-- **Your data stays yours**: keyword research, competitor analysis, and search history never leave your network
+- **Your data stays yours**: keyword research, competitor analysis and search history are stored on your Mac, not on any server of ours
 
 We built RespectASO because we believe developers should be able to research keywords without handing their competitive intelligence to a third party.
 

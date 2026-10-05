@@ -127,6 +127,16 @@ class NoOverclaimTest(SimpleTestCase):
                 hits[relative(path)] = found
         self.assertEqual(hits, {})
 
+    def test_the_public_readme_overclaims_nothing(self):
+        """The free edition's README is what GitHub shows a visitor
+        (_public_files/README.md here, README.md in the free edition)."""
+        root = Path(settings.BASE_DIR)
+        readme = root / "_public_files" / "README.md"
+        if not readme.is_file():
+            readme = root / "README.md"
+        prose = re.sub(r"```.*?```", "\n", readme.read_text(encoding="utf-8"), flags=re.DOTALL)
+        self.assertEqual(_overclaims(relative(readme), prose.split("\n")), [])
+
     def test_every_allowance_is_still_needed(self):
         """An allowance whose words are gone from its file, or that excuses no
         shape, is a hole for the next one."""
