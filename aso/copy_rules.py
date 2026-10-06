@@ -320,12 +320,13 @@ OVERCLAIMS = {
         r"|\bapp store[ -]compliant\b|\bcompliant with (?:the )?app store\b|\bnever (?:be )?rejected\b",
         re.IGNORECASE),
     "says nothing leaves the Mac": re.compile(
-        r"\b100% (?:private|local|offline)\b|\bnothing (?:ever )?leaves your (?:mac|machine|device|computer)\b"
+        r"\b100% (?:privacy|private|local|offline)\b|\bnothing (?:ever )?leaves your (?:mac|machine|device|computer)\b"
         r"|\b(?:no|zero) data (?:ever )?leav(?:es|ing)\b|\bnever leaves your (?:mac|machine|device|computer)\b"
         r"|\bcompletely (?:private|offline)\b",
         re.IGNORECASE),
     "promises a time saving nothing measures": re.compile(
-        r"\bsav(?:e|es|ing) (?:you )?(?:\d+ )?(?:hours|days|weeks|minutes)\b|\b\d+x faster\b|\bhours? saved\b",
+        r"\bsav(?:e|es|ing) (?:you )?(?:\d+ )?(?:hours|days|weeks|minutes)\b|\b\d+x faster\b|\bhours? saved\b"
+        r"|\b(?:hours|days|weeks) of (?:[a-z]+ ){0,3}work\b|\b(?:automated|done|finished) in (?:seconds|minutes)\b",
         re.IGNORECASE),
 }
 
