@@ -38,7 +38,29 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.1.0',
+RELEASES = [{'version': '3.1.1',
+  'date': '2026-10-08',
+  'title': 'RespectASO opens right away, and deleted keywords free their disk space',
+  'kind': 'patch',
+  'sections': [
+      {'heading': 'Fixed',
+       'items': [
+           ('<strong>The window could stay empty at startup</strong> until RespectASO was quit '
+            'and opened again, for example right after your Mac woke from sleep (issue #27). It '
+            'now opens right away, even when the network is slow.'),
+           ('Tracked keywords no longer miss their daily update when other tasks run at the '
+            'same time, such as a search or your AI assistant.'),
+       ]},
+      {'heading': 'Disk space and startup',
+       'items': [
+           ('<strong>Deleting tracked keywords now frees their disk space on your Mac.</strong> '
+            'The first start after this update makes your data take only the space it needs, '
+            'once; with a large history that takes a few seconds.'),
+           ('While RespectASO gets your data ready, the window says so. If it ever cannot '
+            'start, it shows what to send us and gives you the buttons to do it.'),
+       ]},
+  ]},
+ {'version': '3.1.0',
   'date': '2026-10-08',
   'title': 'Track keywords straight from the AI tools, and your own tasks go ahead of the daily update',
   'kind': 'feature',

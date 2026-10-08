@@ -1389,6 +1389,11 @@ function copySelectedKeywords() {
     });
 }
 
+// The spinner the table's delete actions show while the server works.
+function spinnerIcon(size) {
+    return `<svg class="${size} animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>`;
+}
+
 async function deleteSelectedResults() {
     const pairs = historySelectedEntries().map(e => e.pair);
     if (!pairs.length) return;
@@ -1403,7 +1408,7 @@ async function deleteSelectedResults() {
     const originalHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Deleting…`;
+        btn.innerHTML = spinnerIcon('w-3.5 h-3.5') + ' Deleting…';
     }
 
     const entries = pairs.map(pair => {
@@ -1693,6 +1698,20 @@ async function bulkDelete() {
     const ok = await showConfirm(`Delete all keywords ${scope} and their search results?`, {type: 'danger', title: 'Delete all keywords', confirmLabel: 'Delete all', confirmStyle: 'danger'});
     if (!ok) return;
 
+    // A long history takes a few seconds to delete and hand its disk space
+    // back: the menu's button spins and the table dims until the new table
+    // replaces the whole card, as Delete selected does on its own button.
+    const moreBtn = document.querySelector('#history-more [data-menu-button]');
+    const table = document.getElementById('history-table');
+    const moreHtml = moreBtn ? moreBtn.innerHTML : '';
+    if (moreBtn) { moreBtn.disabled = true; moreBtn.innerHTML = spinnerIcon('h-4 w-4'); }
+    if (table) table.classList.add('opacity-50', 'pointer-events-none');
+    const failed = function () {
+        showAlert('The keywords could not be deleted. Try again.', {type: 'danger', title: 'Delete all keywords'});
+        if (moreBtn) { moreBtn.disabled = false; moreBtn.innerHTML = moreHtml; }
+        if (table) table.classList.remove('opacity-50', 'pointer-events-none');
+    };
+
     try {
         const resp = await fetch('{% url "aso:keywords_bulk_delete" %}', {
             method: 'POST',
@@ -1703,9 +1722,11 @@ async function bulkDelete() {
             // The wiped rows leave the selection: the table swapped in next
             // carries the server's selection without them.
             await refreshHistorySection();
+        } else {
+            failed();
         }
     } catch (e) {
-        showAlert('Bulk delete failed.', {type: 'danger', title: 'Error'});
+        failed();
     }
 }
 

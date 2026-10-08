@@ -83,7 +83,71 @@ COPY = {
     "menu_quit": "Quit RespectASO",
     "selftest_title": "RespectASO notifications work",
     "selftest_body": "This is the test notification you asked for.",
+    # The window's loading page (aso/templates/loading_standalone.html) and
+    # the menu bar's line while the data is being prepared.
+    "starting_title": "Getting your data ready",
+    "starting_hint": "The first start after an update can take a little longer.",
+    "start_failed_title": "RespectASO could not start",
+    "start_failed_text": (
+        "Quit it from the menu bar and open it again. If it still does not "
+        "start, send these two things to"
+    ),
+    "start_failed_details": "These details",
+    "start_failed_copy": "Copy",
+    "start_failed_copied": "Copied",
+    "start_failed_logfile": "Your log file",
+    "start_failed_log": "Show in Finder",
+    "start_failed_email": "Email us",
+    "start_failed_note": "Opens an email with the details filled in. Drag the log file into it before you send it.",
+    "menu_starting": "Getting your data ready…",
+    "menu_start_failed": "RespectASO could not start",
 }
+
+# The Mac app's start (desktop/main.py): the window opens at once on its
+# loading page and the database is prepared behind it. Until the data is
+# ready nothing on the main thread may read the database: the one-time
+# rewrite after an update holds it for seconds, and the menu bar would
+# freeze. Every other process (Docker, the MCP server, tests) is ready from
+# the start.
+STARTING, READY, FAILED = "starting", "ready", "failed"
+_startup = {"state": READY}
+
+
+def start_failed_details(version: str, macos: str, error: str) -> str:
+    """The details a failed start asks the user to send: shown on the screen
+    with a Copy button and filled into the Email us message."""
+    return (
+        f"RespectASO version: {version}\n"
+        f"macOS version: {macos}\n"
+        f"What went wrong: {error}"
+    )
+
+
+def start_failed_mail(details: str) -> str:
+    """The mailto: link of the failed start's Email us button: our address, a
+    subject, and a body holding the details; the user adds the log file."""
+    from urllib.parse import quote, urlencode
+
+    from .links import CONTACT_EMAIL
+
+    body = (
+        "RespectASO could not start on my Mac.\n\n"
+        f"{details}\n\n"
+        "My log file, respectaso.log, is attached."
+    )
+    query = urlencode({"subject": COPY["start_failed_title"], "body": body}, quote_via=quote)
+    return f"mailto:{CONTACT_EMAIL}?{query}"
+
+
+def startup_state() -> str:
+    return _startup["state"]
+
+
+def set_startup_state(state: str) -> None:
+    if state not in (STARTING, READY, FAILED):
+        raise ValueError(f"Unknown startup state: {state}")
+    _startup["state"] = state
+
 
 _backend = {"current": None}
 

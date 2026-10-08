@@ -40,6 +40,7 @@ from .apple_ads.storage import (  # noqa: F401 (re-exported for convenience)
     SOURCE_UNSET,
     get_popularity_source,
 )
+from .db_writes import rows_in_batches
 
 logger = logging.getLogger(__name__)
 
@@ -602,7 +603,7 @@ def recompute_all_classifications():
         "keyword__app__track_id",
         "keyword__app__store_profiles",
     )
-    for result in qs.iterator(chunk_size=500):
+    for result in rows_in_batches(qs, 500):
         if source_setting == SOURCE_APPLE:
             key = (result.country, result.inferred_genre)
             if key not in ceilings:
@@ -711,7 +712,7 @@ def recalculate_stored_difficulty() -> dict:
         return True
 
     batch = []
-    for row in SearchResult.objects.select_related("keyword").iterator(chunk_size=200):
+    for row in rows_in_batches(SearchResult.objects.select_related("keyword"), 200):
         stats["search_results"] += 1
         if rescore(row, row.keyword.keyword, "difficulty_score"):
             batch.append(row)
@@ -724,7 +725,7 @@ def recalculate_stored_difficulty() -> dict:
             batch, ["difficulty_score", "difficulty_breakdown"])
 
     batch = []
-    for row in OpportunityScanResult.objects.iterator(chunk_size=200):
+    for row in rows_in_batches(OpportunityScanResult.objects.all(), 200):
         stats["scan_results"] += 1
         if rescore(row, row.keyword_text, "difficulty_score"):
             batch.append(row)
@@ -834,7 +835,7 @@ def recalculate_stored_popularity() -> dict:
         "id", "popularity_score", "inferred_genre", "competitors_data",
         "keyword__keyword",
     ).select_related("keyword")
-    for result in qs.iterator(chunk_size=200):
+    for result in rows_in_batches(qs, 200):
         total += 1
         competitors = result.competitors_data or []
         if not competitors:

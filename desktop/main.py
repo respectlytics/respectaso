@@ -1,8 +1,9 @@
 """
 RespectASO — Native macOS App Entry Point
 
-Launches the Django server in a background thread and opens a native
-WebKit window via pywebview. Data is stored in
+Opens a native WebKit window via pywebview at once, on a loading page,
+while the data is prepared and the Django server starts in the background;
+then the app replaces the loading page. Data is stored in
 ~/Library/Application Support/RespectASO/.
 
 Closing the window hides it and RespectASO keeps running in the menu bar;
@@ -171,6 +172,133 @@ def configure_environment(data_dir):
     os.environ.setdefault("DEBUG", "False")
 
 
+# The loading page's background and the app's (Tailwind bg-slate-900).
+STARTUP_BACKGROUND = "#0F172A"
+
+
+def startup_page(state, error=""):
+    """The window's own page while the data is prepared ("starting"), or when
+    that failed ("failed", with what went wrong for the email to us):
+    aso/templates/loading_standalone.html, with the typeface and the logo
+    inline, since no server runs yet. Its sentences live in
+    aso/desktop_bridge.py COPY."""
+    import base64
+    import platform
+
+    from django.conf import settings
+    from django.template.loader import render_to_string
+
+    from aso.desktop_bridge import COPY, start_failed_details, start_failed_mail
+    from aso.links import CONTACT_EMAIL
+
+    static = Path(settings.BASE_DIR) / "static"
+
+    def inline(name):
+        return base64.b64encode((static / name).read_bytes()).decode("ascii")
+
+    details = start_failed_details(settings.VERSION, platform.mac_ver()[0] or "unknown", error)
+    log = log_file()
+    home = str(Path.home())
+    log_path = str(log) if log else ""
+    if log_path.startswith(home + "/"):
+        log_path = "~" + log_path[len(home):]
+
+    return render_to_string("loading_standalone.html", {
+        "state": state,
+        "copy": COPY,
+        "font_regular": inline("fonts/schibsted-grotesk/SchibstedGrotesk-Regular.woff2"),
+        "font_medium": inline("fonts/schibsted-grotesk/SchibstedGrotesk-Medium.woff2"),
+        "font_semibold": inline("fonts/schibsted-grotesk/SchibstedGrotesk-SemiBold.woff2"),
+        "logo": inline("images/respectaso-logo-64.png"),
+        "contact": CONTACT_EMAIL,
+        "details": details,
+        "log_path": log_path,
+        "mail": start_failed_mail(details),
+    })
+
+
+def log_file():
+    """The app's log file (core/settings.py LOGGING), or None in a process
+    that does not write one."""
+    from django.conf import settings
+
+    handler = settings.LOGGING.get("handlers", {}).get("file") or {}
+    return Path(handler["filename"]) if handler.get("filename") else None
+
+
+def show_log_in_finder():
+    """The failed start page's Show in Finder button: Finder opens the log's
+    folder with the file selected, ready to drag into the email, or just the
+    folder when there is no log yet. True when Finder was asked."""
+    import subprocess
+
+    from django.conf import settings
+
+    log = log_file()
+    if log is not None and log.exists():
+        command = ["/usr/bin/open", "-R", str(log)]
+    else:
+        command = ["/usr/bin/open", str(log.parent if log is not None else settings.DATA_DIR)]
+    return subprocess.run(command, check=False).returncode == 0
+
+
+def prepare_and_serve():
+    """Everything the first page waits for, in order. Returns the server's
+    port; raises when anything fails or the server does not answer in time.
+
+    Migrate first (aso/disk_space.py converts an older database there, which
+    takes seconds on a large one), then the history upgrade and the run queue,
+    which need every column, then the server."""
+    from django.core.management import call_command
+
+    call_command("migrate", "--no-input", verbosity=0)
+    call_command("collectstatic", "--no-input", verbosity=0)
+
+    # Re-score stored history when a version marker bumped, now that every
+    # column it reads exists (aso/apps.py leaves this to the Mac app).
+    from aso.popularity import start_history_upgrade
+
+    start_history_upgrade()
+
+    # Resume the run queue now that the schema is up to date: a keyword search
+    # that was executing when the app was last closed continues from the first
+    # keyword that was not finished, AI runs that were executing are marked
+    # interrupted (with a Retry offer), and anything still queued starts again.
+    # Both editions: the Free build has keyword searches too.
+    from aso.run_queue import resume_after_startup
+
+    resume_after_startup()
+
+    port = find_free_port()
+    threading.Thread(target=run_server, args=(port,), daemon=True).start()
+    if not wait_for_server(port):
+        raise RuntimeError("The server did not start within 30 seconds.")
+    return port
+
+
+def start_app(window):
+    """Behind the loading page (webview.start runs it on its own thread):
+    prepare the data and the server, then open the app in the window. If
+    that fails the window says so, the menu bar says so, and the reason is
+    in the log; until it is done the menu bar never reads the database
+    (aso/desktop_bridge.py startup_state)."""
+    import logging
+
+    from aso import desktop_bridge
+
+    logger = logging.getLogger("desktop.main")
+    try:
+        port = prepare_and_serve()
+    except Exception as e:
+        logger.exception("RespectASO could not start")
+        desktop_bridge.set_startup_state(desktop_bridge.FAILED)
+        what = f"{type(e).__name__}: {e}".splitlines()[0][:300]
+        window.load_html(startup_page("failed", error=what))
+        return
+    desktop_bridge.set_startup_state(desktop_bridge.READY)
+    window.load_url(f"http://127.0.0.1:{port}")
+
+
 def main():
     base_dir = get_base_dir()
     data_dir = get_data_dir()
@@ -195,40 +323,16 @@ def main():
     import certifi
     os.environ["SSL_CERT_FILE"] = certifi.where()
 
-    # Setup Django
+    # Set up Django: quick. The slow work (migrations, the one-time database
+    # conversion after an update, the history upgrade, the server) runs in
+    # start_app, behind the window's loading page, so the window opens at once.
     import django
 
     django.setup()
 
-    # Run migrations
-    from django.core.management import call_command
+    from aso import desktop_bridge
 
-    call_command("migrate", "--no-input", verbosity=0)
-    call_command("collectstatic", "--no-input", verbosity=0)
-
-    # Re-score stored history when a version marker bumped, now that every
-    # column it reads exists (aso/apps.py leaves this to the Mac app).
-    from aso.popularity import start_history_upgrade
-
-    start_history_upgrade()
-
-    # Resume the run queue now that the schema is up to date: a keyword search
-    # that was executing when the app was last closed continues from the first
-    # keyword that was not finished, AI runs that were executing are marked
-    # interrupted (with a Retry offer), and anything still queued starts again.
-    # Both editions: the Free build has keyword searches too.
-    from aso.run_queue import resume_after_startup
-
-    resume_after_startup()
-
-    # Pick a free port and start Gunicorn in a daemon thread
-    port = find_free_port()
-    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
-    server_thread.start()
-
-    if not wait_for_server(port):
-        print("ERROR: Server failed to start within 30 seconds.", file=sys.stderr)
-        sys.exit(1)
+    desktop_bridge.set_startup_state(desktop_bridge.STARTING)
 
     # Set the macOS dock icon (only works outside a PyInstaller bundle)
     icon_path = base_dir / "desktop" / "assets" / "RespectASO.iconset" / "icon_512x512.png"
@@ -279,6 +383,10 @@ def main():
             except Exception:  # noqa: BLE001 (the page gets False and shows its own message)
                 return False
 
+        def show_log(self):
+            """The failed start page's Show log file button."""
+            return show_log_in_finder()
+
         def copy_to_clipboard(self, text):
             """Copy text to the system clipboard.
 
@@ -305,7 +413,7 @@ def main():
     api = Api()
     window = webview.create_window(
         "RespectASO",
-        f"http://127.0.0.1:{port}",
+        html=startup_page("starting"),
         width=1280,
         height=860,
         min_size=(900, 600),
@@ -313,6 +421,9 @@ def main():
         # Shown by desktop/mac_integration.py once macOS has launched the app,
         # unless macOS opened it at login: then it stays in the menu bar.
         hidden=True,
+        # The loading page's colour and the app's, so the window never
+        # flashes white between them.
+        background_color=STARTUP_BACKGROUND,
         js_api=api,
     )
 
@@ -322,7 +433,8 @@ def main():
     from desktop import mac_integration
 
     mac_integration.install(window)
-    webview.start()
+    # start_app runs on its own thread while the window shows its loading page.
+    webview.start(start_app, (window,))
 
 
 if __name__ == "__main__":

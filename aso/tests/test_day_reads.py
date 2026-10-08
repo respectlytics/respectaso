@@ -10,7 +10,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from aso import day_reads
-from aso.models import KeywordDayRead
+from aso.models import Keyword, KeywordDayRead
 
 from .helpers import ranked_search
 
@@ -124,6 +124,9 @@ class PacerTest(TestCase):
 
 class TidyTest(TestCase):
     def _read_on(self, days_ago):
+        # A tracked keyword: a finished day of one no longer tracked goes at
+        # once (test_disk_space.ForgetUntrackedReadsTest).
+        Keyword.objects.create(keyword=f"term {days_ago}")
         read = day_reads.get_or_fetch(f"term {days_ago}", "us", itunes_service=service())
         KeywordDayRead.objects.filter(pk=read.pk).update(day=read.day - timedelta(days=days_ago))
         return read.pk

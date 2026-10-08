@@ -43,7 +43,7 @@ class StartupOrderTest(SimpleTestCase):
     def test_the_mac_app_starts_it_after_migrate(self):
         from desktop import main
 
-        source = inspect.getsource(main.main)
+        source = inspect.getsource(main.prepare_and_serve)
         self.assertLess(source.index('call_command("migrate"'), source.index("start_history_upgrade()"))
 
     def test_the_scratch_gate_keeps_it_off(self):

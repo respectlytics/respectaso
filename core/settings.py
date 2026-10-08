@@ -4,10 +4,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from core.database import SQLITE_OPTIONS
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "3.1.0"
+VERSION = "3.1.1"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -128,6 +130,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": DATA_DIR / "db.sqlite3",
+        # WAL, immediate transactions and a 30 s wait: several writers share
+        # this database (core/database.py).
+        "OPTIONS": SQLITE_OPTIONS,
     }
 }
 
@@ -225,6 +230,13 @@ if IS_NATIVE_APP:
             # it ends, with how many keywords it refreshed: without them a
             # user's log cannot say whether the refresh ran.
             "aso.scheduler": {
+                "handlers": ["file"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            # When the database was converted to give deleted data's disk
+            # space back, and from what size (aso/disk_space.py).
+            "aso.disk_space": {
                 "handlers": ["file"],
                 "level": "INFO",
                 "propagate": False,

@@ -33,7 +33,7 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 
-from django.db import models
+from django.db import OperationalError, models
 from django.utils import timezone
 
 from . import run_queue
@@ -56,6 +56,7 @@ _refresh_status = {
 }
 
 RETENTION_DAYS = 90
+DATABASE_BUSY_RETRY_SECONDS = 2
 
 # The pause between real App Store reads while Apple answers normally.
 REFRESH_PACE_SECONDS = 2.0
@@ -304,29 +305,40 @@ def _refresh_pair(keyword_obj, country, *, force=False):
         SearchAPIUnavailableError,
     )
 
-    try:
-        return score_keyword_pair(
-            keyword_obj, country,
-            itunes_service=ITunesSearchService(),
-            difficulty_calc=DifficultyCalculator(),
-            download_est=DownloadEstimator(),
-            force=force,
-        )
-    except SearchAPIUnavailableError as e:
-        logger.warning(
-            f"Skipping refresh for {keyword_obj.keyword} ({country}): {e}"
-        )
-        return None
+    for attempt in (1, 2):
+        try:
+            return score_keyword_pair(
+                keyword_obj, country,
+                itunes_service=ITunesSearchService(),
+                difficulty_calc=DifficultyCalculator(),
+                download_est=DownloadEstimator(),
+                force=force,
+            )
+        except SearchAPIUnavailableError as e:
+            logger.warning(
+                f"Skipping refresh for {keyword_obj.keyword} ({country}): {e}"
+            )
+            return None
+        except OperationalError as e:
+            # Another writer held the database past the 30 s wait
+            # (core/database.py): rare, and gone a moment later.
+            if attempt == 2 or "locked" not in str(e):
+                raise
+            logger.info(f"The database was busy at {keyword_obj.keyword} ({country}); trying again.")
+            time.sleep(DATABASE_BUSY_RETRY_SECONDS)
 
 
 def _cleanup_old_results():
     """Delete SearchResults older than RETENTION_DAYS, and tidy the day
     reads (aso/day_reads.py) with the same retention."""
     from . import day_reads
+    from .db_writes import delete_in_batches
     from .models import SearchResult
 
     cutoff = timezone.now() - timedelta(days=RETENTION_DAYS)
-    deleted_count, _ = SearchResult.objects.filter(searched_at__lt=cutoff).delete()
+    # In batches: after weeks away this is thousands of rows, and one long
+    # delete made the refresh behind it fail (aso/db_writes.py).
+    deleted_count = delete_in_batches(SearchResult.objects.filter(searched_at__lt=cutoff))
     if deleted_count:
         logger.info(f"Cleaned up {deleted_count} results older than {RETENTION_DAYS} days.")
     day_reads.tidy(RETENTION_DAYS)
@@ -718,11 +730,18 @@ def menu_status(now=None):
     user's other tasks go first), or when the newest ranking was read, in
     the reader's own day (aso/local_day.py).
     """
+    from . import desktop_bridge
     from .desktop_bridge import COPY
     from .local_day import local_date, user_timezone
     from .models import SearchResult
 
     refresh_title = COPY["menu_refresh"]
+    # Called on the main thread: no database before the data is ready.
+    state = desktop_bridge.startup_state()
+    if state == desktop_bridge.STARTING:
+        return COPY["menu_starting"], False, refresh_title
+    if state == desktop_bridge.FAILED:
+        return COPY["menu_start_failed"], False, refresh_title
     status = get_status()
     if status["running"]:
         total = status["total"] or 0

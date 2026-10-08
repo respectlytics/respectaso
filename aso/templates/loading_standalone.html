@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+{% comment %}
+The Mac app's first page (desktop/main.py): the window opens on it at once
+while the database is prepared behind it, then the app replaces it. Nothing
+serves it, so it is standalone: no stylesheet, the typeface and the logo
+inline as data. state "starting" shows the moving bar and, after a few
+seconds, the hint; "failed" says what to do. The sentences live in
+aso/desktop_bridge.py COPY.
+{% endcomment %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<title>RespectASO</title>
+<style>
+@font-face { font-family: "Schibsted Grotesk"; font-weight: 400; font-display: swap; src: url(data:font/woff2;base64,{{ font_regular }}) format("woff2"); }
+@font-face { font-family: "Schibsted Grotesk"; font-weight: 500; font-display: swap; src: url(data:font/woff2;base64,{{ font_medium }}) format("woff2"); }
+@font-face { font-family: "Schibsted Grotesk"; font-weight: 600; font-display: swap; src: url(data:font/woff2;base64,{{ font_semibold }}) format("woff2"); }
+html, body { height: 100%; margin: 0; }
+body {
+  background: #0f172a; color: #fff;
+  font-family: "Schibsted Grotesk", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-font-smoothing: antialiased; cursor: default; user-select: none;
+}
+.start { display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 440px; padding: 0 24px; box-sizing: border-box; }
+.logo { width: 32px; height: 32px; border-radius: 7px; margin-bottom: 18px; }
+.title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+.bar { position: relative; width: 168px; height: 3px; margin-top: 18px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.bar::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0), #a855f7 40%, #c084fc 60%, rgba(168, 85, 247, 0));
+  animation: slide 1.4s ease-in-out infinite;
+}
+@keyframes slide { from { left: -40%; } to { left: 100%; } }
+.hint { font-size: 13px; line-height: 1.5; color: #94a3b8; margin: 16px 0 0; opacity: 0; animation: appear 0.6s ease-out 6s forwards; }
+@keyframes appear { to { opacity: 1; } }
+.text { font-size: 14px; line-height: 1.55; color: #cbd5e1; margin: 10px 0 0; user-select: text; cursor: text; }
+.things { list-style: none; margin: 20px 0 0; padding: 0; width: 100%; text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; background: rgba(255, 255, 255, 0.03); }
+.thing { padding: 14px 16px; }
+.thing + .thing { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.thing-head { display: flex; align-items: center; gap: 10px; }
+.num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: rgba(168, 85, 247, 0.18); color: #d8b4fe;
+  font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.thing-name { flex: 1; font-size: 14px; font-weight: 500; }
+.details, .path { font: inherit; font-size: 12px; line-height: 1.6; color: #cbd5e1; margin: 8px 0 0 30px;
+  white-space: pre-wrap; word-break: break-word; user-select: text; cursor: text; }
+.button {
+  font: inherit; font-size: 13px; font-weight: 500; line-height: 1; padding: 9px 14px; border-radius: 8px; cursor: pointer;
+  color: #fff; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); transition: background 0.15s;
+}
+.button:hover { background: rgba(255, 255, 255, 0.1); }
+.button.small { font-size: 12px; padding: 6px 10px; }
+.button.primary { background: #9333ea; border-color: #9333ea; }
+.button.primary:hover { background: #7e22ce; border-color: #7e22ce; }
+.button.wide { width: 100%; margin-top: 16px; padding: 11px 14px; }
+.button:focus-visible { outline: 2px solid #c084fc; outline-offset: 2px; }
+.note { font-size: 12px; line-height: 1.5; color: #94a3b8; margin: 10px 0 0; }
+.address { color: #cbd5e1; }
+@media (prefers-reduced-motion: reduce) {
+  .bar::after { animation: none; left: 30%; }
+  .hint { animation: none; opacity: 1; }
+}
+</style>
+</head>
+<body>
+<main class="start" role="status" aria-live="polite">
+  <img class="logo" src="data:image/png;base64,{{ logo }}" alt="RespectASO">
+  {% if state == "failed" %}
+  <h1 class="title">{{ copy.start_failed_title }}</h1>
+  <p class="text">{{ copy.start_failed_text }} <span class="address">{{ contact }}</span>:</p>
+  <ol class="things">
+    <li class="thing">
+      <div class="thing-head">
+        <span class="num">1</span><span class="thing-name">{{ copy.start_failed_details }}</span>
+        <button type="button" class="button small" data-done="{{ copy.start_failed_copied }}" onclick="copyDetails(this)">{{ copy.start_failed_copy }}</button>
+      </div>
+      <pre class="details" id="details">{{ details }}</pre>
+    </li>
+    <li class="thing">
+      <div class="thing-head">
+        <span class="num">2</span><span class="thing-name">{{ copy.start_failed_logfile }}</span>
+        <button type="button" class="button small" onclick="ask('show_log')">{{ copy.start_failed_log }}</button>
+      </div>
+      <p class="path">{{ log_path }}</p>
+    </li>
+  </ol>
+  <button type="button" class="button primary wide" data-mail="{{ mail }}" onclick="ask('open_external', this.dataset.mail)">{{ copy.start_failed_email }}</button>
+  <p class="note">{{ copy.start_failed_note }}</p>
+  <script>
+    // The window's native bridge (desktop/main.py Api); a click before it is ready waits for it.
+    // Arguments only when there are some: the bridge hands Python every one it gets, undefined too.
+    function ask(name) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function (resolve) {
+        var call = function () { resolve(window.pywebview.api[name].apply(null, args)); };
+        if (window.pywebview && window.pywebview.api) call();
+        else window.addEventListener("pywebviewready", call, {once: true});
+      });
+    }
+    function copyDetails(button) {
+      ask("copy_to_clipboard", document.getElementById("details").textContent).then(function (copied) {
+        if (!copied) return;
+        var label = button.textContent;
+        button.textContent = button.dataset.done;
+        setTimeout(function () { button.textContent = label; }, 1500);
+      });
+    }
+  </script>
+  {% else %}
+  <h1 class="title">{{ copy.starting_title }}</h1>
+  <div class="bar" aria-hidden="true"></div>
+  <p class="hint">{{ copy.starting_hint }}</p>
+  {% endif %}
+</main>
+</body>
+</html>

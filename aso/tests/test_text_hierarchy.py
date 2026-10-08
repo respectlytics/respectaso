@@ -23,8 +23,9 @@ ROOTS = ("aso/templates", "aso_pro/templates", "_public_overrides/aso/templates"
 ROLES = {"page-title", "run-title", "card-title", "section-label", "item-title"}
 HEADING = re.compile(r"<(h[1-4])\b([^>]*)>", re.DOTALL)
 CLASS = re.compile(r'class=\\?"([^"\\]*)')
-# Pages with their own inline design: the standalone error pages.
-OWN_DESIGN = {"aso/templates/500.html", "aso/templates/error_standalone.html"}
+# Pages with their own inline design: the standalone error pages and the
+# Mac app's loading page, which no stylesheet serves.
+OWN_DESIGN = {"aso/templates/500.html", "aso/templates/error_standalone.html", "aso/templates/loading_standalone.html"}
 
 
 def _headings():

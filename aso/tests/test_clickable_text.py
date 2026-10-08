@@ -20,11 +20,12 @@ BASE = Path(settings.BASE_DIR)
 ROOTS = ("aso/templates", "aso_pro/templates", "_public_overrides/aso/templates", "static/js")
 
 # Pages with their own design: the standalone error pages carry inline CSS so
-# they render when the stylesheet is what broke, and the top bar is the
-# navigation itself.
+# they render when the stylesheet is what broke, the Mac app's loading page
+# because no server runs yet, and the top bar is the navigation itself.
 OWN_DESIGN = {
     "aso/templates/500.html",
     "aso/templates/error_standalone.html",
+    "aso/templates/loading_standalone.html",
     "aso/templates/aso/partials/top_bar.html",
 }
 

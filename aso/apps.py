@@ -23,6 +23,19 @@ class AsoConfig(AppConfig):
         # commands whose migrate must create the triggers.
         post_migrate.connect(_ensure_history_triggers, sender=self)
 
+        # Deleted data gives its disk space back (aso/disk_space.py): the
+        # database is converted after migrate, and a deleted keyword's
+        # earlier day reads go with it.
+        from django.db.models.signals import post_delete
+
+        from . import day_reads, disk_space
+        from .models import Keyword
+
+        post_migrate.connect(disk_space.convert_after_migrate, sender=self)
+        if day_reads.forget_untracked not in disk_space.after_keywords_deleted:
+            disk_space.after_keywords_deleted.append(day_reads.forget_untracked)
+        post_delete.connect(disk_space.keywords_deleted, sender=Keyword, dispatch_uid="aso_keywords_deleted")
+
         # Don't start background work during management commands. "test" is
         # in the set because these hooks fire before the test database exists:
         # the estimator upgrade thread would log "no such table" on every run

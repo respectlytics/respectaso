@@ -41,8 +41,24 @@ class OtherProcess:
 
 
 class RunOwnerTest(SimpleTestCase):
+    def _fresh_token(self):
+        """This process's token taken now, under this test's DATA_DIR. The
+        process keeps its first token for life, and a test that overrides
+        DATA_DIR may have been the one to take it, in a folder gone since: the
+        suite flaked on that depending on which worker ran what (2026-10-08)."""
+        kept = (run_owner._token, run_owner._handle)
+        run_owner._token = run_owner._handle = None
+
+        def restore():
+            if run_owner._handle is not None:
+                run_owner._handle.close()
+            run_owner._token, run_owner._handle = kept
+
+        self.addCleanup(restore)
+        return run_owner.token()
+
     def test_this_process_holds_its_own_lock(self):
-        token = run_owner.token()
+        token = self._fresh_token()
         self.assertEqual(run_owner.token(), token)
         self.assertTrue(token.startswith("app-"))
         self.assertTrue((Path(settings.DATA_DIR) / "run-owners" / f"{token}.lock").exists())
