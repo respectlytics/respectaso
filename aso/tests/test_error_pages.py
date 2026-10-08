@@ -154,8 +154,9 @@ class PagesTest(TestCase):
         self.assertNotIn("<link", html)
         self.assertNotIn("<script", html)
         self.assertEqual(re.findall(r"/static/[^\"')]+", html), [
-            "/static/fonts/inter/Inter-Regular.woff2", "/static/fonts/inter/Inter-Medium.woff2",
-            "/static/fonts/inter/Inter-SemiBold.woff2"])
+            "/static/fonts/schibsted-grotesk/SchibstedGrotesk-Regular.woff2",
+            "/static/fonts/schibsted-grotesk/SchibstedGrotesk-Medium.woff2",
+            "/static/fonts/schibsted-grotesk/SchibstedGrotesk-SemiBold.woff2"])
         self.assertIn("mailto:respectaso@loheden.com", html)
 
     def test_500_for_a_script_is_json(self):

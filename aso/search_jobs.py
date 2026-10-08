@@ -138,7 +138,9 @@ def active_job():
 
 def panel_job():
     """The active job the dashboard's status panel shows: the running one,
-    else the newest paused one, else the oldest queued one."""
+    else the newest paused one, else the oldest queued one. A search whose
+    process ended is released first (run_queue.release_dead_runs)."""
+    run_queue.release_dead_runs()
     running = KeywordSearchJob.objects.filter(status="running").order_by("-created_at", "-pk").first()
     if running is not None:
         return running
@@ -414,10 +416,11 @@ def _results(job) -> dict:
 # Queue hooks
 # ---------------------------------------------------------------------------
 
-def requeue_interrupted(queryset) -> None:
-    """Searches left "running" by a quit, a crash or a container restart go
-    back to the FRONT of the queue (they were executing, not waiting) and
-    continue from the first keyword that was not finished."""
+def requeue_interrupted(queryset, cause=None) -> None:
+    """Searches left "running" by a quit, a crash, a container restart or an
+    MCP server that ended go back to the FRONT of the queue (they were
+    executing, not waiting) and continue from the first keyword that was not
+    finished, whichever process ended (``cause``)."""
     queryset.update(
         status="queued", queue_rank=run_queue.front_rank(), auto_resume=False,
         yielded_for_feature="", yielded_for_id=None, yielded_for_label="",

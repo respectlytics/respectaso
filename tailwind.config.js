@@ -23,12 +23,12 @@ module.exports = {
   ],
   theme: {
     // The one typeface, bundled in static/fonts/ (tailwind.source.css):
-    // Inter for everything, titles included, and the system monospace for
+    // Schibsted Grotesk for everything, titles included, and the system monospace for
     // keyword fields and commands. Set here, not under extend, so Tailwind's
     // own serif family does not exist and font-serif cannot be asked for.
     // System fonts only as fallbacks. docs/development/SELF_HOSTED_FONTS_PLAN.md
     fontFamily: {
-      sans: ['"Inter"', "ui-sans-serif", "system-ui", "-apple-system", '"Segoe UI"', "Roboto", '"Helvetica Neue"', "Arial", "sans-serif", '"Apple Color Emoji"', '"Segoe UI Emoji"'],
+      sans: ['"Schibsted Grotesk"', "ui-sans-serif", "system-ui", "-apple-system", '"Segoe UI"', "Roboto", '"Helvetica Neue"', "Arial", "sans-serif", '"Apple Color Emoji"', '"Segoe UI Emoji"'],
       mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", '"Liberation Mono"', '"Courier New"', "monospace"],
     },
     extend: {

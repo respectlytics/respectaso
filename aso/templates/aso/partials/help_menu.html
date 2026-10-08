@@ -1,6 +1,7 @@
 {% load aso_tags %}{% comment %}
 The Help menu (UI_REDESIGN_PLAN.md 3.3): the in-app help pages, then the
-outside links that used to fill the footer. Opened by static/js/menu.js.
+outside links that used to fill the footer, then Respectlytics in its own
+colours (.menu-item-respectlytics). Opened by static/js/menu.js.
 {% endcomment %}
 <div class="relative">
     <button type="button" data-menu-button aria-expanded="false" aria-haspopup="true" title="Help" aria-label="Help"
@@ -16,7 +17,8 @@ outside links that used to fill the footer. Opened by static/js/menu.js.
         <a role="menuitem" href="{{ links.x }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "x" %}Follow on X{% menu_icon "external" %}</a>
         <a role="menuitem" href="{{ links.github }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "github" %}Source code on GitHub{% menu_icon "external" %}</a>
         <a role="menuitem" href="mailto:{{ links.contact }}" class="menu-item">{% menu_icon "contact" %}Contact us</a>
-        <a role="menuitem" href="{{ links.respectlytics }}" target="_blank" rel="noopener" class="menu-item">{% menu_icon "privacy" %}Respectlytics: privacy-first app analytics{% menu_icon "external" %}</a>
+        <div class="my-1.5 border-t border-white/10"></div>
+        <a role="menuitem" href="{{ links.respectlytics }}" target="_blank" rel="noopener" class="menu-item menu-item-respectlytics">{% picture "respectlytics-mark" 16 classes="h-4 w-4 shrink-0" %}<span class="menu-label">Respectlytics: privacy-first app analytics</span>{% menu_icon "external" %}</a>
         <p class="px-3 pb-1 pt-2 pl-[2.375rem] text-xs text-slate-400">RespectASO {{ VERSION }}</p>
     </div>
 </div>

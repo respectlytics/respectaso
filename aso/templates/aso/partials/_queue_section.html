@@ -39,8 +39,10 @@
         </div>
     </div>
 
-    <!-- A cancelled run is still finishing its step, or a ranking refresh
-         holds the Apple budget: the text says which. -->
+    <!-- A cancelled run is still finishing its step, or a busy probe
+         (run_queue.busy_probes) holds the Apple budget: the text says which.
+         A ranking refresh never does: it pauses for the queue
+         (aso/scheduler.py give_way). -->
     <p id="queue-winding-down" class="hidden text-sm text-slate-400 mb-4"></p>
 
     <!-- Up next -->

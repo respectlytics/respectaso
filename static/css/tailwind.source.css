@@ -1,13 +1,13 @@
-/* The app's one typeface, bundled with it (static/fonts/inter/, the SIL OFL
-   beside it) as the authors' own release files: Inter for everything, titles
-   included, so every screen reads in one voice (the owner, 2026-10-02: Source
-   Serif 4 for titles is not used in RespectASO). Only the weights the
-   templates use are shipped, and nothing is loaded from another server, so
-   the app looks the same online, offline and behind any filter.
-   docs/development/SELF_HOSTED_FONTS_PLAN.md, PRO_AND_CLICKABLE_TEXT_PLAN.md 6 */
-@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/inter/Inter-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/inter/Inter-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/inter/Inter-SemiBold.woff2") format("woff2"); }
+/* The app's one typeface, bundled with it (static/fonts/schibsted-grotesk/,
+   the SIL OFL beside it) as the authors' own release 1.100 files: Schibsted
+   Grotesk for everything, titles included, so every screen reads in one voice
+   and matches the websites (the owner, 2026-10-07; the global font rule).
+   Only the weights the templates use are shipped, and nothing is loaded from
+   another server, so the app looks the same online, offline and behind any
+   filter. docs/development/SELF_HOSTED_FONTS_PLAN.md, PRO_AND_CLICKABLE_TEXT_PLAN.md 6 */
+@font-face { font-family: "Schibsted Grotesk"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/schibsted-grotesk/SchibstedGrotesk-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Schibsted Grotesk"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/schibsted-grotesk/SchibstedGrotesk-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Schibsted Grotesk"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/schibsted-grotesk/SchibstedGrotesk-SemiBold.woff2") format("woff2"); }
 
 @tailwind base;
 @tailwind components;
@@ -148,6 +148,13 @@
     .menu-item.text-red-300 .menu-icon,
     .menu-item.text-red-300:hover .menu-icon { color: currentColor; }
     .menu-icon-external { @apply ml-auto h-3.5 w-3.5 shrink-0 text-slate-500; }
+    /* Respectlytics, the analytics product of the same studio, in the Help
+       menu: its own mark and its indigo to purple, so it reads as a sister
+       product rather than one more help link. */
+    .menu-item-respectlytics { @apply hover:bg-indigo-500/10; }
+    .menu-item-respectlytics .menu-label { @apply bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text font-medium text-transparent; }
+    .menu-item-respectlytics:hover .menu-label { @apply from-indigo-200 to-purple-200; }
+    .menu-item-respectlytics .menu-icon-external { @apply text-purple-400/70; }
 
     /* Clickable text (docs/development/PRO_AND_CLICKABLE_TEXT_PLAN.md): every
        text link, text button (.btn-quiet) and section that opens on a click

@@ -28,7 +28,6 @@ from .pro_access import has_pro_license
 def opportunity_view(request):
     """The page. The scan itself runs in the background, so this only has to
     hand over the current scan and the picker."""
-    opportunity_scans.reclaim_stale()
     scan = opportunity_scans.latest_scan()
     # Filled in from a keyword's "Check other countries" (KEYWORDS_PAGE_PLAN.md M2.7).
     app_query = (request.GET.get("app") or "").strip()
@@ -95,7 +94,6 @@ def _scan_or_404(scan_id):
 
 def opportunity_current_view(request):
     """The poll target: the active scan and the newest finished one."""
-    opportunity_scans.reclaim_stale()
     panel = opportunity_scans.panel_scan()
     finished = opportunity_scans.finished_scan()
     return JsonResponse({

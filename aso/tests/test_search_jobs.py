@@ -150,14 +150,15 @@ class SearchViewTest(JobTestBase):
         self.assertTrue(data["job"]["can_run_now"])
         self.assertEqual(data["job"]["waiting_for"], "the current search")
 
-    def test_a_search_waits_for_the_ranking_refresh(self):
-        with mock.patch("aso.scheduler.get_status", return_value={"running": True}):
+    def test_a_search_goes_ahead_of_the_ranking_refresh(self):
+        """The refresh pauses for it (aso/scheduler.py give_way) rather than
+        the search waiting for every tracked keyword."""
+        with mock.patch("aso.scheduler.get_status", return_value={"running": True, "paused": False}):
             resp = self.search("zeta")
             data = resp.json()
-        self.assertEqual(data["job"]["status"], "queued")
-        self.assertEqual(data["queued_behind"], "the ranking refresh")
-        self.assertEqual(data["job"]["waiting_for"], "the ranking refresh")
-        self.assertFalse(data["job"]["can_run_now"])
+        self.assertEqual(data["job"]["status"], "running")
+        self.assertIsNone(data["queued_behind"])
+        self.assertIsNone(data["job"]["waiting_for"])
 
     def test_run_now_puts_a_quick_search_first(self):
         long = self.job(status="running", keywords=["a", "b"], next_index=1)

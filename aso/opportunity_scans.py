@@ -75,10 +75,6 @@ MAX_COOLDOWNS = 3           # consecutive cool-downs before the scan pauses and 
 STATUS_POLL_SLICE = 5       # seconds between status checks during a cool-down
 ETA_MIN_COUNTRIES = 3       # countries done this run before an ETA is shown
 SCAN_HISTORY_KEEP = 10      # finished scans kept; older ones are pruned on create
-# A scan started from the MCP server runs in another process. If that process
-# dies its row would hold the single run lane for ever, so a heartbeat older
-# than this is treated as abandoned and the scan goes back in the queue.
-STALE_HEARTBEAT_SECONDS = 300
 FALLBACK_SECONDS_PER_COUNTRY = throttle.BASE_DELAY + 0.6
 
 FREE_BUSY_MESSAGE = (
@@ -103,7 +99,10 @@ def active_scan():
 
 def panel_scan():
     """The scan the Opportunity page's status panel shows: the running one,
-    else the newest paused one, else the oldest queued one."""
+    else the newest paused one, else the oldest queued one. A scan whose
+    process ended (an MCP server closed mid-scan) is released first
+    (run_queue.release_dead_runs)."""
+    run_queue.release_dead_runs()
     running = (OpportunityScan.objects.filter(status="running")
                .order_by("-created_at", "-pk").first())
     if running is not None:
@@ -134,25 +133,6 @@ def latest_scan():
     return panel_scan() or (
         OpportunityScan.objects.order_by("-created_at", "-pk").first()
     )
-
-
-def reclaim_stale() -> int:
-    """Re-queue scans whose worker process died without finishing.
-
-    Only scans, and only on a heartbeat older than STALE_HEARTBEAT_SECONDS.
-    A scan started from MCP runs outside this process, so a crash there would
-    otherwise leave a "running" row blocking the single lane for everyone.
-    """
-    cutoff = timezone.now() - timezone.timedelta(seconds=STALE_HEARTBEAT_SECONDS)
-    stale = OpportunityScan.objects.filter(
-        status="running", heartbeat_at__lt=cutoff,
-    )
-    count = stale.count()
-    if count:
-        logger.warning("Re-queueing %s country scan(s) with a stale heartbeat", count)
-        requeue_interrupted(stale)
-        run_queue.kick()
-    return count
 
 
 # ---------------------------------------------------------------------------
@@ -514,10 +494,11 @@ def save_to_history(scan, codes=None) -> int:
 # Queue hooks
 # ---------------------------------------------------------------------------
 
-def requeue_interrupted(queryset) -> None:
-    """Scans left "running" by a quit, a crash or a container restart go back
-    to the FRONT of the queue (they were executing, not waiting) and continue
-    from the first country that was not finished."""
+def requeue_interrupted(queryset, cause=None) -> None:
+    """Scans left "running" by a quit, a crash, a container restart or an
+    MCP server that ended go back to the FRONT of the queue (they were
+    executing, not waiting) and continue from the first country that was not
+    finished, whichever process ended (``cause``)."""
     queryset.update(
         status="queued", queue_rank=run_queue.front_rank(), auto_resume=False,
         yielded_for_feature="", yielded_for_id=None, yielded_for_label="",
@@ -686,7 +667,7 @@ def _execute(pk) -> None:
             elapsed_seconds=elapsed_before + active_seconds,
         )
         OpportunityScan.objects.filter(pk=pk, status="running").update(
-            current_country=next_code, heartbeat_at=timezone.now(),
+            current_country=next_code,
             throttle_state=STATUS_NAME_FOR_THROTTLE.get(state, state),
             progress_message=throttle.wait_message(state, COOLDOWN_SECONDS) or "Scanning...",
         )

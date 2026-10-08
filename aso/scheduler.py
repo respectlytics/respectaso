@@ -17,8 +17,14 @@ Schedule:
   - Deletes the sessions that have expired at every check.
 
 Only one refresh runs at a time, whoever starts it (the daily check, the
-Dashboard's Refresh Rankings button, the Mac app's menu bar): each claims
-the running flag through _claim_refresh() first.
+Dashboard's Refresh Rankings button, the Mac app's menu bar, the Rival
+Tracker): each claims the running flag through _claim_refresh() first.
+
+Whatever the user starts goes first. A refresh pauses before its next
+keyword while the run queue has a search, a scan or an AI run going or
+waiting, and carries on from the same keyword once it has none
+(give_way()). The Rival Tracker's check goes before a refresh of tracked
+keywords in the same way (going_ahead()).
 """
 
 import logging
@@ -45,12 +51,26 @@ _refresh_status = {
     "started_at": None,
     "last_completed_at": None,
     "error": None,
+    "paused": False,         # stepped aside while the run queue has work (give_way)
+    "ahead": False,          # held by the pass going ahead (the Rival Tracker's check)
 }
 
 RETENTION_DAYS = 90
 
 # The pause between real App Store reads while Apple answers normally.
 REFRESH_PACE_SECONDS = 2.0
+
+# How often a paused refresh looks whether the run queue is done.
+GIVE_WAY_POLL_SECONDS = 2.0
+
+# The thread of the pass that goes before any refresh of tracked keywords
+# (the Rival Tracker's check, going_ahead()), or None.
+_ahead_thread = None
+# The refresh that paused for that pass, while the pass holds the flag;
+# _refresh_finished() gives it back.
+_set_aside: list = []
+_SET_ASIDE_FIELDS = ("running", "total", "completed", "current_keyword", "started_at", "error", "paused",
+                     "ahead")
 
 # Set by nudge(): the loop checks for a due refresh at once instead of
 # finishing its hourly wait.
@@ -74,10 +94,16 @@ def _claim_refresh(total):
     The one gate every refresh passes, so two can never run at once. Before
     it, the hourly check could start the daily refresh while a manual one
     was still running, and two clicks could start two manual refreshes.
+
+    The one exception is the pass going ahead (going_ahead()): it takes the
+    flag from a refresh that has paused, and _refresh_finished() gives the
+    flag back to that refresh, still paused.
     """
     with _status_lock:
         if _refresh_status["running"]:
-            return False
+            if not (_is_ahead() and _refresh_status["paused"] and not _set_aside):
+                return False
+            _set_aside.append({key: _refresh_status[key] for key in _SET_ASIDE_FIELDS})
         _refresh_status.update(
             running=True,
             total=total,
@@ -85,13 +111,102 @@ def _claim_refresh(total):
             current_keyword="",
             started_at=timezone.now().isoformat(),
             error=None,
+            paused=False,
+            ahead=_is_ahead(),
         )
     return True
 
 
-# The run queue (keyword searches, AI runs) shares Apple's request budget
-# with the ranking refresh: neither starts while the other runs.
-run_queue.busy_probes.append(lambda: "the ranking refresh" if get_status()["running"] else None)
+# The run queue (keyword searches, country scans, AI runs) shares Apple's
+# request budget with the ranking refresh, and the queue goes first. A
+# refresh never starts while the lane is busy, and a run started while a
+# refresh reads starts at once: the refresh registers no busy probe
+# (run_queue.busy_probes), it pauses itself before its next read
+# (give_way), so the only overlap is the one read already on its way.
+
+
+def _claim(total) -> bool:
+    """_claim_refresh(), except that the pass going ahead waits for a
+    refresh in progress to pause for it (give_way, at its next keyword)."""
+    while not _claim_refresh(total):
+        if not _is_ahead():
+            return False
+        time.sleep(GIVE_WAY_POLL_SECONDS)
+    return True
+
+
+@contextmanager
+def going_ahead():
+    """Held around a pass that goes before any refresh of tracked keywords:
+    the Rival Tracker's check, which has few keywords, and they are what its
+    page shows. A refresh in progress pauses at its next keyword
+    (give_way), the pass takes the flag from it (_claim_refresh), and the
+    refresh carries on from the same keyword when the pass is over. One
+    pass at a time (aso_pro.rivals.daily allows one)."""
+    global _ahead_thread
+    _ahead_thread = threading.get_ident()
+    try:
+        yield
+    finally:
+        _ahead_thread = None
+
+
+def _is_ahead() -> bool:
+    """Whether the calling thread runs the pass going ahead."""
+    return _ahead_thread == threading.get_ident()
+
+
+def _waiting_for_a_pass_ahead() -> bool:
+    """Whether a pass going ahead runs in another thread."""
+    owner = _ahead_thread
+    return owner is not None and owner != threading.get_ident()
+
+
+def _queue_has_work() -> bool:
+    """Whether the run queue has a run going, finishing its step, or
+    waiting; never a run the MCP server started (run_queue.local_work)."""
+    return run_queue.local_work()
+
+
+def give_way(done=None) -> bool:
+    """Pause the refresh in progress while the run queue has work, or while
+    a pass going ahead runs in another thread; return once neither is so.
+    True when it paused.
+
+    A refresh that gives way calls it before each keyword and again right
+    before each App Store read (a run started during the pace wait goes
+    before that read); the Rival Tracker's daily pass calls it before each
+    lookup. The refresh waits in its own thread, so its place in the list
+    and its pace stay as they were, and it carries on from the same
+    keyword, as often as the user starts something. ``done`` is how many
+    pairs are finished, for the progress a paused refresh shows.
+
+    While something waits and nothing runs (a run that waited for the
+    Rival Tracker's own steps), the queue is kicked so it starts: the
+    refresh must never wait for a run that waits for the refresh. The last
+    look at the pass going ahead and the end of the pause happen under the
+    status lock, the lock that pass takes the flag under, so the two never
+    both read.
+    """
+    if not (_queue_has_work() or _waiting_for_a_pass_ahead()):
+        return False
+    fields = {"paused": True}
+    if done is not None:
+        fields["completed"] = done
+    _update_status(**fields)
+    logger.info("Ranking refresh paused: another task goes first.")
+    while True:
+        if _queue_has_work():
+            if run_queue.lane_state() == "idle":
+                run_queue.kick()
+        else:
+            with _status_lock:
+                if not _waiting_for_a_pass_ahead():
+                    _refresh_status["paused"] = False
+                    break
+        time.sleep(GIVE_WAY_POLL_SECONDS)
+    logger.info("Ranking refresh carries on.")
+    return True
 
 
 # What other features add to the daily routine. The Pro build's Rival
@@ -99,8 +214,9 @@ run_queue.busy_probes.append(lambda: "the ranking refresh" if get_status()["runn
 #   extra_pair_sources  callables returning (keyword_id, country) pairs the
 #                       daily refresh must read today even when they have
 #                       no row yet (a keyword just added to a Rival Tracker)
-#   daily_hooks         callables run after each hourly check, while
-#                       nothing else holds Apple's request budget
+#   daily_hooks         callables run at each hourly check before the refresh
+#                       of tracked keywords, while no search or AI run holds
+#                       Apple's request budget
 #   busy_hooks          callables run after each hourly check while something
 #                       does hold it; they may only queue work, never read Apple
 extra_pair_sources: list = []
@@ -119,8 +235,18 @@ def _extra_pairs() -> list:
 
 
 def _refresh_finished(**kwargs):
-    """The last status write of a refresh, then start whatever waited."""
-    _update_status(running=False, current_keyword="", **kwargs)
+    """The last status write of a refresh, then start whatever waited. A
+    refresh set aside for the pass going ahead gets the flag back, still
+    paused: its give_way() carries on once that pass is over."""
+    with _status_lock:
+        if _set_aside and not _is_ahead():
+            # The refresh set aside ended while paused (an error): the pass
+            # going ahead keeps the flag, and nothing is given back.
+            _set_aside.clear()
+        else:
+            _refresh_status.update(running=False, paused=False, ahead=False, current_keyword="", **kwargs)
+            if _set_aside:
+                _refresh_status.update(_set_aside.pop())
     run_queue.kick()
 
 
@@ -206,7 +332,7 @@ def _cleanup_old_results():
     day_reads.tidy(RETENTION_DAYS)
 
 
-def _refresh_pairs(pairs, label, *, force=False, claimed=False):
+def _refresh_pairs(pairs, label, *, force=False, claimed=False, gives_way=True):
     """Refresh each (keyword_id, country) pair in turn, with the progress the
     Dashboard's bar shows. Each pair's new row reaches the Dashboard's table
     as it is written (aso/history_revision.py). Returns the pairs refreshed.
@@ -228,6 +354,11 @@ def _refresh_pairs(pairs, label, *, force=False, claimed=False):
     pairs have no row from today, so the next hourly check carries on with
     them. Until 2.28.1 a busy answer failed each pair in turn at the same
     two second pace, through the whole list.
+
+    Gives way to the run queue before every pair and before every App Store
+    read (give_way), and carries on from the same pair; ``gives_way=False``
+    (the first check of a new Rival Tracker) reads every pair without
+    pausing, while its own busy probe holds the lane.
     """
     from . import day_reads
     from .models import Keyword
@@ -246,12 +377,20 @@ def _refresh_pairs(pairs, label, *, force=False, claimed=False):
     # (keyword_scoring.store_read), so the second is not read again.
     read_in_run = set()
     limiter = AdaptiveITunesRateLimiter(base_delay=REFRESH_PACE_SECONDS)
-    # Waits on the limiter before real App Store reads only, never before a
-    # read already stored today (aso/day_reads.py).
-    pacer = day_reads.Pacer(wait=limiter.wait)
+
+    def pace():
+        limiter.wait()
+        if gives_way:
+            give_way()      # a run started during the wait goes before this read
+
+    # Waits before real App Store reads only, never before a read already
+    # stored today (aso/day_reads.py).
+    pacer = day_reads.Pacer(wait=pace)
     asked = turned_away = 0     # real App Store reads, and those Apple refused or left unanswered
     try:
         for i, (keyword_id, country) in enumerate(pairs):
+            if gives_way:
+                give_way(done=i)
             try:
                 keyword_obj = Keyword.objects.select_related("app").get(id=keyword_id)
             except Keyword.DoesNotExist:
@@ -343,8 +482,9 @@ def _clear_expired_sessions():
 # ── Scheduler thread ─────────────────────────────────────────────────────
 
 def _tick():
-    """One hourly check: sync Apple popularity, then run today's refresh if
-    it is still due and nothing else holds the Apple budget."""
+    """One hourly check: sync Apple popularity, run the daily hooks (the
+    Rival Tracker's check), then today's refresh of tracked keywords if it
+    is still due, each while no search or AI run holds the Apple budget."""
     try:
         # Apple popularity sync first, so today's refresh snapshots can
         # pick up fresh Apple values (the sync also patches rows created
@@ -369,6 +509,17 @@ def _tick():
     except Exception as e:  # noqa: BLE001 (the hourly loop must outlive any error here)
         logger.error(f"Session cleanup error: {e}")
 
+    # What other features do once a day (the Rival Tracker's check), BEFORE
+    # the refresh of tracked keywords: few keywords, and they are what the
+    # Rival Tracker shows, so they never wait behind hundreds of tracked
+    # keywords. A manual refresh in progress pauses for it (going_ahead).
+    for hook in daily_hooks[:]:
+        try:
+            if run_queue.lane_state() == "idle":
+                hook()
+        except Exception as e:  # noqa: BLE001 (one hook's failure must not stop the hourly loop)
+            logger.error(f"Daily hook error: {e}")
+
     try:
         if _needs_refresh_today():
             if run_queue.lane_state() != "idle":
@@ -381,14 +532,6 @@ def _tick():
         logger.error(f"Scheduler error: {e}")
         _refresh_finished(error=str(e))
 
-    # What other features do once a day, after the refresh (the Rival
-    # Tracker's check), while nothing else holds the Apple budget.
-    for hook in daily_hooks[:]:
-        try:
-            if run_queue.lane_state() == "idle" and not get_status()["running"]:
-                hook()
-        except Exception as e:  # noqa: BLE001 (one hook's failure must not stop the hourly loop)
-            logger.error(f"Daily hook error: {e}")
     if run_queue.lane_state() != "idle" or get_status()["running"]:
         for hook in busy_hooks[:]:
             try:
@@ -455,20 +598,21 @@ def run_manual_refresh(pairs):
     return True
 
 
-def refresh_pairs_now(pairs, label, *, force=False):
+def refresh_pairs_now(pairs, label, *, force=False, gives_way=True):
     """Refresh pairs in the calling thread, for a caller that already runs
-    in the background (the Rival Tracker's daily check and its Refresh
-    button). Returns how many were refreshed, or None when another refresh
-    holds the running flag or the run lane is busy (they share Apple's
-    budget). ``force`` is the bulk refresh's: Apple is read again even for a
-    keyword read today, through score_keyword_pair(..., force=True)."""
+    in the background (the Rival Tracker's check and its Refresh button).
+    Returns how many were refreshed, or None when another refresh holds the
+    running flag. The Rival Tracker's check goes ahead (going_ahead), so it
+    waits for a refresh in progress to pause instead. ``gives_way=False``
+    reads every pair without pausing for the run queue (the first check of
+    a new Rival Tracker, whose busy probe holds the lane meanwhile).
+    ``force`` is the bulk refresh's: Apple is read again even for a keyword
+    read today, through score_keyword_pair(..., force=True)."""
     if not pairs:
         return 0
-    if run_queue.lane_state() != "idle":
+    if not _claim(len(pairs)):
         return None
-    if not _claim_refresh(len(pairs)):
-        return None
-    return _refresh_pairs(pairs, label, force=force, claimed=True)
+    return _refresh_pairs(pairs, label, force=force, claimed=True, gives_way=gives_way)
 
 
 @contextmanager
@@ -477,8 +621,10 @@ def refresh_claimed(label, total):
     a keyword refresh (the Rival Tracker's lookups and reviews), so it never
     overlaps a refresh. Yields False, holding nothing, when another refresh
     holds the flag. The Dashboard's progress bar shows ``label`` meanwhile;
-    ``step(done)`` inside the block moves it."""
-    if not _claim_refresh(total):
+    ``step(done)`` inside the block moves it. The Rival Tracker's daily pass
+    calls give_way() before each App Store call, like a keyword refresh.
+    The pass going ahead waits for a refresh in progress to pause (_claim)."""
+    if not _claim(total):
         yield False
         return
     _update_status(current_keyword=label)
@@ -568,8 +714,9 @@ def menu_status(now=None):
     """What the Mac app's menu bar menu shows (desktop/mac_integration.py):
     (status line, whether Update All Tracked Keywords can start, that item's title).
 
-    The line names the refresh in progress, or when the newest ranking was
-    read, in the reader's own day (aso/local_day.py).
+    The line names the refresh in progress (or where it paused while the
+    user's other tasks go first), or when the newest ranking was read, in
+    the reader's own day (aso/local_day.py).
     """
     from .desktop_bridge import COPY
     from .local_day import local_date, user_timezone
@@ -579,6 +726,9 @@ def menu_status(now=None):
     status = get_status()
     if status["running"]:
         total = status["total"] or 0
+        if status["paused"]:
+            done = min(status["completed"] or 0, total)
+            return f"Updating tracked keywords: paused at {done} of {total}", False, refresh_title
         done = min((status["completed"] or 0) + 1, total)
         return f"Updating tracked keywords: {done} of {total}", False, refresh_title
 

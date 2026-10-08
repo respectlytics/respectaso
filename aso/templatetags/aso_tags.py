@@ -2,6 +2,7 @@ import json
 import re
 
 from django import template
+from django.templatetags.static import static
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 
@@ -184,7 +185,6 @@ MENU_ICONS = {
     "x": ("M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z", True),
     "github": ("M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12", True),
     "contact": ("M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75", False),
-    "privacy": ("M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z", False),
     "refresh": ("M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99", False),
     "export": ("M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z", False),
     "guide": ("M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25", False),
@@ -204,6 +204,22 @@ def menu_icon(name):
     paint = mark_safe('fill="currentColor"' if filled else _MENU_STROKE)   # both constants of this module
     css = "menu-icon-external" if name == "external" else "menu-icon"
     return format_html('<svg class="{}" viewBox="0 0 24 24" {} aria-hidden="true"><path d="{}"/></svg>', css, paint, path)
+
+
+@register.simple_tag
+def picture(name, size, classes="", alt=""):
+    """An image drawn `size` CSS px wide: AVIF, then WebP, then the PNG, each
+    at 1x and 2x, from static/images/<name>-<px>.<ext> as scripts/build_images.py
+    makes them. `classes` size the <img>; the <picture> around it is the
+    layout's child (not display:contents, whose <source>s would each take a
+    flex gap)."""
+    def srcset(ext):
+        return f"{static(f'images/{name}-{size}.{ext}')} 1x, {static(f'images/{name}-{size * 2}.{ext}')} 2x"
+
+    return format_html(
+        '<picture class="shrink-0"><source type="image/avif" srcset="{}"><source type="image/webp" srcset="{}">'
+        '<img src="{}" srcset="{}" width="{}" height="{}" alt="{}" class="{}" decoding="async"></picture>',
+        srcset("avif"), srcset("webp"), static(f"images/{name}-{size}.png"), srcset("png"), size, size, alt, classes)
 
 
 OPPORTUNITY_SUBLINE_CLASS ="opp-subline block text-2xs font-normal normal-case text-slate-400 text-balance"

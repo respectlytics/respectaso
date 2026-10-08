@@ -38,7 +38,47 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.0.0',
+RELEASES = [{'version': '3.1.0',
+  'date': '2026-10-08',
+  'title': 'Track keywords straight from the AI tools, and your own tasks go ahead of the daily update',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'Track keywords from the AI tools (Pro)',
+       'intro': [],
+       'items': [
+           ('Every <strong>Keywords</strong> tab and <strong>Suggested Metadata</strong> table in the '
+            'AI Researcher, the AI Competitor and the ASO Score Simulator has a tick column. Tick the '
+            'keywords you want, choose <strong>Track these keywords</strong> and pick one of your apps '
+            'or <strong>All apps</strong>: they are added to Tracked Keywords in the run\'s country, '
+            'with fresh numbers and the picked app\'s rank.'),
+           'Your ticks stay while you sort, filter and switch between the two tabs.',
+       ]},
+      {'heading': 'Your tasks come first',
+       'intro': [],
+       'items': [
+           ('A keyword search, a country scan or an AI run you start while your tracked keywords are '
+            'updating no longer waits for the update to finish. The update pauses and carries on '
+            'from the same keyword when your tasks are done.'),
+           ('<strong>Activity</strong> shows the pause within a few seconds, such as "Updating tracked '
+            'keywords: paused at 4 of 13", and a search you start on a page now shows there too.'),
+           ('Rival Tracker goes ahead of the tracked keywords update, and its first check after you '
+            'add keywords or rivals runs straight through.'),
+       ]},
+      {'heading': 'Fixed',
+       'intro': [],
+       'items': [
+           ('Closing Claude Desktop while your AI assistant was running a task no longer leaves the '
+            'app\'s searches, AI runs or the daily update waiting until you restart RespectASO.'),
+           ('<strong>See details</strong> on a failed AI run opens the run and says why it failed, '
+            'with Retry, instead of "Couldn\'t open this run".'),
+       ]},
+      {'heading': 'Look and feel',
+       'intro': [],
+       'items': [
+           'Text is set in Schibsted Grotesk, the typeface of respectaso.com, and the dashboard\'s chart labels use it too.',
+       ]},
+  ]},
+ {'version': '3.0.0',
   'date': '2026-10-03',
   'title': 'A redesigned RespectASO, Rival Tracker, and a keyword table that keeps itself current',
   'kind': 'feature',

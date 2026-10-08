@@ -11,6 +11,11 @@ run inside Apple's limits and keeps the process-global Local AI cancel flag
 unambiguous. The Free build has only keyword searches; the lane exists there
 too and only ever holds one of them.
 
+A run's row names the process working on it (``run_owner``, aso/run_owner.py).
+A row whose process has ended (an AI assistant closed during an MCP run, a
+crash) is released the way a restart releases it (release_dead_runs), so it
+never holds the lane for everyone until RespectASO restarts.
+
 The queue is ordered by ``queue_rank`` (smallest first, NULL = "append") and
 the user can reorder it: move a run up or down, put it next, or run it now.
 "Run now" pauses the executing run when its feature allows that
@@ -31,10 +36,15 @@ from dataclasses import dataclass
 from django.apps import apps as django_apps
 from django.utils import timezone
 
+from . import run_owner
+
 logger = logging.getLogger(__name__)
 
 INTERRUPTED_MESSAGE = ("Interrupted: RespectASO was closed while this run was "
                        "in progress. Retry to run it again.")
+# A run the MCP server worked on, when the AI assistant that started it closed.
+CLIENT_CLOSED_MESSAGE = ("Interrupted: the AI assistant that started this run was "
+                         "closed while it was in progress. Retry to run it again.")
 YIELDED_MESSAGE = "Paused for a moment while another run goes first"
 
 
@@ -50,10 +60,13 @@ class Feature:
     describe: Callable       # describe(row) -> {"label", "detail", "country", "is_refinement"}
     progress: Callable | None = None   # progress(row) -> the dict the feature's page polls
     open_url: str = "/"                # where the feature lives ("Open" links)
-    # Called by resume_after_startup() with the queryset of rows left
-    # "running" by a crash or a quit. None = mark them failed with
-    # INTERRUPTED_MESSAGE. The AI runs do that with the record of why their
-    # Recent lists read; keyword search re-queues them at the front instead.
+    # Called with the queryset of rows left "running" by a process that
+    # ended (resume_after_startup() after a crash or a quit,
+    # release_dead_runs() when an MCP server or another app process ended)
+    # and ``cause``: "app" (RespectASO was closed) or "mcp" (the AI
+    # assistant was). None = mark them failed with interrupted_message().
+    # The AI runs do that with the record of why their Recent lists read;
+    # keyword searches and country scans go back to the front instead.
     interrupted: Callable | None = None
     # Called by remove_queued() / clear_queued() with a queued row. None =
     # delete the row. Returns True when the row left the queue.
@@ -67,6 +80,7 @@ _features: dict = {}
 _registrars_loaded = False
 _lock = threading.Lock()      # guards the claim, the ranks and _active
 _active: set = set()          # (feature.key, pk) whose worker thread is alive IN THIS PROCESS
+_claimed: set = set()         # (feature.key, pk) this process claimed; dropped once the row stops running
 
 # Callables that answer "what else is using the Apple budget right now?" with
 # a short label ("the daily ranking refresh") or None. While any of them
@@ -117,8 +131,11 @@ def running_run():
 
     Newest ``created_at`` wins when several rows are running - that can happen
     when an MCP-started run (its own process, no queue) overlaps a stale row.
+    A row whose process has ended is released first (release_dead_runs): it is
+    not running, and the screens must not say it is.
     """
     _ensure_features()
+    release_dead_runs()
     best = None
     for feature in _features.values():
         row = (feature.model.objects.filter(status="running", **feature.filter_kwargs)
@@ -169,6 +186,82 @@ def lane_state():
     with _lock:
         winding = bool(_active)
     return "winding_down" if winding else "idle"
+
+
+def local_work() -> bool:
+    """Whether this process's queue has work: a run it started that still
+    runs or finishes its step, or a run waiting that the lane can start.
+
+    A run the MCP server started (its own process, no queue) does not
+    count, nor does a run that waits only for such a run: no worker here
+    ends it, and the row of an MCP run whose server was closed stays
+    "running" until RespectASO restarts. The ranking refresh pauses only
+    while this answers True (aso/scheduler.py give_way); next to an MCP run
+    it carries on, as it always did.
+    """
+    _ensure_features()
+    with _lock:
+        if _active:
+            return True
+        mine = set(_claimed)
+    running = set()
+    for feature in _features.values():
+        for pk in feature.model.objects.filter(status="running", **feature.filter_kwargs).values_list("pk", flat=True):
+            running.add((feature.key, pk))
+    with _lock:
+        # Forget the runs this process claimed that have ended; keep any
+        # claimed since the snapshot above.
+        _claimed.intersection_update(running | (_claimed - mine))
+    if running & mine:
+        return True
+    if running:
+        return False          # waiting runs wait for a run this process cannot end
+    return bool(queued_runs())
+
+
+def interrupted_message(cause) -> str:
+    """The text of a run whose process ended: ``cause`` "mcp" when the AI
+    assistant that started it closed, else RespectASO itself."""
+    return CLIENT_CLOSED_MESSAGE if cause == "mcp" else INTERRUPTED_MESSAGE
+
+
+def _interrupt(feature, rows, cause) -> None:
+    """End ``rows`` (a queryset of running rows whose process ended) the way
+    their feature wants."""
+    if feature.interrupted is not None:
+        feature.interrupted(rows, cause=cause)
+    else:
+        rows.update(status="failed", error_message=interrupted_message(cause),
+                    progress_message="Interrupted")
+
+
+def release_dead_runs() -> int:
+    """Release running rows whose process has ended, the way a restart
+    releases them: a keyword search or a country scan goes back to the front
+    of the queue, an AI run is marked interrupted with why. Returns how many.
+
+    Rows of this process, of a process still alive (an MCP server at work)
+    and rows that name no process (written before owners were recorded) are
+    left alone. Never raises: a check that fails releases nothing.
+    """
+    _ensure_features()
+    released = 0
+    for feature in _features.values():
+        try:
+            owned = list(feature.model.objects.filter(status="running", **feature.filter_kwargs)
+                         .exclude(run_owner="").values_list("pk", "run_owner"))
+            ended: dict = {}
+            for pk, owner in owned:
+                if not run_owner.alive(owner):
+                    ended.setdefault(run_owner.kind(owner), []).append(pk)
+            for cause, pks in ended.items():
+                logger.warning("Releasing %s %s run(s) whose %s process ended: %s",
+                               len(pks), feature.key, cause, pks)
+                _interrupt(feature, feature.model.objects.filter(pk__in=pks, status="running"), cause)
+                released += len(pks)
+        except Exception:  # a failed check must never break the lane or a screen
+            logger.exception("Could not check the %s runs for ended processes", feature.key)
+    return released
 
 
 def front_rank() -> int:
@@ -389,9 +482,10 @@ def _claim_next():
             return None
         feature, row = nxt
         # The atomic claim; a row removed meanwhile yields 0. Progress is
-        # left alone so a resumed keyword search keeps its place.
+        # left alone so a resumed keyword search keeps its place. The row
+        # names this process, so its end releases the row (release_dead_runs).
         claimed = feature.model.objects.filter(pk=row.pk, status="queued").update(
-            status="running", started_at=timezone.now(),
+            status="running", started_at=timezone.now(), run_owner=run_owner.token(),
         )
         if claimed:
             return feature, row.pk
@@ -403,10 +497,13 @@ def kick():
     Returns the pk it started, or None.
     """
     _ensure_features()
+    release_dead_runs()
     with _lock:
         _rank_unranked()
         _restore_yielded()
         claimed = _claim_next()
+        if claimed is not None:
+            _claimed.add((claimed[0].key, claimed[1]))
     if claimed is None:
         return None
     feature, pk = claimed
@@ -466,11 +563,13 @@ def should_resume_on_ready(argv, environ, is_native) -> bool:
 def resume_after_startup():
     """Continue what the previous process left behind, then start the queue.
 
-    A row left "running" has no thread behind it any more (the process that
-    owned it is gone). AI runs are marked failed with a message that invites
-    a retry; a keyword search goes back to the front of the queue and
-    continues from the first keyword that was not finished (its feature's
-    ``interrupted`` hook). Runs that were still queued simply resume.
+    A row left "running" by a process that has ended has no thread behind it
+    any more. AI runs are marked failed with a message that invites a retry;
+    a keyword search goes back to the front of the queue and continues from
+    the first keyword that was not finished (its feature's ``interrupted``
+    hook). Runs that were still queued simply resume. A run an MCP server is
+    still working on is left to it: the app opening mid-run used to mark it
+    failed while it went on.
 
     Runs on every start in every edition (native app, runserver worker,
     gunicorn worker). Never raises: startup must not be able to crash here.
@@ -478,15 +577,14 @@ def resume_after_startup():
     try:
         _ensure_features()
         for feature in _features.values():
-            stale = feature.model.objects.filter(status="running", **feature.filter_kwargs)
-            if feature.interrupted is not None:
-                feature.interrupted(stale)
-            else:
-                stale.update(
-                    status="failed",
-                    error_message=INTERRUPTED_MESSAGE,
-                    progress_message="Interrupted",
-                )
+            running = feature.model.objects.filter(status="running", **feature.filter_kwargs)
+            ended: dict = {}
+            for pk, owner in running.values_list("pk", "run_owner"):
+                if owner and run_owner.alive(owner):
+                    continue
+                ended.setdefault(run_owner.kind(owner), []).append(pk)
+            for cause, pks in ended.items():
+                _interrupt(feature, feature.model.objects.filter(pk__in=pks, status="running"), cause)
         kick()
     except Exception:
         logger.exception("Could not resume the run queue after startup")

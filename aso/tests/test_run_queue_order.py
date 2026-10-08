@@ -121,7 +121,37 @@ class QueueOrderTest(TestCase):
 
     def test_a_busy_probe_holds_the_lane(self):
         self.job()
-        with mock.patch("aso.scheduler.get_status", return_value={"running": True}):
+        def probe():
+            return "the Rival Tracker check"
+
+        run_queue.busy_probes.append(probe)
+        try:
             self.assertIsNone(run_queue.kick())
-            self.assertEqual(run_queue.busy_reason(), "the ranking refresh")
+            self.assertEqual(run_queue.busy_reason(), "the Rival Tracker check")
+        finally:
+            run_queue.busy_probes.remove(probe)
         self.assertIsNotNone(run_queue.kick())
+
+    def test_local_work_is_only_this_processs_queue(self):
+        """What the ranking refresh pauses for (aso/scheduler.py give_way)."""
+        run_queue._claimed.clear()
+        self.addCleanup(run_queue._claimed.clear)
+        self.assertFalse(run_queue.local_work())
+        waiting = self.job()
+        self.assertTrue(run_queue.local_work())                 # a run waiting that the lane can start
+        with mock.patch("aso.run_queue.threading.Thread"):
+            self.assertEqual(run_queue.kick(), waiting.pk)
+        self.assertTrue(run_queue.local_work())                 # a run this process started
+        KeywordSearchJob.objects.filter(pk=waiting.pk).update(status="completed")
+        self.assertFalse(run_queue.local_work())
+        self.assertEqual(run_queue._claimed, set())             # forgotten once it ended
+        self.job(status="running")                              # the MCP server's, left running
+        self.job()
+        self.assertFalse(run_queue.local_work())                # neither it nor what waits behind it
+
+    def test_the_ranking_refresh_does_not_hold_the_lane(self):
+        """A refresh gives way by itself (aso/scheduler.py give_way)."""
+        waiting = self.job()
+        with mock.patch("aso.scheduler.get_status", return_value={"running": True, "paused": False}):
+            self.assertIsNone(run_queue.busy_reason())
+            self.assertEqual(run_queue.kick(), waiting.pk)

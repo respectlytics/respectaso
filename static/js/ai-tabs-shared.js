@@ -880,13 +880,31 @@
     // The sentence a failed request carries: the server's own "error" when it
     // answered with JSON (every endpoint and aso/error_views.py do), a plain
     // sentence otherwise, never the raw body.
-    function errorFrom(response) {
+    function errorBody(response) {
         return response.text().then(function (text) {
-            try {
-                var data = JSON.parse(text);
-                if (data && data.error) { return data.error; }
-            } catch (e) { /* not JSON: fall through */ }
-            return 'RespectASO could not load this (error ' + response.status + '). Try again.';
+            var data = null;
+            try { data = JSON.parse(text); } catch (e) { /* not JSON: fall through */ }
+            data = data && typeof data === 'object' ? data : {};
+            return {
+                message: data.error || 'RespectASO could not load this (error ' + response.status + '). Try again.',
+                run: data.run || null,
+            };
+        });
+    }
+
+    function errorFrom(response) {
+        return errorBody(response).then(function (body) { return body.message; });
+    }
+
+    // A results request for a run that has not finished: rejects with the
+    // message, and for a failed or stopped run with ``error.run``, what the
+    // Recent list opens (aso_pro views _not_finished), so a link to it shows
+    // why and Retry the way the Recent list does.
+    function unfinishedFrom(response) {
+        return errorBody(response).then(function (body) {
+            var error = new Error(body.message);
+            if (body.run && (body.run.status === 'failed' || body.run.status === 'cancelled')) error.run = body.run;
+            throw error;
         });
     }
 
@@ -911,6 +929,7 @@
         applyWhoseScore: applyWhoseScore,
         simulateLink: simulateLink,
         errorFrom: errorFrom,
+        unfinishedFrom: unfinishedFrom,
         cutAtSentence: cutAtSentence,
         scoredForTip: scoredForTip,
         renderResultsHeader: renderResultsHeader,

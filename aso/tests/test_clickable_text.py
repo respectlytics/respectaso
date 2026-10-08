@@ -157,9 +157,11 @@ class DisclosureChevronsTest(SimpleTestCase):
 class EveryMenuRowHasItsIconTest(SimpleTestCase):
     """The Help menu and the ⋯ menus draw an icon on every row, from the one
     set in aso_tags.MENU_ICONS (the owner, 2026-10-02), so no menu mixes rows
-    with and without one."""
+    with and without one. A row for another product carries that product's
+    own mark at the icon's 16 px instead (Respectlytics, the owner, 2026-10-07)."""
 
     ROW = re.compile(r'<(a|button)\b[^>]*class="menu-item[^"]*"[^>]*>(.*?)</\1>', re.DOTALL)
+    ICON = re.compile(r'{%\s*menu_icon\s|{%\s*picture\s+"[\w-]+"\s+16\s+classes="h-4 w-4 ')
 
     def test_every_menu_row_starts_with_an_icon(self):
         bad = []
@@ -168,7 +170,7 @@ class EveryMenuRowHasItsIconTest(SimpleTestCase):
                 continue
             text = path.read_text(encoding="utf-8")
             for match in self.ROW.finditer(text):
-                if not match.group(2).lstrip().startswith("{% menu_icon"):
+                if not self.ICON.match(match.group(2).lstrip()):
                     bad.append(f"{path.relative_to(BASE)}:{text.count(chr(10), 0, match.start()) + 1}")
         self.assertEqual(bad, [])
 

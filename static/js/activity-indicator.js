@@ -215,6 +215,10 @@
         sources.announce = note.queued ? {running: null, waiting: 1}
                                        : {running: {label: note.label || 'Starting', pct: null}, waiting: 0};
         render();
+        // The panel's job row asks again, so a search or a scan started here shows in it,
+        // and the update of tracked keywords is asked again once it has paused for it.
+        if (window.JobStrip && JobStrip.poll) JobStrip.poll();
+        setTimeout(pollDaily, DAILY_AFTER_START_MS);
         clearTimeout(announceTimer);
         announceTimer = setTimeout(function () {
             if (sources.announce) { sources.announce = null; render(); }
@@ -250,22 +254,37 @@
     // --- the daily update of tracked keywords -----------------------------
 
     var DAILY_MS = 10000;
+    var DAILY_AFTER_START_MS = 3000;    // a refresh pauses within a read or two (aso/scheduler.py give_way)
     var dailyTimer = null;
 
     function showDaily(status) {
         var row = byId('activity-daily');
         var running = !!(status && status.running && status.total);
+        // Paused while the user's other tasks go first (aso/scheduler.py
+        // give_way): it waits like a queued run, and carries on by itself.
+        var paused = running && !!status.paused;
+        var counts = running
+            ? (status.completed || 0).toLocaleString('en-US') + ' of ' + status.total.toLocaleString('en-US')
+            : '';
         if (row) {
             row.classList.toggle('hidden', !running);
-            row.textContent = running
-                ? 'Updating tracked keywords: ' + (status.completed || 0).toLocaleString('en-US') +
-                  ' of ' + status.total.toLocaleString('en-US')
-                : '';
+            row.textContent = '';
+            if (running) {
+                var line = document.createElement('p');
+                line.textContent = 'Updating tracked keywords: ' + (paused ? 'paused at ' : '') + counts;
+                row.appendChild(line);
+            }
+            if (paused) {
+                var note = document.createElement('p');
+                note.className = 'mt-0.5 text-xs text-slate-400';
+                note.textContent = 'Carries on when your other tasks finish';
+                row.appendChild(note);
+            }
         }
-        sources.daily = running
-            ? {running: {label: 'Updating tracked keywords',
-                         pct: Math.round(100 * (status.completed || 0) / status.total)}, waiting: 0}
-            : null;
+        sources.daily = !running ? null
+            : paused ? {running: null, waiting: 1}
+            : {running: {label: 'Updating tracked keywords',
+                         pct: Math.round(100 * (status.completed || 0) / status.total)}, waiting: 0};
         render();
     }
 

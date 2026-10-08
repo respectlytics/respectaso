@@ -124,7 +124,7 @@
             if (!data) return;
             var status = el('rival-status');
             if (data.run && data.run.running && status) {
-                status.innerHTML = '<span class="text-sky-300">Checking now: ' + esc(data.run.message) + '</span>';
+                status.innerHTML = '<span class="text-sky-300">' + esc(data.run.line) + '</span>';
             }
             var sections = el('rival-sections');
             if (sections && data.history_revision && sections.dataset.revision !== data.history_revision) {

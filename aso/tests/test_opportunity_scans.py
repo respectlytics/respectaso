@@ -226,21 +226,6 @@ class RestartAndQueueTest(ScanTestBase):
         self.assertEqual(scan.restart_resumes, 1)
         self.assertEqual(scan.results.count(), 1)   # so do the rows
 
-    def test_a_stale_heartbeat_is_reclaimed(self):
-        stale = timezone.now() - timezone.timedelta(seconds=600)
-        scan = self.scan(status="running", heartbeat_at=stale, next_index=1)
-        with self.hold_lane():
-            opportunity_scans.reclaim_stale()
-        scan.refresh_from_db()
-        self.assertEqual(scan.status, "queued")
-        self.assertEqual(scan.next_index, 1)
-
-    def test_a_fresh_heartbeat_is_left_alone(self):
-        scan = self.scan(status="running", heartbeat_at=timezone.now())
-        opportunity_scans.reclaim_stale()
-        scan.refresh_from_db()
-        self.assertEqual(scan.status, "running")
-
     def test_creating_a_scan_prunes_old_finished_ones(self):
         for i in range(12):
             self.scan(keyword=f"kw{i}", status="completed", finished_at=timezone.now())

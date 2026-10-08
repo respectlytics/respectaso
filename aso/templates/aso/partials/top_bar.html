@@ -1,4 +1,4 @@
-{% load static %}
+{% load aso_tags %}
 {% comment %}
 The top bar (docs/development/APP_SHELL_PLAN.md, UI_REDESIGN_PLAN.md 3.1):
 four sections, then the Activity pill, The Creator Behind on YouTube (always
@@ -12,7 +12,7 @@ aso.context_processors.nav and pro_button; nothing here compares url names.
     <div class="mx-auto flex h-12 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div class="flex h-full items-center gap-8">
             <a href="{% url 'aso:dashboard' %}" class="flex shrink-0 items-center gap-2 text-white transition-colors hover:text-purple-300">
-                <img src="{% static 'images/respectaso-logo.png' %}" alt="" class="h-8 w-8 rounded">
+                {% picture "respectaso-logo" 32 classes="h-8 w-8 rounded" %}
                 <span class="text-base font-semibold">RespectASO</span>
             </a>
             <div class="flex h-full items-center gap-4 text-sm font-medium" data-top-sections>

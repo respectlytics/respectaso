@@ -8,7 +8,7 @@
     {# Compiled locally via scripts/build_css.sh - never load Tailwind from a CDN (see tailwind.instructions.md) #}
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}{% if STYLESHEET_VERSION %}?v={{ STYLESHEET_VERSION }}{% endif %}">
     {# The two typefaces, bundled in static/fonts/ (tailwind.source.css): fetched at once, before the stylesheet asks #}
-    <link rel="preload" href="{% static 'fonts/inter/Inter-Regular.woff2' %}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{% static 'fonts/schibsted-grotesk/SchibstedGrotesk-Regular.woff2' %}" as="font" type="font/woff2" crossorigin>
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32x32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'images/favicon-16x16.png' %}">

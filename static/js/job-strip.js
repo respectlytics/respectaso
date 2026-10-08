@@ -76,5 +76,14 @@
         if (options.state && options.state.active) { timer = setTimeout(refresh, POLL_MS); }
     }
 
-    window.JobStrip = { init: init, render: render };
+    // Something just started on this page (ActivityIndicator.announce). The
+    // page drew the strip with nothing active and stopped asking, so a search
+    // started here never reached the activity panel's job row.
+    function poll() {
+        if (!cfg) { return; }
+        clearTimeout(timer);
+        refresh();
+    }
+
+    window.JobStrip = { init: init, render: render, poll: poll };
 })();

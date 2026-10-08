@@ -75,6 +75,13 @@ class App(models.Model):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def track_targets(cls) -> list[dict]:
+        """The apps a keyword can be tracked for, as the "Track for" menu
+        lists them, each with its logo (static/js/track-keywords.js)."""
+        return [{"id": app.pk, "name": app.name, "icon": app.icon_url or ""}
+                for app in cls.objects.order_by("name")]
+
 
 class Keyword(models.Model):
     """
@@ -477,6 +484,9 @@ class KeywordSearchJob(models.Model):
     restart_resumes = models.PositiveIntegerField(default=0)      # continued after the app was closed mid-run
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
+    # The process working on the run while it is "running" (aso/run_owner.py):
+    # a row whose process has ended is released, not left holding the lane.
+    run_owner = models.CharField(max_length=64, blank=True, default="", db_default="")
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -904,9 +914,9 @@ class OpportunityScan(models.Model):
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
     seconds_per_country = models.FloatField(null=True, blank=True)   # feeds the ETA
     elapsed_seconds = models.FloatField(default=0)
-    # Stamped on every country. A scan started from MCP runs in another
-    # process, so a dead process is recognised by a stale heartbeat instead of
-    # holding the single run lane for ever.
+    # No longer read or written (run_owner replaced it on 2026-10-07). Kept so
+    # an app from before then keeps working on a database the MCP server has
+    # brought up to date, which a removed column would break.
     heartbeat_at = models.DateTimeField(null=True, blank=True)
     acknowledged = models.BooleanField(default=False)
     restart_resumes = models.PositiveIntegerField(default=0)
@@ -914,6 +924,9 @@ class OpportunityScan(models.Model):
     origin = models.CharField(max_length=4, choices=ORIGIN_CHOICES, default="web")
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
+    # The process working on the run while it is "running" (aso/run_owner.py):
+    # a row whose process has ended is released, not left holding the lane.
+    run_owner = models.CharField(max_length=64, blank=True, default="", db_default="")
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
