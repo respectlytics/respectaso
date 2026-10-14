@@ -159,7 +159,7 @@ The `.private` TLD is reserved by [RFC 6762](https://www.rfc-editor.org/rfc/rfc6
 
 ## Tech Stack
 
-- **Python 3.12** + **Django 5.1**
+- **Python 3.12** + **Django 5.2**
 - **pywebview**: native macOS WebKit window
 - **SQLite**: local single-user database
 - **wsgiref**: built-in Python WSGI server

@@ -9,7 +9,7 @@ from core.database import SQLITE_OPTIONS
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "3.1.1"
+VERSION = "3.1.2"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)
@@ -179,6 +179,18 @@ if IS_NATIVE_APP:
     for p in range(8000, 8100):
         CSRF_TRUSTED_ORIGINS.append(f"http://127.0.0.1:{p}")
         CSRF_TRUSTED_ORIGINS.append(f"http://localhost:{p}")
+
+# RespectASO is served over plain HTTP on the user's own computer (the Mac
+# app on 127.0.0.1, Docker on http://localhost), so the deploy checks that
+# assume HTTPS do not apply: an HTTPS redirect, HSTS or a secure-only cookie
+# would leave the app unreachable or without its session. CI runs
+# `manage.py check --deploy --fail-level WARNING`, which passes with these.
+SILENCED_SYSTEM_CHECKS = [
+    "security.W004",  # SECURE_HSTS_SECONDS
+    "security.W008",  # SECURE_SSL_REDIRECT
+    "security.W012",  # SESSION_COOKIE_SECURE
+    "security.W016",  # CSRF_COOKIE_SECURE
+]
 
 # Logging — write to a file in the data directory for the native app
 if IS_NATIVE_APP:

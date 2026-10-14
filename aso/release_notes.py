@@ -38,7 +38,30 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.1.1',
+RELEASES = [{'version': '3.1.2',
+  'date': '2026-10-15',
+  'title': 'Security updates, and Rival Tracker review counts taken from the reviews themselves',
+  'kind': 'patch',
+  'sections': [
+      {'heading': 'Security',
+       'items': [
+           ('<strong>RespectASO now runs on Django 5.2</strong>, a version of its web framework that '
+            'still receives security fixes, and the libraries it relies on are updated to their '
+            'patched versions, in the Mac app and the Docker edition alike.'),
+       ]},
+      {'heading': 'Fixed',
+       'items': [
+           ('<strong>The number beside each complaint in the Rival Tracker</strong> is now counted '
+            'from the reviews that raise it, and the apps it names are the apps of those reviews. '
+            'Before, both came from the AI\'s own estimate. A summary made before this update shows '
+            'its complaints without a number until the next one.'),
+           ('Your AI assistant can check an opportunity scan with the scan number it was given; '
+            'that call could be refused before.'),
+           ('When your AI assistant sends something a tool does not take, it now gets a short answer '
+            'saying what to send.'),
+       ]},
+  ]},
+ {'version': '3.1.1',
   'date': '2026-10-08',
   'title': 'RespectASO opens right away, and deleted keywords free their disk space',
   'kind': 'patch',

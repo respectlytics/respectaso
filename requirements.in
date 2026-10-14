@@ -1,0 +1,16 @@
+# What the app needs. Every line is bounded: a new major version is tested before a bound moves.
+# requirements.txt is the lock compiled from this file, with hashes (its first lines name the command).
+# certifi stays open, and every release moves it to the newest CA bundle.
+Django>=5.2.18,<5.3
+gunicorn==23.0.0
+whitenoise==6.8.2
+requests==2.34.2
+python-dotenv==1.2.4
+pywebview>=5.0,<6.0
+# The Mac app's login item and notifications (desktop/mac_integration.py).
+# macOS only; pywebview already brings pyobjc-core and the Cocoa wrappers there.
+pyobjc-framework-ServiceManagement>=12.2,<13; sys_platform == "darwin"
+pyobjc-framework-UserNotifications>=12.2,<13; sys_platform == "darwin"
+certifi>=2024.0.0
+PyJWT>=2.9.0,<3.0
+cryptography>=44.0.0,<51.0
