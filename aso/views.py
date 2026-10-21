@@ -29,6 +29,7 @@ from .history_filters import (
     HistoryFilters,
 )
 from .keyword_scoring import score_keyword_pair
+from .links import RESPECTLYTICS_URL
 from .models import App, Keyword, KeywordSearchJob, SearchResult
 from .popularity import (
     popularity_fields,
@@ -1530,7 +1531,7 @@ def export_history_csv_view(request):
 
     # Respectlytics attribution row
     writer.writerow([])
-    writer.writerow(["Privacy-first mobile analytics: https://respectlytics.com"])
+    writer.writerow([f"Privacy-first mobile analytics: {RESPECTLYTICS_URL}"])
 
     return response
 

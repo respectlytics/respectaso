@@ -245,6 +245,7 @@ def nav(request):
         "links": {
             "youtube": links.YOUTUBE_URL, "x": links.X_URL, "github": links.GITHUB_URL,
             "respectlytics": links.RESPECTLYTICS_URL, "contact": links.CONTACT_EMAIL,
+            "popularity_writeup": links.POPULARITY_WRITEUP_URL,
         },
     }
     try:
