@@ -28,7 +28,7 @@
         <form id="search-form" method="post" action="{% url 'aso:search' %}">
             {% csrf_token %}
             <div class="flex items-start gap-3">
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1" data-film-mark="search-box">
                     <label for="id_keywords" class="sr-only">Keywords</label>
                     {{ search_form.keywords }}
                 </div>
@@ -36,7 +36,7 @@
                     {% include "aso/partials/country_picker.html" with picker_id="search-countries" label="Countries" label_hidden=True max=5 memory_key="search" form_id="search-form" compact=True %}
                 </div>
                 {# border-transparent: the same height as the bordered keyword field, so both stay level #}
-                <button type="submit" id="search-btn"
+                <button type="submit" id="search-btn" data-film-mark="search-button"
                         class="btn-primary gap-2 whitespace-nowrap border border-transparent py-2.5 leading-5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -313,7 +313,7 @@
                                 <span class="text-slate-400 text-xs font-normal">N/A</span>
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_score|default:'-1' }}">
+                            <td class="px-3 py-2 text-center" data-sort-value="{{ result.difficulty_score|default:'-1' }}" data-film-mark="difficulty">
                                 <div class="text-sm font-semibold">
                                     <span class="{{ result.difficulty_color }}">{{ result.difficulty_score }}</span>{{ result.difficulty_delta|trend_arrow:"lower_better" }}
                                 </div>
@@ -322,7 +322,7 @@
                                 <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-2xs inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword: it matches the #1 app's publisher. Difficulty counts every ranking app, not just that one.">🏷️ Brand</span>
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 text-center text-base font-semibold bg-cyan-500/5" data-sort-value="{{ result.opportunity_score }}">
+                            <td class="px-3 py-2 text-center text-base font-semibold bg-cyan-500/5" data-sort-value="{{ result.opportunity_score }}" data-film-mark="opportunity">
                                 <span class="text-cyan-300 cursor-help" data-tip="{{ result.opportunity_reach.tip }}">{{ result.opportunity_score }}</span>
                             </td>
                             <td class="px-3 py-2 text-center" data-sort-value="{{ result.effective_download_estimates|download_sort_value }}">
