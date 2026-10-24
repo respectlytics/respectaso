@@ -180,6 +180,12 @@ RespectASO is designed with privacy as a core principle:
 
 We built RespectASO because we believe developers should be able to research keywords without handing their competitive intelligence to a third party.
 
+## Our other products
+
+- [Respectlytics](https://respectlytics.com/?ref=respectaso-github): privacy-first mobile app analytics for iOS and Android that finds your conversion paths and drop-offs from five fields per event, with no user IDs and no device IDs.
+- [Prokoll](https://prokoll.com/?ref=respectaso-github): private meeting notes that stay on your Mac, with who said what, and no account, no cloud and no bot in the call.
+- [Therese AI](https://thereseai.com/?ref=respectaso-github): daily content intelligence for a business's marketing, turning the news from the authorities and trade press in your field into post ideas, each with its source.
+
 ## License
 
 [AGPL-3.0](LICENSE): free to use, modify, and distribute. If you modify and deploy RespectASO as a service, you must share your changes under the same license.
@@ -198,4 +204,4 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ---
 
-**Built by [Respectlytics](https://respectlytics.com/?utm_source=respectaso&utm_medium=readme&utm_campaign=oss)**: privacy-focused mobile analytics for iOS & Android. We help developers avoid collecting personal data in the first place.
+**Built by [Respectlytics](https://respectlytics.com/?ref=respectaso-github)**: privacy-focused mobile analytics for iOS & Android. We help developers avoid collecting personal data in the first place.
