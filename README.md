@@ -31,7 +31,7 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 
 | Feature | Description |
 |---------|-------------|
-| **Keyword Popularity** | Popularity scores (1–100): a built-in estimate calibrated against Apple's official search-popularity data, or (optionally) Apple's own weekly values via your Apple Ads connection |
+| **Keyword Popularity** | Popularity scores (1-100): a built-in estimate calibrated against Apple's official search-popularity data, or (optionally) Apple's own weekly values via your Apple Ads connection |
 | **Difficulty Score** | Competition difficulty analysis across multiple factors with ranking tier breakdowns for Top 5, Top 10, and Top 20 |
 | **Ranking Tiers** | Separate difficulty analysis for Top 5, Top 10, and Top 20 positions, because breaking into the top 5 is different from reaching the top 20 |
 | **Download Estimates** | Estimated daily downloads per ranking position based on search volume, tap-through rates, and conversion rates |
@@ -48,7 +48,7 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 
 ### 1. Download
 
-**→ [Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+, Apple Silicon)
+**[Download RespectASO.dmg](https://github.com/respectlytics/respectaso/releases/latest)** (macOS 12+, Apple Silicon)
 
 ### 2. Install
 
@@ -124,19 +124,19 @@ docker compose down -v  # Also remove the volume (only after confirming native a
 
 RespectASO uses the public **iTunes Search API** plus, when you choose to connect it, the official **Apple Ads Platform API** with your own free API key. If Apple's search API fails, RespectASO reads the same search on Apple's public App Store search page instead, takes only the list of apps in Apple's order, and looks up their details through the iTunes Search API as usual. No private APIs, no paid data services.
 
-### Popularity Score (1–100)
+### Popularity Score (1-100)
 
 Estimates how frequently a keyword is searched by analyzing multiple signals from iTunes Search results, including the number and quality of competing apps, keyword relevance patterns, and market depth. Higher scores mean more people are searching for that keyword.
 
-### Difficulty Score (1–100)
+### Difficulty Score (1-100)
 
 Estimates how hard it would be to rank for a keyword by evaluating competition strength across factors like existing app ratings, market dominance, publisher diversity, and content relevance.
 
-**Tiers:** Very Easy (&lt;16) · Easy (16–35) · Moderate (36–55) · Hard (56–75) · Very Hard (76–90) · Extreme (91+)
+**Tiers:** Very Easy (&lt;16) · Easy (16-35) · Moderate (36-55) · Hard (56-75) · Very Hard (76-90) · Extreme (91+)
 
 ### Download Estimates
 
-Estimates daily downloads per ranking position based on search volume, expected tap-through rates by position, and install conversion rates. Results are shown as ranges with tier breakdowns for Top 5, Top 6–10, and Top 11–20.
+Estimates daily downloads per ranking position based on search volume, expected tap-through rates by position, and install conversion rates. Results are shown as ranges with tier breakdowns for Top 5, Top 6-10, and Top 11-20.
 
 For full methodology details, visit the **Methodology** page inside the app or explore the [source code](https://github.com/respectlytics/respectaso).
 
