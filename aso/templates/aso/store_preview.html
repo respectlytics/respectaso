@@ -1,0 +1,91 @@
+{% extends "aso/base.html" %}
+{% comment %}
+The Store section whenever the live page cannot render, one tab at a time
+(owner, 2026-11-16: every tab on one page read as a wall of text). Context
+comes from aso.store_preview.preview_context(state, tab=...). Each tab is a
+title, one line, the call to action, then one card: what the tab helps with
+as its title, a picture of it, and its steps in a word or two. The free
+edition and a Pro install without a valid licence blur the keywords; a Pro
+install with no App Store Connect key yet (state "connect") does not.
+Nothing in the picture is live: no buttons, forms or handlers besides the
+call to action.
+{% endcomment %}
+
+{% block title %}{{ preview.words.title }} · RespectASO{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-5xl mx-auto" data-store-state="{% if preview.locked %}preview{% else %}not_connected{% endif %}" data-store-tab="{{ preview.tab }}">
+    {% if preview.tabs %}
+    {% include "aso/partials/store_preview_tabs.html" with tabs=preview.tabs %}
+    {% else %}
+    {% include "aso/partials/section_tabs.html" with section="store" %}
+    {% endif %}
+    <div class="mb-4">
+        <h1 class="page-title mb-1">{{ preview.words.heading|default:preview.words.title }}</h1>
+        <p class="page-lead">{{ preview.words.lead }}</p>
+    </div>
+
+    {% include "aso/partials/preview_hero.html" with cta=preview.cta %}
+
+    <section class="card overflow-hidden p-0" data-store-explainer>
+        <div class="flex items-start justify-between gap-4 px-6 pt-6">
+            <h2 class="run-title">{{ preview.why }}</h2>
+            <span class="inline-flex shrink-0 items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>{% if preview.locked and preview.tab == "autopilot" or preview.locked and preview.tab == "results" %}Sample · keywords locked{% else %}Sample{% endif %}
+            </span>
+        </div>
+
+        {% if preview.tab != "results" %}
+        <div class="select-none px-6 py-6 pointer-events-none" aria-hidden="true" data-store-preview>
+            {% if preview.tab == "autopilot" %}
+            {% with s=preview.search %}
+            <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-5">
+                {% include "aso/partials/store_search_result.html" with label="Today" app=s.before tone="before" %}
+                <svg class="h-7 w-7 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                {% include "aso/partials/store_search_result.html" with label="With the new name and subtitle" app=s.after tone="after" %}
+            </div>
+            {% endwith %}
+            <div class="mt-6 rounded-xl border border-white/10 bg-slate-950/40 p-4">
+                <p class="mb-2 text-sm font-medium text-slate-100">Ready to apply</p>
+                {% for f in preview.fields %}
+                <div class="grid grid-cols-[1.25rem_9rem_1fr] items-start gap-3 border-t border-white/5 py-2 text-sm">
+                    <span class="mt-0.5 h-4 w-4 rounded bg-purple-500"></span>
+                    <span class="text-slate-300">{{ f.label }}</span>
+                    <span class="min-w-0"><span class="block text-xs text-slate-500 line-through">{% if f.locked %}<span class="preview-term blur-sm">{{ f.old }}</span>{% else %}{{ f.old }}{% endif %}</span><span class="block text-slate-100">{% if f.locked %}<span class="preview-term blur-sm">{{ f.new }}</span>{% else %}{{ f.new }}{% endif %}</span></span>
+                </div>
+                {% endfor %}
+                <span class="btn-secondary mt-2 inline-flex opacity-80{% if preview.locked %} pro-lock{% endif %}">Apply to App Store Connect</span>
+            </div>
+
+            {% elif preview.tab == "pages" %}
+            {% include "aso/partials/store_pages_picture.html" with sample=preview.pages %}
+            {% else %}
+            {% with r=preview.review %}
+            <div class="mx-auto max-w-2xl rounded-xl border border-white/10 bg-slate-950/40 p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="flex items-center gap-0.5 text-amber-300">{% for _ in r.stars %}<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L10 14.8l-5.2 2.8 1-5.8L1.5 7.7l5.9-.9z"/></svg>{% endfor %}{% for _ in r.empty_stars %}<svg class="h-4 w-4 text-slate-600" viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L10 14.8l-5.2 2.8 1-5.8L1.5 7.7l5.9-.9z"/></svg>{% endfor %}</p>
+                    <p class="text-xs text-slate-400">{{ r.reviewer }} · {{ r.territory }}</p>
+                </div>
+                <p class="mt-2 text-sm font-medium text-slate-100">{{ r.title }}</p>
+                <p class="mt-0.5 text-sm text-slate-300">{{ r.body }}</p>
+                <div class="ml-6 mt-4 rounded-lg border border-purple-400/30 bg-purple-500/10 px-4 py-3">
+                    <p class="text-2xs font-medium text-purple-200">Your reply, drafted in German</p>
+                    <p class="mt-1 text-sm text-slate-100">{{ r.reply }}</p>
+                </div>
+                <div class="ml-6 mt-3"><span class="btn-secondary inline-flex py-1.5 opacity-80{% if preview.locked %} pro-lock{% endif %}">Post reply</span></div>
+            </div>
+            {% endwith %}
+            {% endif %}
+        </div>
+        {% else %}<div class="pb-6"></div>{% endif %}
+
+        <div class="border-t border-white/5 bg-white/[0.03] px-6 py-5">
+            {% include "aso/partials/store_flow.html" with flow=preview.flow compact=True %}
+        </div>
+    </section>
+
+    {% if preview.tab == "results" %}{% include "aso/partials/store_results_sample.html" %}{% endif %}
+
+    {% if preview.tab == "results" %}{% include "aso/partials/preview_footer.html" with cta=preview.cta %}{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% comment %}The notice a page shows after one of its buttons (.notice):
+message and message_type (success, error, warning, info) from the view;
+message_id and message_class (spacing, mb-4 by default) from the include.{% endcomment %}
+{% if message %}
+{% with tone=message_type|default:"info" %}
+<div class="notice notice-{% if tone == 'success' or tone == 'error' or tone == 'warning' %}{{ tone }}{% else %}info{% endif %} {% if message_class is None %}mb-4{% else %}{{ message_class }}{% endif %} animate-fade-in" id="{{ message_id|default:'settings-message' }}" role="status">
+    {% include "aso/partials/notice_icon.html" %}
+    <p class="min-w-0 flex-1">{{ message }}</p>
+    {% include "aso/partials/notice_close.html" %}
+</div>
+{% endwith %}
+{% endif %}

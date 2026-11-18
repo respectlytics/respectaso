@@ -1,0 +1,92 @@
+{% comment %}The one Add an app dialog (aso/add_app.py), drawn by base.html on every page and opened by any
+[data-add-app] (static/js/add-app.js; data-add-app="all" ticks every account app). Top to bottom: the
+apps of the App Store Connect account not added yet (Pro, connected), any app in the App Store by name
+or link, and one by hand behind a disclosure. Both editions draw it; the free edition has no account
+section. account, form and csrf_token come from the add_app_dialog tag.{% endcomment %}
+<dialog id="add-app-dialog" class="mt-[8vh] w-full max-w-xl rounded-xl border border-white/10 bg-[#1e293b] p-0 text-slate-200 backdrop:bg-black/60"
+        aria-labelledby="add-app-title" data-lookup-url="{% url 'aso:app_lookup' %}" data-add-url="{% url 'aso:app_add' %}" data-csrf="{{ csrf_token }}">
+    <div class="flex max-h-[84vh] flex-col">
+        <div class="flex items-start justify-between gap-4 px-5 pt-5">
+            <div>
+                <h2 class="card-title" id="add-app-title">Add an app</h2>
+                <p class="card-lead">{% if account %}Pick apps from your account, or find any app in the App Store.{% else %}Find it in the App Store by name or link.{% endif %}</p>
+            </div>
+            <button type="button" class="btn-quiet" data-add-app-close aria-label="Close"><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></button>
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4">
+            {% include "aso/partials/notice_live.html" with id="add-app-notice" extra="mb-4" %}
+
+            {% if account %}
+            <section id="add-app-account" data-url="{{ account.url }}">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="item-title">In your App Store Connect account</h3>
+                    {% if account.apps|length > 3 %}
+                    <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                        <input type="checkbox" id="add-app-account-all" class="h-3.5 w-3.5 accent-purple-500"> Select all
+                    </label>
+                    {% endif %}
+                </div>
+                <ul class="mt-2 max-h-[min(18rem,32vh)] divide-y divide-white/5 overflow-y-auto rounded-xl border border-white/10" id="add-app-account-list">
+                    {% for a in account.apps %}
+                    <li data-account-app="{{ a.id }}">
+                        <label class="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-white/5">
+                            <input type="checkbox" name="add-app-account" value="{{ a.id }}" class="h-4 w-4 shrink-0 accent-purple-500">
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-sm text-slate-100">{{ a.name }}</span>
+                                {% if a.bundle_id %}<span class="block truncate text-2xs text-slate-400">{{ a.bundle_id }}</span>{% endif %}
+                            </span>
+                        </label>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="mt-3 flex items-center gap-3">
+                    <button type="button" class="btn-primary inline-flex items-center gap-2" id="add-app-account-button" disabled>
+                        <span class="hidden h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white border-t-transparent" data-spinner aria-hidden="true"></span>
+                        <span data-label>Add apps</span>
+                    </button>
+                    <span class="text-xs text-slate-400" id="add-app-account-hint">Tick the apps to add.</span>
+                </div>
+            </section>
+            {% endif %}
+
+            <section id="add-app-search" class="{% if account %}mt-5 border-t border-white/5 pt-4{% endif %}">
+                {% if account %}<h3 class="item-title">Any other app</h3>{% endif %}
+                <label for="app-search-input" class="{% if account %}mt-2 {% endif %}mb-1.5 block text-xs font-medium text-slate-300">App name or App Store link</label>
+                <div class="relative">
+                    <input type="text" id="app-search-input"
+                           class="w-full rounded-lg border border-white/10 bg-slate-700 px-3 py-2 pr-8 text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                           placeholder="Search by name or paste a link" autocomplete="off" spellcheck="false">
+                    <div id="app-search-spinner" class="absolute right-2.5 top-2.5 hidden" aria-hidden="true">
+                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-purple-400 border-t-transparent"></div>
+                    </div>
+                </div>
+                <ul id="app-search-results" class="mt-2 hidden divide-y divide-white/5 rounded-xl border border-white/10" aria-live="polite"></ul>
+                <p id="app-search-note" class="mt-2 hidden text-sm text-slate-400" role="status"></p>
+            </section>
+
+            <details id="add-app-manual" class="mt-4">
+                <summary class="disclosure text-xs">Add one that is not in the App Store yet</summary>
+                <form id="add-app-manual-form" class="mt-3 space-y-3" novalidate>
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label for="{{ form.name.id_for_label }}" class="mb-1.5 block text-xs font-medium text-slate-300">App name</label>
+                            {{ form.name }}
+                        </div>
+                        <div class="flex-1">
+                            <label for="{{ form.bundle_id.id_for_label }}" class="mb-1.5 block text-xs font-medium text-slate-300">Bundle ID <span class="text-slate-400">(optional)</span></label>
+                            {{ form.bundle_id }}
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" class="btn-secondary inline-flex items-center gap-2 whitespace-nowrap" id="add-app-manual-button">
+                                <span class="hidden h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" data-spinner aria-hidden="true"></span>
+                                <span data-label>Add</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-2xs text-slate-400">Manual apps can't track keyword rankings. Use App Store search above for rank tracking.</p>
+                </form>
+            </details>
+        </div>
+    </div>
+</dialog>

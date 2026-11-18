@@ -11,18 +11,10 @@
     <!-- Header -->
     <div class="mb-4">
         <h1 class="page-title mb-1">Apple Ads popularity</h1>
-        <p class="page-lead">Use Apple's own popularity numbers. Free, read-only, about 5 minutes.</p>
+        <p class="page-lead">Use Apple's own popularity numbers. Free, read-only, set up once.</p>
     </div>
 
-    <!-- Success/Error Message -->
-    {% if message %}
-    <div class="mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in
-        {% if message_type == 'success' %}bg-emerald-900/30 border border-emerald-500/30 text-emerald-300
-        {% elif message_type == 'error' %}bg-red-900/30 border border-red-500/30 text-red-300
-        {% else %}bg-blue-900/30 border border-blue-500/30 text-blue-300{% endif %}">
-        {{ message }}
-    </div>
-    {% endif %}
+    {% include "aso/partials/settings_message.html" %}
 
     {% comment %}First card: the connection (UI_REDESIGN_PLAN.md 10.2). Not
     connected, the three numbered steps and Generate my key pair; connected,
@@ -32,11 +24,10 @@
 
         {% if wizard_state == 'connected' %}
         <!-- Connected summary card -->
-        <div class="rounded-lg bg-emerald-900/20 border border-emerald-500/30 px-4 py-3 mb-3">
-            <p class="text-sm text-emerald-300 font-medium flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                Connected to Apple Ads
-            </p>
+        <div class="notice notice-success mb-3">
+            {% include "aso/partials/notice_icon.html" with tone="success" %}
+            <div class="min-w-0 flex-1">
+            <p class="notice-title">Connected to Apple Ads</p>
             <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-400">
                 <dt>Ad account</dt><dd class="text-slate-300">{{ apple_block.ad_account_name|default:apple_block.ad_account_id }}</dd>
                 <dt>Key ID</dt><dd class="text-slate-300 font-mono text-2xs">{{ apple_block.key_id|truncatechars:18 }}</dd>
@@ -44,6 +35,7 @@
             <p class="text-2xs text-slate-400 mt-2">
                 The key does not expire. Popularity refreshes each week, after Apple publishes on Monday, while RespectASO runs.
             </p>
+            </div>
         </div>
         <dl class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-400 mb-3" id="sync-facts">
             <dt>Data week</dt>
@@ -75,21 +67,25 @@
         </div>
 
         {% elif wizard_state == 'credential_rejected' %}
-        <div class="rounded-lg bg-red-900/20 border border-red-500/30 px-4 py-3 mb-3">
-            <p class="text-sm text-red-300 font-medium">Apple rejected the credentials.</p>
-            <p class="text-xs text-slate-400 mt-1">
+        <div class="notice notice-error mb-3">
+            {% include "aso/partials/notice_icon.html" with tone="error" %}
+            <div class="min-w-0 flex-1">
+            <p class="notice-title">Apple rejected the credentials.</p>
+            <p class="text-xs mt-1">
                 The key may have been removed at Apple, or an id mistyped. Check the three values below against
-                Account Settings → API at <span class="text-slate-300">ads.apple.com</span> and verify again.
+                Account Settings → API at <span class="text-white">ads.apple.com</span> and verify again.
             </p>
+            </div>
         </div>
         {% include "aso/partials/apple_wizard_credentials.html" %}
 
         {% elif wizard_state == 'unverified' %}
-        <div class="rounded-lg bg-amber-900/20 border border-amber-500/30 px-4 py-3 mb-3">
-            <p class="text-sm text-amber-300 font-medium">One step left: verify the connection.</p>
-            <p class="text-xs text-slate-400 mt-1">
-                Your key and ids are saved. Verify to start getting Apple's data.
-            </p>
+        <div class="notice notice-warning mb-3">
+            {% include "aso/partials/notice_icon.html" with tone="warning" %}
+            <div class="min-w-0 flex-1">
+            <p class="notice-title">One step left: verify the connection.</p>
+            <p class="text-xs mt-1">Your key and ids are saved. Verify to start getting Apple's data.</p>
+            </div>
         </div>
         {% include "aso/partials/apple_wizard_credentials.html" %}
 
@@ -120,7 +116,7 @@
         {% else %}
         <!-- no_credentials -->
         <p class="text-xs text-slate-400 mb-3">
-            Connect once for Apple's official popularity: free, read-only, no ad spend, about 5 minutes.
+            Connect once for Apple's official popularity: free, read-only, no ad spend.
         </p>
         <ol class="text-xs text-slate-400 space-y-1 mb-4 list-decimal pl-4">
             <li>RespectASO generates a secure key pair on this computer.</li>
@@ -238,7 +234,7 @@
                         {% else %}
                         <span class="mt-2 inline-flex items-center gap-1.5 text-2xs font-medium text-amber-300">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            Locked: connect Apple Ads above first (one time, about 5 minutes)
+                            Locked: connect Apple Ads above first (one time)
                         </span>
                         {% endif %}
                     </span>
@@ -262,10 +258,10 @@
                                 RespectASO Estimate
                             </p>
                             <ul class="text-xs text-slate-400 space-y-1.5">
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Works instantly for every keyword, in all {% storefront_count %} storefronts</span></li>
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Open methodology: see exactly how the score is built</span></li>
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No account or setup needed</span></li>
-                                <li class="flex gap-2"><span class="text-red-400">−</span><span>An estimate, not Apple's own measurement: on busy keywords it can differ from Apple's numbers</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>Works for every keyword, in all {% storefront_count %} storefronts, with no setup</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>Open methodology: see exactly how the score is built</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>No account or setup needed</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>An estimate, not Apple's own measurement: on busy keywords it can differ from Apple's numbers</span></li>
                             </ul>
                             <a href="{% url 'aso:methodology' %}" class="link inline-block mt-2 text-xs">How the estimate works →</a>
                         </div>
@@ -275,12 +271,12 @@
                                 Apple Ads Popularity
                             </p>
                             <ul class="text-xs text-slate-400 space-y-1.5">
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Popularity as Apple itself measures it</span></li>
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>Granular 1-100 values plus each keyword's category rank, refreshed weekly, automatically</span></li>
-                                <li class="flex gap-2"><span class="text-emerald-400">+</span><span>No ads or spend required: a free Apple Ads account with a one-time API key setup</span></li>
-                                <li class="flex gap-2"><span class="text-red-400">−</span><span>Apple reports only each category's top 500 terms; the rest get the estimate, marked <span class="text-slate-300 font-medium">EST*</span></span></li>
-                                <li class="flex gap-2"><span class="text-red-400">−</span><span>Weekly snapshots, not real-time (Apple publishes each completed week on Mondays)</span></li>
-                                <li class="flex gap-2"><span class="text-red-400">−</span><span>No data for storefronts where Apple Ads does not operate (for example Russia), which use the estimate</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>Popularity as Apple itself measures it</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>Granular 1-100 values plus each keyword's category rank, refreshed weekly, automatically</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>No ads or spend required: a free Apple Ads account with a one-time API key setup</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>Apple reports only each category's top 500 terms; the rest get the estimate, marked <span class="text-slate-300 font-medium">EST*</span></span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>Weekly snapshots, not real-time (Apple publishes each completed week on Mondays)</span></li>
+                                <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>No data for storefronts where Apple Ads does not operate (for example Russia), which use the estimate</span></li>
                             </ul>
                             <a href="{% url 'aso:apple_ads_setup' %}" class="link inline-block mt-2 text-xs">Step-by-step setup guide →</a>
                         </div>

@@ -28,14 +28,14 @@ TITLES = {
 # (keyword, popularity, difficulty, opportunity, downloads at #1 as the table
 #  prints it, the same in words, tag, the competitor's rank or None)
 SAMPLE_ROWS = (
-    ("daily habit tracker", 52, 28, 71, "4.1–41/day", "4.1 to 41 downloads a day", "Sweet Spot", 7),
-    ("habit streaks", 47, 24, 63, "2.2–22/day", "2.2 to 22 downloads a day", "Good Target", 3),
-    ("routine planner", 45, 33, 55, "1.7–17/day", "1.7 to 17 downloads a day", "Good Target", 12),
-    ("habit journal", 39, 22, 48, "0.8–8.1/day", "0.8 to 8.1 downloads a day", "Supporting", 9),
-    ("self care checklist", 31, 18, 41, "0.3–3.4/day", "0.3 to 3.4 downloads a day", "Supporting", None),
-    ("goal tracker", 55, 61, 27, "3.2–32/day", "3.2 to 32 downloads a day", "Worth Climbing", 15),
-    ("morning routine", 49, 57, 24, "2.6–26/day", "2.6 to 26 downloads a day", "Worth Climbing", None),
-    ("streak counter", 22, 15, 19, "0.1–0.9/day", "at most 0.9 downloads a day", "Low Volume", None),
+    ("daily habit tracker", 52, 28, 71, "4.1-41/day", "4.1 to 41 downloads a day", "Sweet Spot", 7),
+    ("habit streaks", 47, 24, 63, "2.2-22/day", "2.2 to 22 downloads a day", "Good Target", 3),
+    ("routine planner", 45, 33, 55, "1.7-17/day", "1.7 to 17 downloads a day", "Good Target", 12),
+    ("habit journal", 39, 22, 48, "0.8-8.1/day", "0.8 to 8.1 downloads a day", "Supporting", 9),
+    ("self care checklist", 31, 18, 41, "0.3-3.4/day", "0.3 to 3.4 downloads a day", "Supporting", None),
+    ("goal tracker", 55, 61, 27, "3.2-32/day", "3.2 to 32 downloads a day", "Worth Climbing", 15),
+    ("morning routine", 49, 57, 24, "2.6-26/day", "2.6 to 26 downloads a day", "Worth Climbing", None),
+    ("streak counter", 22, 15, 19, "0.1-0.9/day", "at most 0.9 downloads a day", "Low Volume", None),
 )
 
 SAMPLE_COUNTS = (("Target now", 14), ("Target and climb", 9), ("Skip", 6))

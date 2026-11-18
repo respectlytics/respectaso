@@ -19,6 +19,14 @@ class AsoConfig(AppConfig):
     verbose_name = "ASO Keyword Research"
 
     def ready(self):
+        # The one App Store pace of every thread and process lives in the data folder
+        # (aso/throttle.py AppleGate, which imports no Django so respectaso.com can run it).
+        from django.conf import settings
+
+        from .throttle import apple_gate
+
+        apple_gate.folder = lambda: settings.DATA_DIR
+
         # Before the early return below: migrate and test are exactly the
         # commands whose migrate must create the triggers.
         post_migrate.connect(_ensure_history_triggers, sender=self)
@@ -54,8 +62,6 @@ class AsoConfig(AppConfig):
 
         import os
         import threading
-
-        from django.conf import settings
 
         # The MCP server (aso_pro/mcp/bootstrap.py) is a second process on
         # the same database. It must never do the day's background work: its

@@ -91,3 +91,44 @@ class MacAppPageTest(TestCase):
         self.assertContains(self.client.get(reverse("aso:settings_popularity")), "Mac App</a>")
         desktop_bridge.unregister_backend()
         self.assertNotContains(self.client.get(reverse("aso:settings_popularity")), "Mac App</a>")
+
+
+class OpenNotificationSettingsTest(TestCase):
+    """One action opens System Settings at RespectASO's notifications: the
+    Notifications card's button and the Get set up tile's both post here, and
+    the request carries no address, so nothing but the two System Settings
+    links ever reaches macOS (desktop_bridge.notification_settings_urls)."""
+
+    OPEN = "aso:open_notification_settings"
+
+    def tearDown(self):
+        desktop_bridge.unregister_backend()
+
+    def test_it_exists_only_in_the_mac_app(self):
+        desktop_bridge.unregister_backend()
+        self.assertEqual(self.client.post(reverse(self.OPEN)).status_code, 404)
+
+    def test_only_a_post_opens_it(self):
+        backend = FakeBackend(permission="denied")
+        desktop_bridge.register_backend(backend)
+        self.assertEqual(self.client.get(reverse(self.OPEN)).status_code, 405)
+        self.assertEqual(backend.notification_settings_opened, 0)
+
+    def test_a_post_opens_system_settings(self):
+        backend = FakeBackend(permission="denied")
+        desktop_bridge.register_backend(backend)
+        response = self.client.post(reverse(self.OPEN), {"url": "https://evil.example/"})
+        self.assertEqual(response.json(), {"opened": True})
+        self.assertEqual(backend.notification_settings_opened, 1)
+
+    def test_when_macos_does_not_open_it_the_person_reads_the_way_there(self):
+        from aso.copy_rules import dash_punctuation_in, mechanics_in
+        from aso.settings_views import NOTIFICATION_SETTINGS_FAILED
+
+        backend = FakeBackend(permission="denied")
+        backend.notification_settings_open = False
+        desktop_bridge.register_backend(backend)
+        answer = self.client.post(reverse(self.OPEN)).json()
+        self.assertEqual(answer, {"opened": False, "error": NOTIFICATION_SETTINGS_FAILED})
+        self.assertEqual(mechanics_in(NOTIFICATION_SETTINGS_FAILED), "")
+        self.assertEqual(dash_punctuation_in(NOTIFICATION_SETTINGS_FAILED), "")

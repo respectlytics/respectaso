@@ -6,7 +6,7 @@ the Countries prefill."""
 import re
 
 from django.apps import apps as django_apps
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from aso import ui_memory
@@ -113,11 +113,56 @@ class FirstRunTest(TestCase):
         self.assertNotIn('id="setup-checklist"', html)
         self.assertIn('scroll-mt-20 hidden"', html)    # the empty table waits
 
-    def test_an_app_brings_the_checklist_not_the_welcome(self):
+    def test_an_app_ends_the_welcome_and_brings_no_setup_card(self):
+        """Get set up moved to Apps (DAILY_USE_PLAN.md step 3.7a and step 8.1)."""
         App.objects.create(name="Moonpond")
         html = self.client.get(reverse("aso:dashboard")).content.decode()
         self.assertNotIn("Which app do you want to grow?", html)
-        self.assertIn('id="setup-checklist"', html)
+        self.assertNotIn('id="setup-checklist"', html)
+        self.assertNotIn('id="setup-strip"', html)
+
+
+class WhatLeftTest(TestCase):
+    """What left the Keywords page for Apps (DAILY_USE_PLAN.md step 8): the
+    setup card, the Rival Tracker card, and for a Pro license the "next step"
+    row, which a person without one keeps as in 3.2.0 (D12)."""
+
+    NEXT_STEP = "Most apps need 40-80 keywords"
+
+    def setUp(self):
+        self.app = App.objects.create(name="Moonpond")
+        _row(self.app, "sleep sounds")
+
+    def _page(self):
+        return self.client.get(reverse("aso:dashboard"), {"app": self.app.pk}).content.decode()
+
+    def test_no_setup_strip_and_no_rival_card(self):
+        html = self._page()
+        for marker in ('id="setup-checklist"', 'id="setup-strip"', 'id="rival-digest-slot"'):
+            with self.subTest(marker=marker):
+                self.assertNotIn(marker, html)
+
+    def test_the_next_step_row_stays_without_a_license(self):
+        html = self._page()
+        self.assertIn(self.NEXT_STEP, html[html.index('id="app-summary-section"'):])
+
+    @override_settings(DEBUG_SKIP_LICENSE=True)
+    def test_a_license_reads_the_advice_on_apps_instead(self):
+        html = self._page()
+        self.assertIn('id="app-summary-section"', html)
+        self.assertNotIn(self.NEXT_STEP, html)
+
+    def test_every_add_an_app_button_opens_the_add_dialog(self):
+        """The one Add an app dialog (aso/add_app.py, owner 2026-11-18), on this page itself."""
+        Keyword.objects.all().delete()
+        App.objects.all().delete()
+        html = self.client.get(reverse("aso:dashboard")).content.decode()    # the first run card
+        for marker in ('id="add-app-button"', ">Add your app…</button>"):
+            with self.subTest(marker=marker):
+                tag = html[html.rindex("<button ", 0, html.index(marker) + len(marker)):]
+                tag = tag[:tag.index(">")]
+                self.assertIn("data-add-app", tag)
+        self.assertEqual(html.count('id="add-app-dialog"'), 1)
 
 
 class RememberedAppTest(TestCase):
@@ -156,6 +201,7 @@ class RememberedAppTest(TestCase):
         response = self.client.get(reverse("aso:dashboard"), {"app": self.a.pk})
         menu = response.context["app_menu"]
         self.assertEqual(menu[-1], {"value": "__manage__", "label": "Add or remove apps…", "glyph": "manage"})
+        # Adding and removing: the Apps page itself, without opening the Add an app dialog.
         self.assertIn(f'id="manage-apps-link" href="{reverse("aso:apps")}"', response.content.decode())
 
     def test_the_switcher_shows_each_apps_logo(self):

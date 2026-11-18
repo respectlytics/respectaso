@@ -18,7 +18,6 @@
     var state = JSON.parse(document.getElementById('rival-setup-data').textContent);
     var csrf = root.dataset.csrf;
     var MAX_RIVALS = parseInt(root.dataset.maxRivals, 10);
-    var SECONDS = parseInt(root.dataset.secondsPerCall, 10);
     var AI = root.dataset.ai === '1';
     var more = {};           // country -> suggestions not added
     var reasons = {};        // country -> {keyword: why it was suggested}
@@ -327,8 +326,7 @@
         if (title) title.textContent = (state.titles || {})[state.active] || state.app_name;
         var estimate = el('suggest-estimate');
         if (estimate) {
-            estimate.textContent = 'Suggestions for ' + storeName(state.active) + ' take ' +
-                root.dataset.suggestionEstimate + '.';
+            estimate.textContent = 'Suggestions for ' + storeName(state.active) + '. You can keep working while it runs.';
         }
     }
 
@@ -359,7 +357,7 @@
                 if (window.ActivityIndicator && ActivityIndicator.announce) {
                     ActivityIndicator.announce({
                         queued: res.data.status === 'queued', label: 'Suggest keywords',
-                        current: (window.AsoRunQueue && AsoRunQueue.busyWith) ? AsoRunQueue.busyWith() : '', eta: null
+                        current: (window.AsoRunQueue && AsoRunQueue.busyWith) ? AsoRunQueue.busyWith() : ''
                     });
                 }
                 job = res.data.id;
@@ -612,16 +610,13 @@
                 : 'Add ' + what + ' to start following.';
             return;
         }
-        var calls = keywords + state.countries.length + state.rivals.length * state.countries.length;
         var countriesText = state.countries.length === 1 ? '1 country' : state.countries.length + ' countries';
         el('rival-estimate').textContent = 'Every day: ' + plural(keywords, 'keyword') + ' and ' + plural(state.rivals.length, 'rival') +
-            ' in ' + countriesText + ', ' + CountryPicker.durationText(calls * SECONDS) + ' at most.';
+            ' in ' + countriesText + '.';
     }
 
     function showError(text) {
-        var box = el('rival-save-error');
-        box.textContent = text || 'That did not go through. Please try again.';
-        box.classList.remove('hidden');
+        window.Notice.show(el('rival-save-error'), text || 'That did not go through. Please try again.', 'error');
     }
     function hideError() { el('rival-save-error').classList.add('hidden'); }
 

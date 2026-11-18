@@ -1,0 +1,23 @@
+{% comment %}What a search page is, as two iPhones searching the App Store (the
+Search pages tab's first meeting, owner 2026-11-16): the same app answers
+both searches; for "morning routine" its search page leads with the
+mornings screenshot. sample: aso.store_preview.SAMPLE_PAGES.{% endcomment %}
+<div class="flex items-start gap-5" aria-hidden="true">
+    {% for key, p in sample.items %}
+    <figure class="w-[9.5rem]">
+        <div class="rounded-[1.6rem] border border-slate-600/80 bg-slate-950 p-2 shadow-lg shadow-black/30 {% if key == 'theme' %}ring-1 ring-emerald-400/30{% endif %}">
+            <div class="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-700"></div>
+            <p class="flex items-center gap-1.5 rounded-full bg-white/[0.08] px-2.5 py-1 text-2xs text-slate-100">
+                <svg class="h-3 w-3 shrink-0 text-slate-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg><span class="truncate">{{ p.query }}</span>
+            </p>
+            <div class="mt-2.5 flex items-center gap-1.5 px-0.5">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></span>
+                <span class="min-w-0 flex-1 truncate text-2xs font-semibold text-slate-100">Habito</span>
+                <span class="rounded-full bg-white/10 px-1.5 text-2xs font-semibold text-sky-300">Get</span>
+            </div>
+            <div class="mt-2 grid grid-cols-3 gap-1">{% for label, tone, icon in p.shots %}{% if key == "theme" and forloop.first %}{% include "aso/partials/store_shot.html" with size="xs" lead=True %}{% else %}{% include "aso/partials/store_shot.html" with size="xs" %}{% endif %}{% endfor %}</div>
+        </div>
+        <figcaption class="mt-2 text-center text-2xs {% if key == 'theme' %}text-emerald-300{% else %}text-slate-400{% endif %}">{% if key == 'theme' %}A custom product page{% else %}Your store page{% endif %}</figcaption>
+    </figure>
+    {% endfor %}
+</div>

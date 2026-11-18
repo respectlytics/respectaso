@@ -4,7 +4,7 @@
                                shows; a full page load of the Dashboard
                                without them opens the view last shown
     the App Summary folded     drawn folded by the server
-    the setup checklist folded the Keywords page's "Get set up" card, folded
+    the Apps page's period     7 or 30 days, the last one chosen
     the Discover tab           the tab of Discover shown last, which the top
                                bar's Discover opens (context_processors.nav)
     the current app            the app picked last on any page; every app
@@ -46,10 +46,7 @@ from .history_filters import (
 DASHBOARD_VIEW = "dashboard_view"
 APP_SUMMARY_FOLDED = "app_summary_folded"
 COUNTRY_PICKS = "country_picks"
-SETUP_CHECKLIST_FOLDED = "setup_checklist_folded"
-# Kept for good, in the settings file and not the session: a Pro user who
-# closed "Get set up" (the owner, 2026-10-02). Free users cannot close it.
-SETUP_CHECKLIST_CLOSED = "setup_checklist_closed"
+APPS_PERIOD = "apps_period"
 DISCOVER_TAB = "discover_tab"
 CURRENT_APP = "current_app"
 
@@ -67,6 +64,30 @@ def is_full_page_load(request) -> bool:
 def is_background(request) -> bool:
     """A refresh the page made by itself, not a view the reader chose."""
     return request.headers.get("X-In-Place") == "background"
+
+
+def apps_period(request) -> int:
+    """7 or 30 days on the Apps page: ?days= when given (and remembered), else the last one chosen."""
+    from .apps_home import PERIODS
+
+    session = getattr(request, "session", None)
+    asked = request.GET.get("days")
+    if asked and asked.isdigit() and int(asked) in PERIODS:
+        if session is not None and session.get(APPS_PERIOD) != int(asked):
+            session[APPS_PERIOD] = int(asked)
+        return int(asked)
+    return remembered_apps_period(request)
+
+
+def remembered_apps_period(request) -> int:
+    """The Apps page's period chosen last, without reading ?days= (another
+    page's ?days= is its own): what the number beside Apps counts on every
+    page, and what the Apps page asks each minute."""
+    from .apps_home import DEFAULT_PERIOD, PERIODS
+
+    session = getattr(request, "session", None)
+    remembered = session.get(APPS_PERIOD) if session is not None else None
+    return remembered if remembered in PERIODS else DEFAULT_PERIOD
 
 
 # ---- the app picked last, on any page -------------------------------------
@@ -263,7 +284,7 @@ def remembered_countries(request, picker: str) -> list[str]:
 def save(request, name, value):
     """Store what the page sends and answer with the value as stored.
 
-    ``app_summary_folded`` and ``setup_checklist_folded`` take true or false; ``countries.<picker>`` takes
+    ``app_summary_folded`` takes true or false; ``countries.<picker>`` takes
     a list of storefront codes, kept valid, in lower case, each once, in
     order. Anything else raises ValueError with a sentence for the page."""
     if name == APP_SUMMARY_FOLDED:
@@ -272,26 +293,6 @@ def save(request, name, value):
             raise ValueError("Folded is true or false.")
         if request.session.get(name) is not value:
             request.session[name] = value
-        return value
-    if name == SETUP_CHECKLIST_CLOSED:
-        from .pro_access import has_pro_license
-
-        if value is not True:
-            raise ValueError("Closing is for good: send true.")
-        if not has_pro_license():
-            raise ValueError("Get set up stays until Pro is unlocked.")
-        from .apple_ads import storage
-
-        storage.save_block("ui", {SETUP_CHECKLIST_CLOSED: True})
-        return True
-    if name == SETUP_CHECKLIST_FOLDED:
-        if not isinstance(value, bool):
-            raise ValueError("Folded is true or false.")
-        if value:
-            if request.session.get(name) is not True:
-                request.session[name] = True
-        else:
-            request.session.pop(name, None)
         return value
 
     prefix = "countries."

@@ -59,7 +59,7 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
     {% endwith %}
 
     {# ── The next step ─────────────────────────────────────────────────────── #}
-    {% if summary.cta %}
+    {% if summary.cta and not keyword_limit_context.is_pro %}
     <div class="flex items-center justify-between gap-3 px-4 pt-4">
         <p class="text-sm text-slate-200">{{ summary.cta.message }}</p>
         {% with btn=summary.cta.buttons.0 %}
@@ -254,11 +254,11 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-2xs text-slate-400">
                 {% with rd=summary.rank_dist %}
                 {% if rd.t5 %}<span class="cursor-help" data-tip="Positions 1-5, the most visible search slots."><span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 align-middle mr-1"></span>Top 5: <span class="text-slate-300">{{ rd.t5 }}</span></span>{% endif %}
-                {% if rd.t10 %}<span class="cursor-help" data-tip="Positions 6-10, still on the first page of results for most users."><span class="inline-block w-2 h-2 rounded-sm bg-green-500 align-middle mr-1"></span>Top 6–10: <span class="text-slate-300">{{ rd.t10 }}</span></span>{% endif %}
-                {% if rd.t20 %}<span class="cursor-help" data-tip="Positions 11-20, visible with some scrolling."><span class="inline-block w-2 h-2 rounded-sm bg-yellow-500 align-middle mr-1"></span>Top 11–20: <span class="text-slate-300">{{ rd.t20 }}</span></span>{% endif %}
-                {% if rd.t50 %}<span class="cursor-help" data-tip="Positions 21-50, very limited organic visibility."><span class="inline-block w-2 h-2 rounded-sm bg-orange-500 align-middle mr-1"></span>Top 21–50: <span class="text-slate-300">{{ rd.t50 }}</span></span>{% endif %}
-                {% if rd.t100 %}<span class="cursor-help" data-tip="Positions 51-100, effectively no download contribution."><span class="inline-block w-2 h-2 rounded-sm bg-red-500/70 align-middle mr-1"></span>Top 51–100: <span class="text-slate-300">{{ rd.t100 }}</span></span>{% endif %}
-                {% if rd.t200 %}<span class="cursor-help" data-tip="Positions 101-200, only visible to deep scrollers."><span class="inline-block w-2 h-2 rounded-sm bg-slate-600 align-middle mr-1"></span>101–200: <span class="text-slate-300">{{ rd.t200 }}</span></span>{% endif %}
+                {% if rd.t10 %}<span class="cursor-help" data-tip="Positions 6-10, still on the first page of results for most users."><span class="inline-block w-2 h-2 rounded-sm bg-green-500 align-middle mr-1"></span>Top 6-10: <span class="text-slate-300">{{ rd.t10 }}</span></span>{% endif %}
+                {% if rd.t20 %}<span class="cursor-help" data-tip="Positions 11-20, visible with some scrolling."><span class="inline-block w-2 h-2 rounded-sm bg-yellow-500 align-middle mr-1"></span>Top 11-20: <span class="text-slate-300">{{ rd.t20 }}</span></span>{% endif %}
+                {% if rd.t50 %}<span class="cursor-help" data-tip="Positions 21-50, very limited organic visibility."><span class="inline-block w-2 h-2 rounded-sm bg-orange-500 align-middle mr-1"></span>Top 21-50: <span class="text-slate-300">{{ rd.t50 }}</span></span>{% endif %}
+                {% if rd.t100 %}<span class="cursor-help" data-tip="Positions 51-100, effectively no download contribution."><span class="inline-block w-2 h-2 rounded-sm bg-red-500/70 align-middle mr-1"></span>Top 51-100: <span class="text-slate-300">{{ rd.t100 }}</span></span>{% endif %}
+                {% if rd.t200 %}<span class="cursor-help" data-tip="Positions 101-200, only visible to deep scrollers."><span class="inline-block w-2 h-2 rounded-sm bg-slate-600 align-middle mr-1"></span>101-200: <span class="text-slate-300">{{ rd.t200 }}</span></span>{% endif %}
                 {% if rd.unranked %}<span class="cursor-help" data-tip="Outside the Top 200, your app isn't visible for these searches."><span class="inline-block w-2 h-2 rounded-sm bg-slate-700 align-middle mr-1"></span>Not ranking: <span class="text-slate-300">{{ rd.unranked }}</span></span>{% endif %}
                 {% endwith %}
             </div>

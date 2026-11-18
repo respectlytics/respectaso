@@ -150,9 +150,22 @@ class RespectASOMenuTarget(AppKit.NSObject):
         _guarded(_app().did_wake)
 
 
+def _clicked_path(response) -> str:
+    """The page a clicked notification is about (its userInfo "path"), or ""
+    to keep the page shown. Never raises: it runs inside a Cocoa callback,
+    and the completion handler after it must always be called."""
+    try:
+        info = response.notification().request().content().userInfo() or {}
+        return str(info.get("path") or "")
+    except Exception:
+        logger.exception("Could not read which page a notification opens")
+        return ""
+
+
 def _new_notification_delegate():
     """A UNUserNotificationCenter delegate: banners also while RespectASO is in
-    front, and a click on one brings the window forward. The class is made on
+    front, and a click on one brings the window forward on the page the
+    notification is about (its userInfo "path"). The class is made on
     first use because UserNotifications is only imported inside the app bundle."""
     import UserNotifications as UN
 
@@ -171,7 +184,7 @@ def _new_notification_delegate():
             ):
                 app = _app()
                 if app is not None:
-                    AppHelper.callAfter(_guarded, app.show_window)
+                    AppHelper.callAfter(_guarded, app.show_window, _clicked_path(response))
                 handler()
 
         _current["notification_delegate_class"] = RespectASONotificationDelegate
@@ -193,6 +206,8 @@ class MacApp:
         # (uncaught NSException, spike of 2026-09-30), so every notification
         # path checks this first.
         self.bundled = bundle.bundleIdentifier() == BUNDLE_ID
+        # The app's own identifier, read from its bundle, for System Settings' links.
+        self.bundle_id = str(bundle.bundleIdentifier() or "") if self.bundled else ""
         self.bundle_path = str(bundle.bundlePath())
         self.macos_major = int(platform.mac_ver()[0].split(".")[0] or 0)
         self._target = RespectASOMenuTarget.alloc().init()
@@ -249,9 +264,16 @@ class MacApp:
         self.window.native.orderOut_(None)
         AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
 
-    def show_window(self):
+    def show_window(self, path=""):
+        """Bring the window forward; with a path of this app (a click on a
+        notification), on that page."""
         AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyRegular)
         self.window.show()
+        if desktop_bridge.safe_path(path):
+            # Never call evaluate_js here: show_window runs on the main thread, and pywebview's
+            # evaluate_js queues its work on the main thread and waits for it, which would freeze the app.
+            threading.Thread(target=_guarded, daemon=True, name="open-page",
+                             args=(self.window.evaluate_js, f"window.location.assign('{path}')")).start()
 
     # ---- the menu bar menu -------------------------------------------------
 
@@ -339,6 +361,22 @@ class MacApp:
 
         _on_main_thread(ServiceManagement.SMAppService.openSystemSettingsLoginItems)
 
+    def open_notification_settings(self) -> bool:
+        """System Settings at Notifications, at RespectASO's own entry from
+        macOS 13 (desktop_bridge.notification_settings_urls). Through
+        NSWorkspace, since the window's WebKit view does not open
+        x-apple.systempreferences: links itself."""
+        def open_first():
+            workspace = AppKit.NSWorkspace.sharedWorkspace()
+            for url in desktop_bridge.notification_settings_urls(self.bundle_id, self.macos_major):
+                if workspace.openURL_(Foundation.NSURL.URLWithString_(url)):
+                    return True
+            return False
+
+        opened = bool(_on_main_thread(open_first))
+        logger.info("Notification settings opened: %s", opened)
+        return opened
+
     def maybe_ask_login_item(self):
         """The one-time question on a normal launch (never at login)."""
         if ui_state.is_dismissed(ui_state.LOGIN_ITEM_QUESTION):
@@ -396,7 +434,7 @@ class MacApp:
 
         self._center().requestAuthorizationWithOptions_completionHandler_(UN.UNAuthorizationOptionAlert, answered)
 
-    def send_notification(self, title: str, body: str) -> bool:
+    def send_notification(self, title: str, body: str, path: str = "") -> bool:
         if self.notification_permission() != "granted":
             return False
         import UserNotifications as UN
@@ -404,6 +442,7 @@ class MacApp:
         content = UN.UNMutableNotificationContent.alloc().init()
         content.setTitle_(title)
         content.setBody_(body)
+        content.setUserInfo_({"path": path or ""})   # the page a click opens (show_window)
         request = UN.UNNotificationRequest.requestWithIdentifier_content_trigger_(str(uuid.uuid4()), content, None)
 
         def delivered(error):

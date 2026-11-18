@@ -1,82 +1,42 @@
-{% comment %}
-"Get set up" on the Keywords page (aso/setup_checklist.py,
-UI_REDESIGN_PLAN.md 6.3). Without Pro it stays, and can be folded; with Pro
-it goes when every step is done, and Close for good removes it at any time
-(the owner, 2026-10-02).
-{% endcomment %}
-<section id="setup-checklist" class="card p-4" data-folded="{% if setup.folded %}true{% else %}false{% endif %}">
-    <div class="flex items-center justify-between gap-3">
+{% comment %}"Get set up" on the Apps page (aso/setup_checklist.py): one row of tiles, every one always
+drawn, so everything that is missing shows at once. Its script is static/js/setup-strip.js, which
+listens on document, so the strip can be swapped in place.{% endcomment %}
+<section id="setup-strip" class="card mb-4 p-4" aria-label="Get set up">
+    <div class="mb-3 flex items-center justify-between gap-3">
         <h2 class="card-title">Get set up</h2>
         <div class="flex items-center gap-3">
             <span class="text-sm text-slate-400">{{ setup.done }} of {{ setup.total }} done</span>
-            <button type="button" class="btn-quiet" data-setup-toggle aria-expanded="{% if setup.folded %}false{% else %}true{% endif %}">{% if setup.folded %}Show{% else %}Hide{% endif %}</button>
-            {% if setup.can_close %}<button type="button" class="btn-quiet text-xs" data-setup-close data-url="{% url 'aso:ui_memory' %}">Close for good</button>{% endif %}
+            <button type="button" class="notice-close" data-setup-do="hide" aria-label="Hide Get set up" title="Hide">{% include "aso/partials/icon_x.html" %}</button>
         </div>
     </div>
-    <ul class="mt-3 space-y-3{% if setup.folded %} hidden{% endif %}" data-setup-body>
-        {% for step in setup.steps %}
-        <li class="flex items-center justify-between gap-4" data-setup-step="{{ step.key }}">
-            <div class="flex items-start gap-3">
-                {% if step.done %}
-                <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                <span class="text-sm text-slate-400 line-through">{{ step.label }}</span>
-                {% else %}
-                <span class="mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 {% if step.key == 'pro' %}border-emerald-400/70{% else %}border-slate-500{% endif %}" aria-hidden="true"></span>
-                <div>
-                    <p class="text-sm font-medium text-white">{{ step.label }}</p>
-                    {% if step.hint %}<p class="text-sm text-slate-400">{{ step.hint }}</p>{% endif %}
-                </div>
+    <ul class="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
+        {% for tile in setup.tiles %}
+        <li class="flex min-h-[6.75rem] flex-col rounded-xl border p-3 {% if tile.state == 'warn' %}border-amber-500/40{% elif tile.state == 'open' %}border-white/10 bg-slate-900/40{% else %}border-white/5{% endif %}"
+            data-setup-tile="{{ tile.key }}" data-state="{{ tile.state }}">
+            <div class="flex items-center justify-between gap-1.5">
+                <span class="item-title{% if tile.state == 'done' or tile.state == 'locked' %} text-slate-400{% endif %}{% if tile.state == 'locked' %} pro-lock{% endif %}">{{ tile.name }}</span>
+                {% if tile.state == 'done' %}<svg class="h-4 w-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                {% elif tile.state == 'warn' %}<span class="shrink-0 text-amber-300">{% include "aso/partials/notice_icon.html" with tone="warning" %}</span>{% endif %}
+            </div>
+            <p class="mt-1 text-xs text-slate-400">{{ tile.gives }}</p>
+            <div class="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2">
+                {% if tile.word %}<span class="text-xs font-medium {% if tile.state == 'warn' %}text-amber-200{% elif tile.state == 'done' %}text-emerald-300{% else %}text-slate-400{% endif %}">{{ tile.word }}</span>{% endif %}
+                {% if tile.action %}
+                    {% if tile.action.fields is not None %}
+                    <form method="post" action="{{ tile.action.url }}"{% if tile.action.in_place %} data-setup-post{% endif %}>{% csrf_token %}{% for name, value in tile.action.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}<button type="submit" class="btn-secondary px-2.5 py-1 text-xs">{{ tile.action.label }}</button></form>
+                    {% else %}
+                    <a href="{{ tile.action.url }}"{% if tile.action.external %} target="_blank" rel="noopener"{% endif %} class="{% if tile.action.tone == 'pro' %}btn-pro{% else %}btn-secondary{% endif %} px-2.5 py-1 text-xs">{{ tile.action.label }}</a>
+                    {% endif %}
+                {% endif %}
+                {% if tile.quiet %}
+                    {% if tile.quiet.fields %}
+                    <form method="post" action="{{ tile.quiet.url }}" class="-ml-2" data-setup-post>{% csrf_token %}{% for name, value in tile.quiet.fields.items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}<button type="submit" class="btn-quiet text-xs">{{ tile.quiet.label }}</button></form>
+                    {% else %}
+                    <a href="{{ tile.quiet.url }}" class="btn-quiet -ml-2 whitespace-normal text-xs">{{ tile.quiet.label }}</a>
+                    {% endif %}
                 {% endif %}
             </div>
-            {% if not step.done and step.action %}
-            <div class="flex shrink-0 items-center gap-2">
-                {% if step.key == "apple" %}
-                <form method="post" action="{% url 'aso:settings_popularity' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="estimate_opt_out">
-                    <input type="hidden" name="opt_out" value="1">
-                    <button type="submit" class="btn-quiet">Stay on the estimate</button>
-                </form>
-                {% endif %}
-                {% if step.action.tone == 'pro' %}
-                <a href="{{ step.action.url }}" target="_blank" rel="noopener" class="btn-pro py-1.5">{{ step.action.label }}</a>
-                {% else %}
-                <a href="{{ step.action.url }}" class="{% if step.action.tone == 'primary' %}btn-primary{% elif step.action.tone == 'apple' %}inline-flex items-center rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-sky-500{% else %}btn-secondary{% endif %}">{{ step.action.label }}</a>
-                {% endif %}
-            </div>
-            {% endif %}
         </li>
         {% endfor %}
     </ul>
 </section>
-<script>
-(function () {
-    var card = document.getElementById('setup-checklist');
-    if (!card) return;
-    var button = card.querySelector('[data-setup-toggle]');
-    var body = card.querySelector('[data-setup-body]');
-    button.addEventListener('click', function () {
-        var folded = !body.classList.contains('hidden');
-        body.classList.toggle('hidden', folded);
-        button.textContent = folded ? 'Show' : 'Hide';
-        button.setAttribute('aria-expanded', folded ? 'false' : 'true');
-        if (window.UiMemory) UiMemory.save('setup_checklist_folded', folded);
-    });
-    var close = card.querySelector('[data-setup-close]');
-    if (close) close.addEventListener('click', function () {
-        window.showConfirm('Close Get set up for good? Every step stays in Settings.',
-                           {title: 'Close Get set up', confirmLabel: 'Close for good'}).then(function (ok) {
-            if (!ok) return;
-            var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-            fetch(close.dataset.url, {
-                method: 'POST', credentials: 'same-origin',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
-                body: JSON.stringify({name: 'setup_checklist_closed', value: true})
-            }).then(function (r) {
-                if (r.ok) card.remove();
-                else window.showAlert && showAlert('Get set up could not be closed. Try again.');
-            });
-        });
-    });
-})();
-</script>

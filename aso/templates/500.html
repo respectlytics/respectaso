@@ -8,5 +8,6 @@
 {% endblock %}
 {% block more_actions %}
 <button class="button secondary" type="button" onclick="location.reload()">Try again</button>
-<a class="button secondary" href="mailto:respectaso@loheden.com">Contact us</a>
+{# The Mac app's window cannot open a mail link itself: there it goes to macOS (as static/js/mail-links.js does on every other page). #}
+<a class="button secondary" href="mailto:respectaso@loheden.com" onclick="var api = window.pywebview &amp;&amp; window.pywebview.api; if (api &amp;&amp; api.open_external) { api.open_external(this.getAttribute('href')); return false; }">Contact us</a>
 {% endblock %}

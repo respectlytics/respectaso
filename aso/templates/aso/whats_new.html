@@ -56,8 +56,8 @@
         {% elif release.kind == "feature" %}
         <!-- Earlier feature release: collapsible card -->
         <details class="group card mb-3 overflow-hidden">
-            <summary class="disclosure flex items-baseline justify-between gap-3 flex-wrap px-4 py-3.5 hover:bg-white/[0.02]">
-                <span class="min-w-0">
+            <summary class="disclosure flex items-baseline justify-between gap-3 px-4 py-3.5 hover:bg-white/[0.02]">
+                <span class="min-w-0 flex-1">
                     <span class="text-sm font-semibold text-white">v{{ release.version }}</span>
                     <span class="ml-2 text-sm text-slate-400">{{ release.title }}</span>
                 </span>
@@ -91,8 +91,8 @@
         {% else %}
         <!-- Patch release: compact one-liner, expandable -->
         <details class="group bg-[#1e293b]/60 border border-white/5 rounded-lg mb-3 overflow-hidden">
-            <summary class="disclosure flex items-baseline justify-between gap-3 flex-wrap px-4 py-2.5 hover:bg-white/[0.02]">
-                <span class="min-w-0">
+            <summary class="disclosure flex items-baseline justify-between gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
+                <span class="min-w-0 flex-1">
                     <span class="text-xs font-medium text-slate-300">v{{ release.version }}</span>
                     <span class="ml-2 text-xs text-slate-400">{{ release.title }}</span>
                 </span>

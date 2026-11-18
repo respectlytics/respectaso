@@ -15,12 +15,11 @@ Parameters, all passed with {% include ... with %}:
                  ("search" or "opportunity", aso/ui_memory.py COUNTRY_PICKERS);
                  omitted, the picker remembers nothing
   preset         preset id selected while nothing is remembered
-  cost_per_country  seconds one country costs, drives the cost line
   items_id       the id of a json_script of [{value, label, icon, hint,
                  selected}]: the picker then chooses ONE of these items (the
                  Rival Tracker setup's App) with the same button and panel,
-                 and the country parts (presets, bulk choices, cost and
-                 coverage lines) are left out
+                 and the country parts (presets, bulk choices and the
+                 coverage line) are left out
   search_placeholder  the search field's placeholder in that case; an item
                  may carry a "glyph" ("all" or "manage") in place of an icon
   items_select   the id of a <select> on the page: its options are the items
@@ -95,8 +94,7 @@ base.html emits once, so this file carries no country data at all.
 
         {% if not items_id and not items_select %}
         <div class="px-3 py-2 border-t border-white/5">
-            <p class="cp-cost text-2xs text-slate-400"></p>
-            <p class="text-2xs text-slate-400 mt-1">
+            <p class="text-2xs text-slate-400">
                 Markers show what is different in a country.
                 <a href="{% url 'aso:methodology' %}#country-coverage" class="link">How coverage works</a>
             </p>

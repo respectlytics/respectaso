@@ -37,7 +37,7 @@ from aso.tests.surfaces import (
 
 # (file, the words that matched, lower case): why they stay.
 ALLOWED: dict[tuple[str, str], str] = {
-    ("aso_pro/views.py", "guarantee"): "says a successful AI test does not guarantee a fast or complete run",
+    ("aso_pro/views.py", "guarantee"): "says a successful AI test does not guarantee a complete run",
 }
 
 # The shapes themselves and the sentences that prove them.

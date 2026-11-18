@@ -206,12 +206,31 @@
         clearTimeout(toastTimer);
     }
 
-    function showToast(message, appId) {
+    // The app of the "Track for" menu, as #track-apps lists it ('' for All apps).
+    function appById(appId) {
+        return apps().filter(function (app) { return String(app.id) === String(appId || ''); })[0] || null;
+    }
+
+    // After tracking: for an app Get found writes (store_url, from
+    // aso_pro.store.home.track_targets) the message says where the keywords go
+    // and offers Get found; otherwise it offers the Keywords page.
+    function showToast(total, app) {
         var toast = byId('track-toast');
         if (!toast) return;
-        byId('track-toast-msg').textContent = message;
-        var params = new URLSearchParams({app: appId || '', country: runCountry});
-        byId('track-toast-link').href = '/?' + params.toString();
+        var target = appById(app.id);
+        var link = byId('track-toast-link');
+        var name = target ? (target.short_name || target.name) : (app.name || 'All apps');
+        var tracking = 'Tracking ' + keywordsText(total) + ' for ' + name + '.';
+        if (target && target.store_url) {
+            byId('track-toast-msg').textContent = tracking + ' Get found uses them in your next draft.';
+            link.href = target.store_url;
+            link.textContent = 'Open Get found';
+        } else {
+            byId('track-toast-msg').textContent = tracking;
+            var params = new URLSearchParams({app: app.id || '', country: runCountry});
+            link.href = byId('track-root').dataset.keywordsUrl + '?' + params.toString();
+            link.textContent = 'Open Keywords';
+        }
         toast.classList.remove('hidden');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(hideToast, 6000);
@@ -237,10 +256,9 @@
                         queued: job.status === 'queued',
                         label: keywordsText(job.total_keywords) + ' in ' + job.countries_text,
                         current: data.queued_behind,
-                        eta: data.eta_seconds,
                     });
                 }
-                showToast('Tracking ' + keywordsText(job.total_keywords) + ' for ' + (app.name || 'All apps') + '.', app.id);
+                showToast(job.total_keywords, app);
             }).catch(function () {
                 button.disabled = false;
                 button.textContent = 'Track these keywords';

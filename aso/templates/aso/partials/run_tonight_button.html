@@ -1,0 +1,20 @@
+{% comment %}"Run tonight" beside a run's start button (aso/run_queue.py
+not_before_for): the run waits in the queue until 02:00 in the user's time
+zone. Include it right AFTER the main submit button, inside the same flex
+row: Enter presses the first submit button of a form, so the main button
+must come first in the markup, and order-first draws this one on its left.
+The hidden field tells the start view which button was pressed.{% endcomment %}
+<input type="hidden" name="when" value="now">
+<button type="submit" class="btn-quiet order-first shrink-0 whitespace-nowrap" data-when="tonight"
+        title="Starts at 02:00 your time"{% if disabled %} disabled{% endif %}>Run tonight</button>
+<script>
+(function () {
+    if (window.__runTonightWired) return;
+    window.__runTonightWired = true;
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('button[type="submit"]');
+        if (!button || !button.form || !button.form.elements.when) return;
+        button.form.elements.when.value = button.dataset.when || 'now';
+    }, true);
+})();
+</script>

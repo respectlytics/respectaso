@@ -97,19 +97,19 @@ class RankOfTest(TestCase):
 
 
 class PacerTest(TestCase):
-    def test_waits_between_real_reads_but_not_before_the_first(self):
+    def test_waits_before_every_real_read_the_first_included(self):
+        # The wait is the shared gate's turn: free when nobody asked Apple
+        # lately, a pace after the last request of any run otherwise.
         wait = mock.Mock()
         pacer = day_reads.Pacer(wait=wait)
         self.assertTrue(pacer.before("one", "us"))
-        wait.assert_not_called()
         self.assertTrue(pacer.before("two", "us"))
-        wait.assert_called_once()
+        self.assertEqual(wait.call_count, 2)
 
     def test_never_waits_before_a_read_stored_today(self):
         day_reads.get_or_fetch("stored", "us", itunes_service=service())
         wait = mock.Mock()
         pacer = day_reads.Pacer(wait=wait)
-        self.assertTrue(pacer.before("one", "us"))
         self.assertFalse(pacer.before("stored", "us"))
         wait.assert_not_called()
 
@@ -117,7 +117,6 @@ class PacerTest(TestCase):
         day_reads.get_or_fetch("stored", "us", itunes_service=service())
         wait = mock.Mock()
         pacer = day_reads.Pacer(wait=wait)
-        pacer.before("one", "us")
         self.assertTrue(pacer.before("stored", "us", force=True))
         wait.assert_called_once()
 

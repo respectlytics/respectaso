@@ -77,6 +77,10 @@ _SET_ASIDE_FIELDS = ("running", "total", "completed", "current_keyword", "starte
 # finishing its hourly wait.
 _wake = threading.Event()
 
+# How often the hourly wait looks for a run that waited for the night and
+# may start now ("Run tonight", aso/run_queue.py): at most this late.
+NIGHT_RUN_POLL_SECONDS = 60.0
+
 
 def get_status():
     """Return a snapshot of the current refresh status."""
@@ -566,10 +570,42 @@ def nudge():
 
 
 def _wait_for_next_check(seconds=3600):
-    """Wait until the next check: an hour, or until nudge(). True when nudged."""
-    nudged = _wake.wait(seconds)
-    _wake.clear()
-    return nudged
+    """Wait until the next check: an hour, or until nudge(). True when nudged.
+
+    Meanwhile a run that waited for the night starts at its hour ("Run
+    tonight"): the wait looks every minute, or at that very moment when it
+    is nearer, and kicks the run queue once one is due.
+    """
+    deadline = time.monotonic() + seconds
+    while True:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return False
+        if _wake.wait(min(left, _until_a_night_run())):
+            _wake.clear()
+            return True
+        _start_night_runs()
+
+
+def _until_a_night_run() -> float:
+    """Seconds to wait before looking again for a run due tonight."""
+    try:
+        due = run_queue.next_due_in()
+    except Exception:      # the wait must outlive a busy database
+        logger.exception("Could not read the runs that wait for the night")
+        due = None
+    if due is None:
+        return NIGHT_RUN_POLL_SECONDS
+    return min(NIGHT_RUN_POLL_SECONDS, due + 0.5)
+
+
+def _start_night_runs() -> None:
+    """Start the queue when a run that waited for the night may go now."""
+    try:
+        if run_queue.night_runs_due():
+            run_queue.kick()
+    except Exception:      # the wait must outlive any error here
+        logger.exception("Could not start a run that waited for the night")
 
 
 def _scheduler_loop():

@@ -40,7 +40,7 @@ class NoCdnTest(SimpleTestCase):
 
 
 class RenderedPagesTest(TestCase):
-    PAGES = ("/", "/apps/", "/opportunity/", "/methodology/", "/setup/", "/settings/popularity/")
+    PAGES = ("/", "/keywords/", "/opportunity/", "/methodology/", "/setup/", "/settings/popularity/")
 
     def test_every_stylesheet_script_font_and_icon_comes_from_this_server(self):
         foreign = {}

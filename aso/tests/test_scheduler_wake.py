@@ -12,7 +12,7 @@ from datetime import datetime
 from unittest import mock
 from zoneinfo import ZoneInfo
 
-from django.test import SimpleTestCase, TestCase
+from django.test import TestCase
 from django.urls import reverse
 from django.utils.html import escape
 
@@ -23,10 +23,17 @@ from aso.tests.helpers import _SyncThread
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 
-class NudgeTest(SimpleTestCase):
+class NudgeTest(TestCase):
+    """The wait also reads the run queue for a run due tonight, so it needs
+    the database: a SimpleTestCase refused that read, and the wait logged the
+    refusal as an error at every test while still passing."""
+
     def setUp(self):
         scheduler._wake.clear()
         self.addCleanup(scheduler._wake.clear)
+        logs = self.assertNoLogs("aso.scheduler", level="ERROR")    # the wait reads the queue cleanly
+        logs.__enter__()
+        self.addCleanup(logs.__exit__, None, None, None)
 
     def test_a_nudge_ends_the_wait_at_once(self):
         scheduler.nudge()

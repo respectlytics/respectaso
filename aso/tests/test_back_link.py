@@ -29,10 +29,11 @@ class TheWayBackTest(TestCase):
     @override_settings(DEBUG_SKIP_LICENSE=True)   # the Pro pages themselves, not their previews
     def test_every_detail_page_has_one_and_the_top_level_none(self):
         detail = ["aso:apple_ads_setup", "aso:methodology", "aso:whats_new", "aso:setup",
-                  "aso:apps", "aso:settings_popularity"]
-        top = ["aso:dashboard", "aso:opportunity"]
+                  "aso:settings_popularity"]
+        top = ["aso:apps", "aso:dashboard", "aso:opportunity"]
         if PRO:
             detail += ["aso_pro:settings_ai", "aso_pro:settings_license", "aso_pro:settings_mcp",
+                       "aso_pro:settings_asc",
                        "aso_pro:settings_setup", "aso_pro:rival_setup"]
             top += ["aso_pro:ai_researcher", "aso_pro:ai_competitor", "aso_pro:top_terms",
                     "aso_pro:simulator", "aso_pro:rival_tracker"]
@@ -46,11 +47,11 @@ class TheWayBackTest(TestCase):
     def test_opened_directly_it_leads_to_the_natural_parent(self):
         self.assertEqual(back(self.get("aso:apple_ads_setup")),
                          (reverse("aso:settings_popularity"), "Apple Ads settings"))
-        self.assertEqual(back(self.get("aso:methodology")), (reverse("aso:dashboard"), "Keywords"))
+        self.assertEqual(back(self.get("aso:methodology")), (reverse("aso:apps"), "Apps"))
 
     def test_it_leads_to_the_page_the_reader_came_from_with_its_view(self):
-        html = self.get("aso:methodology", referer="http://testserver/?app=5&country=de")
-        self.assertEqual(back(html), ("/?app=5&amp;country=de", "Keywords"))
+        html = self.get("aso:methodology", referer="http://testserver/keywords/?app=5&country=de")
+        self.assertEqual(back(html), ("/keywords/?app=5&amp;country=de", "Keywords"))
         html = self.get("aso:apple_ads_setup", referer="http://testserver" + reverse("aso:opportunity"))
         self.assertEqual(back(html), (reverse("aso:opportunity"), "Countries"))
 
@@ -79,7 +80,7 @@ class TheWayBackTest(TestCase):
         for referer in ("https://ads.apple.com/", "http://testserver/no-such-page/"):
             with self.subTest(referer=referer):
                 self.assertEqual(back(self.get("aso:methodology", referer=referer)),
-                                 (reverse("aso:dashboard"), "Keywords"))
+                                 (reverse("aso:apps"), "Apps"))
 
     def test_an_in_place_update_does_not_change_the_way_back(self):
         self.get("aso:settings_popularity", referer="http://testserver" + reverse("aso:opportunity"))
@@ -99,8 +100,8 @@ class AJumpLeadsBackTest(TestCase):
         return self.client.get(reverse(name), params).content.decode()
 
     def test_a_top_level_page_reached_by_a_jump_leads_back(self):
-        html = self.get("aso:opportunity", back="/?app=5&country=de")
-        self.assertEqual(back(html), ("/?app=5&amp;country=de", "Keywords"))
+        html = self.get("aso:opportunity", back="/keywords/?app=5&country=de")
+        self.assertEqual(back(html), ("/keywords/?app=5&amp;country=de", "Keywords"))
         if PRO:
             with override_settings(DEBUG_SKIP_LICENSE=True):
                 html = self.get("aso_pro:simulator", back=reverse("aso_pro:ai_competitor") + "?run=3")
@@ -130,4 +131,4 @@ class AJumpLeadsBackTest(TestCase):
         self.assertIn("link.closest('nav')", script)
         self.assertIn("url.searchParams.set('back', here());", script)
         tabs = (base / "aso/templates/aso/partials/section_tabs.html").read_text()
-        self.assertEqual(tabs.count("<nav "), 2)
+        self.assertEqual(tabs.count("<nav "), 3)

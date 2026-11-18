@@ -56,22 +56,6 @@
         return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     }
 
-    // A wait in words: "20 seconds", "about 3 minutes", "about 1 hour 7
-    // minutes". The one script copy (job-polling.js and keyword-search-job.js
-    // call it); its twin is duration_text() in aso/opportunity_scans.py, and
-    // aso/tests/test_duration_text.py runs both.
-    function durationText(seconds) {
-        if (!seconds || seconds <= 0) { return ''; }
-        var tens = Math.max(10, Math.floor(seconds / 10 + 0.5) * 10);
-        if (tens < 60) { return tens + ' seconds'; }
-        var minutes = Math.ceil(seconds / 60);
-        if (minutes < 60) { return 'about ' + minutes + ' minute' + (minutes === 1 ? '' : 's'); }
-        var hours = Math.floor(minutes / 60);
-        minutes = minutes % 60;
-        return 'about ' + hours + ' hour' + (hours === 1 ? '' : 's') +
-            (minutes ? ' ' + minutes + ' minute' + (minutes === 1 ? '' : 's') : '');
-    }
-
     // ---- one picker ----------------------------------------------------
 
     // A select's options as items (data-select).
@@ -100,7 +84,6 @@
         // visitor (aso/ui_memory.py): the server writes it into
         // data-remembered, and every change goes back through UiMemory.
         this.memoryKey = root.dataset.memoryKey || '';
-        this.costPer = parseFloat(root.dataset.costPerCountry) || 0;
         this.defaultPreset = root.dataset.defaultPreset || '';
         this.button = root.querySelector('.cp-button');
         this.buttonText = root.querySelector('.cp-button-text');
@@ -110,7 +93,6 @@
         this.list = root.querySelector('.cp-list');
         this.empty = root.querySelector('.cp-empty');
         this.countEl = root.querySelector('.cp-count');
-        this.costEl = root.querySelector('.cp-cost');
         this.value = root.querySelector('.cp-value');
         this.rows = {};
         this.built = false;
@@ -324,10 +306,6 @@
         if (this.max && n >= this.max) {
             this.countEl.textContent = n + ' of ' + this.max + ' selected, clear one to add another';
         }
-        if (this.costEl) {
-            var text = this.costPer ? durationText(n * this.costPer) : '';
-            this.costEl.textContent = text ? n + ' ' + (n === 1 ? 'country' : 'countries') + ', ' + text : '';
-        }
     };
 
     Picker.prototype.updateButton = function () {
@@ -527,8 +505,7 @@
         onChange: function (id, fn) {
             var picker = instances[id];
             if (picker) { picker.listeners.push(fn); }
-        },
-        durationText: durationText
+        }
     };
 
     window.CountryPicker = CountryPicker;

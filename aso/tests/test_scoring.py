@@ -684,9 +684,9 @@ class OneDownloadRangeTest(TestCase):
     def test_the_app_summary_never_prints_a_lone_high_figure(self):
         from aso.dashboard_summary import format_interval
 
-        self.assertEqual(format_interval(0.8, 8), "~0.8–8")
-        self.assertEqual(format_interval(0.03, 0.3), "~0–0.3")
-        self.assertEqual(format_interval(0, 0.3), "~0–0.3")
+        self.assertEqual(format_interval(0.8, 8), "~0.8-8")
+        self.assertEqual(format_interval(0.03, 0.3), "~0-0.3")
+        self.assertEqual(format_interval(0, 0.3), "~0-0.3")
         self.assertEqual(format_interval(0, 0), "—")
 
 

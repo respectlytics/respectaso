@@ -23,6 +23,9 @@
 
     var POLL_MS = 2000;
 
+    // A run started with "Run tonight" (aso/run_queue.py TONIGHT_LABEL).
+    var TONIGHT_LABEL = 'Starts tonight at 02:00';
+
     var FEATURE_BADGE_LABELS = {
         researcher: 'Researcher',
         competitor: 'Competitor',
@@ -52,17 +55,17 @@
     var payload = null;          // the latest queue status
     var busy = false;            // anything running or queued, anywhere
     var lastBusyWith = '';       // what runs now, in words ("the ranking refresh"), for the queued note
-    var lastRun = null;          // {id, label} of the run this tab last showed
+    var lastRun = null;          // {id, label, feature, feature_label} of the run this tab last showed
     var handledIds = {};         // runs whose outcome has already been surfaced
     var tickerRunId = null;      // run id the progress ticker was started for
     var cancelBtnHtml = null;    // pristine Cancel button markup
     var cancelling = false;
     var noticeRun = null;        // the finished run shown in the queue notice
     var lastSignature = null;    // running + queued ids, to fire onChanged
-    var lastElsewhere = null;    // {feature, id} of the other tab's run last seen running
+    var lastElsewhere = null;    // {feature, id, kind} of the other tab's run last seen running
     var pendingFinished = null;  // that run, once it stopped running, until its outcome is known
-    var ending = null;           // {feature, since}: a run stopped, its outcome not known yet
-    var outcome = null;          // {feature, failed}: how the last run ended, for the top bar
+    var ending = null;           // {kind, since}: a run stopped, its outcome not known yet
+    var outcome = null;          // {kind, failed}: how the last run ended, for the top bar
 
     function esc(value) {
         var text = value === null || value === undefined ? '' : String(value);
@@ -106,8 +109,13 @@
     // running row and in Up next.
     function badgeHtml(item) {
         var badgeClass = FEATURE_BADGE_CLASSES[item.feature] || 'bg-slate-700/30 text-slate-300';
-        var badgeLabel = FEATURE_BADGE_LABELS[item.feature] || item.feature_label;
-        return '<span class="shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium ' + badgeClass + '">' + esc(badgeLabel) + '</span>';
+        return '<span class="shrink-0 rounded px-1.5 py-0.5 text-2xs font-medium ' + badgeClass + '">' + esc(kindName(item)) + '</span>';
+    }
+
+    // What kind of run it is, in words ("Simulator", "Review reply"): the
+    // badge, and the top bar while it runs, as it ends and once it ended.
+    function kindName(item) {
+        return FEATURE_BADGE_LABELS[item.feature] || item.feature_label || 'Run';
     }
 
     function runName(item) {
@@ -163,6 +171,7 @@
                 progressTicker.syncScoredCount(run.scored_count);
             }
             if (run.progress_data) progressTicker.update(run.progress_data);
+            if (progressTicker.renderLive) progressTicker.renderLive(run.live);
         }
         if (window.updateThrottleBanner) updateThrottleBanner(run.progress_data || {});
     }
@@ -184,7 +193,8 @@
     function queueRowHtml(item, index, count) {
         var data = ' data-feature="' + esc(item.feature) + '" data-id="' + item.id + '"';
         var actions = '' +
-            (index > 0 ? quietHtml('queue-run-next', 'Run next', 'Put this run first in line') : '') +
+            (index > 0 || item.tonight ? quietHtml('queue-run-next', 'Run next',
+                item.tonight ? 'Run this next instead of tonight' : 'Put this run first in line') : '') +
             (item.can_run_now ? quietHtml('queue-run-now', 'Run now', 'Start this run now; the running keyword search pauses and resumes right after') : '');
         var controls = '' +
             controlHtml('queue-move-up', 'Move up', ICON_UP, index === 0) +
@@ -200,6 +210,7 @@
                             '<span class="truncate text-sm font-medium text-white">' + esc(runName(item)) + '</span>' +
                         '</div>' +
                         '<div class="mt-0.5 flex min-w-0 items-center gap-2">' +
+                            (item.tonight ? '<span class="shrink-0 whitespace-nowrap text-xs text-indigo-300">' + TONIGHT_LABEL + '</span>' : '') +
                             '<span class="truncate text-xs text-slate-400">' + esc(item.detail) + '</span>' + actions +
                         '</div>' +
                     '</div>' +
@@ -277,26 +288,28 @@
             'hidden',
             !noticeRun && !shownRunning && !waitingText && queued.length === 0
         );
-        reportActivity(runningRun, queued.length);
+        var tonight = queued.filter(function (item) { return item.tonight; }).length;
+        reportActivity(runningRun, queued.length - tonight, tonight);
     }
 
     // Tell the activity indicator in the top bar (static/js/activity-indicator.js).
     // A run that just stopped stays "running" until its outcome is known (at
     // most a few seconds), so the top bar says Done or Stopped truthfully.
-    function reportActivity(run, waiting) {
+    // Runs that wait for the night ("Run tonight") are counted apart: they
+    // are not about to start.
+    function reportActivity(run, waiting, tonight) {
         if (!window.ActivityIndicator) return;
         if (ending && Date.now() - ending.since > 6000) ending = null;
-        var state = {waiting: waiting};
+        var state = {waiting: waiting, tonight: tonight || 0};
         if (run) {
-            state.running = {label: FEATURE_BADGE_LABELS[run.feature] || run.feature_label || 'Run',
-                             pct: run.progress_percent || 0};
+            state.running = {label: kindName(run), pct: run.progress_percent || 0};
         } else if (ending) {
-            state.running = {label: FEATURE_BADGE_LABELS[ending.feature] || 'Run', pct: 100};
+            state.running = {label: ending.kind, pct: 100};
         }
         if (outcome) {
-            state.done = {label: FEATURE_BADGE_LABELS[outcome.feature] || 'Run', failed: outcome.failed};
+            state.done = {label: outcome.kind, failed: outcome.failed};
         }
-        window.ActivityIndicator.report('queue', state.running || waiting || outcome ? state : null);
+        window.ActivityIndicator.report('queue', state.running || waiting || state.tonight || outcome ? state : null);
         if (!state.running && !waiting) outcome = null;   // said once
     }
 
@@ -313,15 +326,16 @@
         // progress endpoint to ask.
         if (!previous || handledIds[previous.id] || !cfg.progressUrl) return;
         handledIds[previous.id] = true;
-        ending = {feature: cfg.feature, since: Date.now()};
+        ending = {kind: kindName(previous), since: Date.now()};
         fetch(cfg.progressUrl(previous.id))
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (data) {
                 // A 404 means the row was deleted - nothing to report.
                 if (!data) return;
                 ending = null;
-                outcome = {feature: cfg.feature, failed: data.status === 'failed'};
-                reportActivity(null, (payload && payload.queued || []).length);
+                outcome = {kind: kindName(previous), failed: data.status === 'failed'};
+                var waitingNow = (payload && payload.queued || []).filter(function (item) { return !item.tonight; });
+                reportActivity(null, waitingNow.length, (payload && payload.queued || []).length - waitingNow.length);
                 if (data.status !== 'completed' && data.status !== 'failed') return;
                 var run = {
                     id: previous.id,
@@ -350,24 +364,26 @@
         var elsewhere = data.running_elsewhere;
         if (lastElsewhere && (!elsewhere || elsewhere.id !== lastElsewhere.id || elsewhere.feature !== lastElsewhere.feature)) {
             pendingFinished = lastElsewhere;
-            ending = {feature: lastElsewhere.feature, since: Date.now()};
+            ending = {kind: lastElsewhere.kind, since: Date.now()};
         }
-        lastElsewhere = elsewhere ? {feature: elsewhere.feature, id: elsewhere.id} : null;
+        lastElsewhere = elsewhere ? {feature: elsewhere.feature, id: elsewhere.id, kind: kindName(elsewhere)} : null;
         if (data.finished && pendingFinished && data.finished.id === pendingFinished.id
                 && data.finished.feature === pendingFinished.feature) {
             pendingFinished = null;
             ending = null;
-            outcome = {feature: data.finished.feature, failed: data.finished.status === 'failed'};
+            outcome = {kind: kindName(data.finished), failed: data.finished.status === 'failed'};
             if (data.finished.status !== 'cancelled') {
                 noticeRun = {id: data.finished.id, status: data.finished.status, label: data.finished.label,
                              feature: data.finished.feature, url: data.finished.url};
             }
         }
-        busy = data.lane_state !== 'idle' || data.queued.length > 0;
+        // A run that waits for the night ("Run tonight") does not make the
+        // lane busy: a run started now still starts at once.
+        busy = data.lane_state !== 'idle' || data.queued.some(function (item) { return !item.tonight; });
 
         var here = data.running_here;
         if (lastRun && (!here || here.id !== lastRun.id)) handleFinished(lastRun);
-        lastRun = here ? {id: here.id, label: here.label} : null;
+        lastRun = here ? {id: here.id, label: here.label, feature: here.feature, feature_label: here.feature_label} : null;
 
         renderProgress(here);
         renderQueue();

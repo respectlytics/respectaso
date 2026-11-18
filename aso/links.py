@@ -10,7 +10,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 # A browser opened by an app sends no Referer, so every link to one of our sites
 # names the app as where the visit came from, or the site would count it as direct.
-# The tag is the app's one entry in the register of ref tags (the loheden-legal
+# The tag is the app's one entry in the register of ref tags (the loheden-analytics
 # skill, The ref tags): the same at respectaso.com and at every other site of ours.
 REF = "respectaso-app"
 # Every site of Loheden AI Solutions.

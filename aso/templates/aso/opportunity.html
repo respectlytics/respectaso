@@ -24,7 +24,7 @@
                     {{ form.keyword }}
                 </div>
                 <div class="w-full lg:w-72">
-                    {% include "aso/partials/country_picker.html" with picker_id="scan-countries" label="Countries to scan" memory_key="opportunity" cost_per_country=seconds_per_country %}
+                    {% include "aso/partials/country_picker.html" with picker_id="scan-countries" label="Countries to scan" memory_key="opportunity" %}
                 </div>
                 <div class="w-full lg:w-64">
                     <label class="block text-xs font-medium text-slate-300 mb-1.5" for="opp-app-picker-button">App (optional)</label>
@@ -38,7 +38,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div>
+                <div class="flex items-center gap-2">
                     <button type="submit" id="opp-btn"
                             class="btn-primary gap-2 whitespace-nowrap border border-transparent py-2.5">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,6 +46,7 @@
                         </svg>
                         <span id="opp-btn-text">Start the scan</span>
                     </button>
+                    {% if is_pro %}{% include "aso/partials/run_tonight_button.html" %}{% endif %}
                 </div>
             </div>
             <p class="text-slate-400 text-xs mt-2">Any of the {{ total_storefronts }} App Store countries.</p>
@@ -115,10 +116,7 @@
             </button>
         </div>
 
-        <div id="opp-saved-banner" class="hidden bg-green-900/20 border border-green-500/20 rounded-xl p-3 text-green-300 text-sm flex items-center gap-2">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            <span id="opp-saved-text"></span>
-        </div>
+        {% include "aso/partials/notice_live.html" with id="opp-saved-banner" %}
 
         <div class="card overflow-hidden">
             <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
@@ -176,7 +174,6 @@
         dismissUrl: "{% url 'aso:opportunity_dismiss' 0 %}",
         saveUrl: "{% url 'aso:opportunity_save' %}",
         csrfToken: "{{ csrf_token }}",
-        secondsPerCountry: {{ seconds_per_country }},
         bootstrap: JSON.parse(document.getElementById("opp-scan-data").textContent)
     });
 </script>

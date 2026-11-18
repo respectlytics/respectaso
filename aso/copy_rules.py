@@ -26,6 +26,18 @@ own:
   * the missing-value glyph alone in a table cell ("| — |") or named in
     quotes ('a rank of "—"').
 
+The em dash and the en dash themselves never reach a person either (owner,
+2026-10-05 and 2026-11-08): a range or a minus is written with the plain
+hyphen ("120-180", "-12"), and the one long dash a screen may show is the
+empty figure standing alone. ``long_dash_in`` is that check and
+``no_long_dash`` its fix, both built on the same ``_dash_role``; every
+surface guard reads through ``long_dash_in`` and every writer of model
+output through ``no_long_dash``. ``long_dash_in`` is the same code as
+respectaso.com's (core/copy_rules.py), whose test holds this module's
+``dash_punctuation_in`` and ``no_dash_punctuation`` to its own copy, so
+those two stay exactly as they are; the repository's docs (no person reads
+them as the product) keep ``dash_punctuation_in``.
+
 The owner's second copy rule (2026-10-01), that screens show what a person
 needs and never how the tool works inside, has its predicate at the end of
 this module: ``mechanics_in``.
@@ -164,6 +176,44 @@ def dash_punctuation_in(text: str) -> str:
     return ""
 
 
+# The long dashes: the figure dash, the en dash, the em dash, the horizontal bar.
+_LONG_DASHES = frozenset("‒–—―")
+_PLAIN = str.maketrans(dict.fromkeys("‒–—―−", "-"))
+# A long dash or the true minus sign right before a number, opening the text
+# or after a space or bracket: a minus sign ("fell –12 points").
+_LONG_MINUS = re.compile("(?<![^\\s(\\[])[‒–―−](?=\\d)")
+
+
+def long_dash_in(text: str) -> str:
+    """The first dash in ``text`` a person must not read, with the words
+    either side, '' when there is none: a dash standing between words
+    (``dash_punctuation_in``), or an em or en dash doing any other job (a
+    range, a minus, a list marker). The empty figure alone is left: a line
+    with no word in it ("—", "$—") and the glyph alone in a table cell or
+    named in quotes. The same code as respectaso.com's."""
+    for line in (text or "").split("\n"):
+        if not has_word(line):
+            continue
+        for m in _DASH_RUN.finditer(line):
+            role = _dash_role(m)
+            if role == "punct" or (role != "cell" and _LONG_DASHES & set(m.group())):
+                return line[max(0, m.start() - 25):m.end() + 25].strip()
+    return ""
+
+
+def no_long_dash(text: str) -> str:
+    """``no_dash_punctuation``, with every long dash it leaves written as the
+    hyphen: a range ("120–180" reads "120-180"), a minus ("–12" reads "-12"),
+    an arrow. The empty figure alone stays. ``long_dash_in`` finds nothing in
+    what it returns. For text a model writes for a person."""
+    text = no_dash_punctuation(_LONG_MINUS.sub("-", text or ""))
+
+    def plain(m: re.Match) -> str:
+        return m.group() if _dash_role(m) == "cell" else m.group().translate(_PLAIN)
+
+    return "\n".join(_DASH_RUN.sub(plain, line) if has_word(line) else line for line in text.split("\n"))
+
+
 def walk_prose(obj, fn, *, keep=()):
     """``obj`` with ``fn`` applied to every string inside it, recursively.
     ``keep`` names dict keys whose values pass through untouched."""
@@ -276,6 +326,61 @@ def mechanics_in(text: str) -> str:
             return found.group()
     return ""
 
+
+
+# Never say how long something will take (the owner's rule, 2026-11-18, after
+# a Simulator run said "Takes a few minutes" and ran for more than twelve):
+# no estimate, remaining time or ETA, no "quick", "fast", "soon" or "almost
+# done" about a run, on any screen, in any message, the newest What's New
+# entry or the MCP texts an assistant repeats. A screen may say the person
+# can keep working while it runs and that it carries on by itself; it may show
+# the elapsed time and how long a finished run took. ``duration_in`` finds the
+# first expectation in a text; aso/tests/test_no_duration_estimates.py reads
+# every surface through it. Rule: .github/instructions/user-facing-docs.instructions.md.
+_QTY = (r"(?:~\s*)?(?:\d+(?:[.,]\d+)?(?:\s*(?:-|to|or)\s*\d+(?:[.,]\d+)?)?|x|an?|one|two|three|four|five|ten"
+        r"|fifteen|twenty|thirty|a few|a couple of|several|few)")
+_UNIT = r"(?:sec(?:ond)?s?|min(?:ute)?s?|hours?|hrs?)"
+_SPAN = rf"{_QTY}[\s-]+{_UNIT}(?![-\w])"
+DURATIONS = tuple(re.compile(p, re.IGNORECASE) for p in (
+    rf"\b{_SPAN}",                                          # "about 5 minutes", "2-5 min", "a few seconds"
+    r"\b\d+\s*-\s*\d+\s*s\b",                                # "(2-5s)"
+    r"\btakes? (?:a (?:little )?while|a moment|some time|long(?:er)?|a (?:little|bit) longer)\b",
+    (r"\b(?:may|can|could|might|will|should) take (?:a (?:little )?while|a moment|some time|(?:a )?(?:very )?long"
+     r"(?: time)?|longer|several|about|around|up to)\b"),
+    r"\bwithin (?:the|an|a) (?:hour|minute|day)\b|\b(?:ready|done|back) in\b|\bin no time\b",
+    r"\b(?:almost|nearly) (?:done|there|finished|ready|complete)\b",
+    r"\b(?:time|minutes?|seconds?|hours?) (?:left|remaining|to go)\b|\bETA\b",
+    r"\b(?:quick(?:ly|er|est)?|fast(?:er|est)?|instant(?:ly)?|soon(?:er)?|shortly|right away)\b",
+))
+# What is never an expectation of how long a run will take, each with why.
+DURATION_KEEPS = tuple(re.compile(p, re.IGNORECASE) for p in (
+    rf"\b{_SPAN}\s+ago\b",                                   # elapsed: "12 minutes ago"
+    (rf"\b(?:took|took about|took longer than|finished in|ran for|has run|has run for|has run over|"
+     rf"over the last|in the last)\s+{_SPAN}"),               # how long a finished run took
+    rf"\bdid not (?:start|answer|finish) within\s+(?:your\s+)?{_SPAN}",   # a limit, said after it hit
+    rf"\b{_SPAN}\s+(?:AI\s+)?(?:response\s+)?deadline\b",   # the person's own deadline setting
+    rf"\b(?:try|run (?:it|this \w+)|ask) again (?:in|after)\s+{_SPAN}",   # retry advice after a refusal
+    rf"\bwait\s+{_SPAN}[,;]?\s+(?:(?:and|then)\s+)*(?:try again|retry|press resume|run it again)",
+    r"\btry again (?:shortly|soon|later)\b",
+    r"\bhow fast\b|\bfast-growing\b|\bgrow(?:s|ing)? fast(?:est)?\b",   # rivals' rating growth
+    r"\brank (?:for )?quickly\b",                            # how soon an app can rank, not a run
+    r"\bfaster (?:model|setup)s?\b",                         # names a remedy the person can pick
+    r"\bas soon as\b",                                       # a conjunction: "once"
+))
+
+
+def duration_in(text: str) -> str:
+    """The first expectation of how long something will take in ``text``
+    (the words that matched), or an empty string. The kept kinds
+    (``DURATION_KEEPS``) are blanked first."""
+    flat = re.sub(r"\s+", " ", text or "")
+    for keep in DURATION_KEEPS:
+        flat = keep.sub(lambda m: "█" * len(m.group()), flat)
+    for pattern in DURATIONS:
+        for found in pattern.finditer(flat):
+            if found.group().lower() not in ("a second", "an second", "one second"):   # "a second week"
+                return found.group()
+    return ""
 
 # Never promise what the terms disclaim (the owner's rule, 2026-10-02). The
 # terms (respectaso.com/terms/, section 10) give no warranty that keyword

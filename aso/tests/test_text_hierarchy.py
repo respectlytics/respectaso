@@ -20,7 +20,8 @@ from django.test import SimpleTestCase
 
 BASE = Path(settings.BASE_DIR)
 ROOTS = ("aso/templates", "aso_pro/templates", "_public_overrides/aso/templates", "static/js")
-ROLES = {"page-title", "run-title", "card-title", "section-label", "item-title"}
+# notice-title: a notice's heading (.notice, aso/tests/test_notices.py), white on its tone.
+ROLES = {"page-title", "run-title", "card-title", "section-label", "item-title", "notice-title"}
 HEADING = re.compile(r"<(h[1-4])\b([^>]*)>", re.DOTALL)
 CLASS = re.compile(r'class=\\?"([^"\\]*)')
 # Pages with their own inline design: the standalone error pages and the

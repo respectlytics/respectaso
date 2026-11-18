@@ -27,9 +27,11 @@ class FakeBackend:
         self.requested = 0
         self.set_calls = []
         self.opened = 0
+        self.notification_settings_opened = 0
+        self.notification_settings_open = True   # what macOS answers to opening System Settings
 
-    def send_notification(self, title, body):
-        self.sent.append((title, body))
+    def send_notification(self, title, body, path=""):
+        self.sent.append((title, body, path))
         return self.permission == "granted"
 
     def notification_permission(self):
@@ -48,6 +50,10 @@ class FakeBackend:
 
     def open_login_items_settings(self):
         self.opened += 1
+
+    def open_notification_settings(self):
+        self.notification_settings_opened += 1
+        return self.notification_settings_open
 
 
 class BrokenBackend:
@@ -80,6 +86,22 @@ class WithoutTheMacAppTest(SimpleTestCase):
         self.assertEqual(desktop_bridge.login_item_state(), "unavailable")
         self.assertEqual(desktop_bridge.set_login_item(True), "unavailable")
         self.assertIsNone(desktop_bridge.open_login_items_settings())
+        self.assertFalse(desktop_bridge.open_notification_settings())
+
+
+class SafePathTest(SimpleTestCase):
+    """The page a notification's click opens is handed to the window as
+    script (desktop/mac_integration.py show_window): only plain paths of this
+    app pass."""
+
+    def test_paths_of_this_app_pass(self):
+        for path in ("/", "/keywords/?app=2", "/pro/store/get-found/?app=1&country=us"):
+            self.assertTrue(desktop_bridge.safe_path(path), path)
+
+    def test_anything_else_is_refused(self):
+        for path in ("", None, "//evil.example", "/a'b", '/a"b', "/a b", "/a\\b", "https://evil.example/",
+                     "keywords/", "/a\nb"):
+            self.assertFalse(desktop_bridge.safe_path(path), repr(path))
 
 
 class WithTheMacAppTest(SimpleTestCase):
@@ -91,7 +113,7 @@ class WithTheMacAppTest(SimpleTestCase):
         desktop_bridge.register_backend(backend)
         self.assertTrue(desktop_bridge.is_desktop_app())
         self.assertTrue(desktop_bridge.send_notification("Title", "Body"))
-        self.assertEqual(backend.sent, [("Title", "Body")])
+        self.assertEqual(backend.sent, [("Title", "Body", "")])
         self.assertEqual(desktop_bridge.notification_permission(), "granted")
         desktop_bridge.request_notification_permission()
         self.assertEqual(backend.requested, 1)
@@ -100,6 +122,18 @@ class WithTheMacAppTest(SimpleTestCase):
         self.assertEqual(backend.set_calls, [True])
         desktop_bridge.open_login_items_settings()
         self.assertEqual(backend.opened, 1)
+        self.assertTrue(desktop_bridge.open_notification_settings())
+        self.assertEqual(backend.notification_settings_opened, 1)
+        backend.notification_settings_open = False
+        self.assertFalse(desktop_bridge.open_notification_settings())
+
+    def test_a_click_opens_only_a_safe_path_of_this_app(self):
+        backend = FakeBackend(permission="granted")
+        desktop_bridge.register_backend(backend)
+        desktop_bridge.send_notification("Title", "Body", "/keywords/?app=2")
+        desktop_bridge.send_notification("Title", "Body", "//evil.example")
+        desktop_bridge.send_notification("Title", "Body", "/x');alert(1)//")
+        self.assertEqual([path for _, _, path in backend.sent], ["/keywords/?app=2", "", ""])
 
     def test_no_permission_means_nothing_sent(self):
         desktop_bridge.register_backend(FakeBackend(permission="denied"))
@@ -115,6 +149,8 @@ class WithTheMacAppTest(SimpleTestCase):
             self.assertEqual(desktop_bridge.set_login_item(True), "unavailable")
         with self.assertLogs("aso.desktop_bridge", level="ERROR"):
             desktop_bridge.open_login_items_settings()
+        with self.assertLogs("aso.desktop_bridge", level="ERROR"):
+            self.assertFalse(desktop_bridge.open_notification_settings())
 
     def test_an_unknown_answer_reads_as_unavailable(self):
         desktop_bridge.register_backend(NonsenseBackend())
@@ -124,6 +160,19 @@ class WithTheMacAppTest(SimpleTestCase):
 
 
 class RulesTest(SimpleTestCase):
+    def test_notification_settings_open_at_the_app_from_macos_13(self):
+        own = "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.respectlytics.respectaso"
+        every = "x-apple.systempreferences:com.apple.preference.notifications"
+        self.assertEqual(desktop_bridge.notification_settings_urls("com.respectlytics.respectaso", 26), [own, every])
+        self.assertEqual(desktop_bridge.notification_settings_urls("com.respectlytics.respectaso", 13), [own, every])
+        self.assertEqual(desktop_bridge.notification_settings_urls("com.respectlytics.respectaso", 12), [every])
+
+    def test_notification_settings_never_carry_anything_but_a_bundle_identifier(self):
+        every = ["x-apple.systempreferences:com.apple.preference.notifications"]
+        for bundle_id in ("", None, "a b", "x&y=1", "com.x?id=1", "évil"):
+            with self.subTest(bundle_id=bundle_id):
+                self.assertEqual(desktop_bridge.notification_settings_urls(bundle_id, 26), every)
+
     def test_permission_from_every_macos_status(self):
         cases = {0: "not_determined", 1: "denied", 2: "granted", 3: "granted", 4: "granted", 99: "unavailable"}
         for status, expected in cases.items():

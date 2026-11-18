@@ -167,7 +167,7 @@ class ProTabsSayWhatTheyDoTest(TestCase):
 
         url = reverse("aso_pro:ai_researcher") if django_apps.is_installed("aso_pro") else reverse("aso:pro_promo_researcher")
         html = self.client.get(url).content.decode()
-        for label, feature in (("Metadata", "simulator"), ("Rivals", "rival_tracker"),
+        for label, feature in (("Store", "store"), ("Rivals", "rival_tracker"),
                                ("AI Researcher", "researcher"), ("AI Competitor", "competitor"),
                                ("Top Terms", "top_terms")):
             with self.subTest(tab=label):

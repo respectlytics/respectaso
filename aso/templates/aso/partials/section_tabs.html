@@ -1,7 +1,8 @@
 {% comment %}
 A section's tabs, above the page title (UI_REDESIGN_PLAN.md 3.2). section is
-"discover" or "settings"; the tabs, their addresses and which one is shown
-come from aso.context_processors.nav. Without Pro, a Pro feature's tab
+"discover", "store" or "settings"; the tabs, their addresses and which one is shown
+come from aso.context_processors.nav. The Store tabs open on the page's app:
+the Simulator reads it as app_id, the other four as app. Without Pro, a Pro feature's tab
 carries the Pro lock and says on hover what it does for the reader. Settings
 shows no bar when it has one tab (the free edition in Docker).
 {% endcomment %}
@@ -10,6 +11,13 @@ shows no bar when it has one tab (the free edition in Docker).
     <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Discover</span>
     {% for tab in discover_tabs %}
     <a href="{{ tab.url }}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %} inline-flex items-center{% if tab.locked %} pro-lock{% endif %}"{% if tab.benefit %} data-tip="{{ tab.benefit }}"{% endif %}{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+</nav>
+{% elif section == "store" and store_tabs %}
+<nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="store" aria-label="Store">
+    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Store</span>
+    {% for tab in store_tabs %}
+    <a href="{{ tab.url }}{% if app %}?{% if tab.key == 'simulator' %}app_id{% else %}app{% endif %}={{ app.pk }}{% endif %}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}
 </nav>
 {% elif section == "settings" and settings_tabs|length > 1 %}

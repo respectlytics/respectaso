@@ -1,4 +1,5 @@
 {% extends "aso/base.html" %}
+{% load static %}
 
 {% block title %}Mac app · RespectASO{% endblock %}
 
@@ -13,14 +14,7 @@
         <p class="page-lead">How RespectASO keeps running on your Mac, so your rankings stay current.</p>
     </div>
 
-    {% if message %}
-    <div class="mb-4 px-4 py-3 rounded-lg text-sm animate-fade-in
-        {% if message_type == 'success' %}bg-emerald-900/30 border border-emerald-500/30 text-emerald-300
-        {% elif message_type == 'error' %}bg-red-900/30 border border-red-500/30 text-red-300
-        {% else %}bg-blue-900/30 border border-blue-500/30 text-blue-300{% endif %}" id="mac-app-message">
-        {{ message }}
-    </div>
-    {% endif %}
+    {% include "aso/partials/settings_message.html" %}
 
     {% comment %}Open at login. The state comes from macOS on every render
     (aso/desktop_bridge.py login_item_state), so what this card says is
@@ -69,11 +63,15 @@
         {% endif %}
     </section>
 
-    {% if 'aso_pro' in INSTALLED_APPS %}{% include "aso_pro/rival_tracker/_mac_app_card.html" %}{% endif %}
+    {% if 'aso_pro' in INSTALLED_APPS %}{% include "aso_pro/_includes/notifications_card.html" %}{% endif %}
     <section class="card p-4 mb-4" id="closing-the-window">
         <h2 class="card-title mb-1">Closing the window</h2>
         <p class="text-sm text-slate-400">RespectASO keeps refreshing from the menu bar. Click its chart icon there to reopen or quit it.</p>
     </section>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/mac-app-settings.js' %}" defer></script>
 {% endblock %}

@@ -1,0 +1,18 @@
+{% comment %}What Get found works on, drawn (the Get found tab's first meeting,
+owner 2026-11-16): each part of a store page and the searches its words
+match. words: aso.store_preview.SAMPLE_WORDS.{% endcomment %}
+<div class="w-[29rem]" aria-hidden="true">
+    <div class="mb-2 grid grid-cols-[minmax(0,1fr)_1.75rem_minmax(0,1fr)] text-2xs text-slate-400"><span>Your store page</span><span></span><span>Searches it matches</span></div>
+    <div class="space-y-2">
+        {% for part, text, searches in words %}
+        <div class="grid grid-cols-[minmax(0,1fr)_1.75rem_minmax(0,1fr)] items-center">
+            <div class="min-w-0 rounded-lg border border-white/10 bg-slate-900 px-3 py-2">
+                <p class="text-2xs text-slate-400">{{ part }}</p>
+                <p class="truncate text-xs font-medium text-slate-100">{{ text }}</p>
+            </div>
+            <svg class="h-4 w-7 text-purple-300/80" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 28 16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8h20m0 0-4-4m4 4-4 4"/></svg>
+            <div class="flex flex-wrap gap-1">{% for s in searches %}<span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-2xs text-emerald-200"><svg class="h-2.5 w-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>{{ s }}</span>{% endfor %}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>

@@ -178,7 +178,6 @@ def _cta(state: str, license_url: str | None) -> dict:
         return pro_preview_words.cta("top_terms", state, license_url, needs_apple=True)
     if state == STATE_SYNCING:
         return {
-            "eyebrow": "Apple Ads connected · first sync pending",
             "headline": "Your first week of Apple data is on its way",
             "body": (
                 "Apple Ads is connected. This page unlocks by itself when "
@@ -197,11 +196,10 @@ def _cta(state: str, license_url: str | None) -> dict:
             ),
         }
     return {
-        "eyebrow": "One step left",
         "headline": "Connect Apple Ads to unlock the real terms",
         "body": (
-            "Your license is active. The connection is free, takes about "
-            "5 minutes and needs no ad spend."
+            "Your license is active. The connection is free and needs no "
+            "ad spend."
         ),
         "primary_label": "Connect Apple Ads",
         "primary_url": connect_url + "#apple-connection",

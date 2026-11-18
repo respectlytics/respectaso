@@ -15,7 +15,8 @@ from pathlib import Path
 
 from django.conf import settings
 from django.template.loader import render_to_string
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, modify_settings, override_settings
+from django.urls import include, path, reverse
 
 from aso import ai_tools_preview as preview
 from aso.links import PRICING_URL, PRO_PAGE_URL, RENEW_URL
@@ -158,6 +159,48 @@ class FreeEditionPagesTest(TestCase):
                 self.assertNotContains(response, "I have a license key")
 
 
+# The free edition's addresses: aso.urls alone (the public repo's core/urls.py),
+# for FreeEditionStoreTabsTest, where the aso_pro routes must not shadow them.
+urlpatterns = [path("", include("aso.urls"))]
+
+
+def _store_tabs(html):
+    bar = re.search(r'<nav [^>]*data-section-tabs="store"[^>]*>(.*?)</nav>', html, re.DOTALL)
+    return [(label, 'aria-current="page"' in attrs)
+            for attrs, label in re.findall(r"<a ([^>]*)>([^<]+)</a>", bar.group(1))] if bar else []
+
+
+@modify_settings(INSTALLED_APPS={"remove": ["aso_pro", "licensing"]})
+@override_settings(ROOT_URLCONF=__name__)
+class FreeEditionStoreTabsTest(TestCase):
+    """The free edition: the Simulator lives under Store, so its preview and
+    the Store previews show the same five tabs (DAILY_USE_PLAN.md step 1.4)."""
+
+    FIVE = ("Get found", "Simulator", "Custom product pages", "Sales &amp; growth", "Reviews")
+
+    def test_the_simulator_preview_shows_the_store_tabs_with_simulator_active(self):
+        html = self.client.get(reverse("aso:pro_promo_simulator")).content.decode()
+        tabs = _store_tabs(html)
+        self.assertEqual([label for label, _active in tabs], list(self.FIVE))
+        self.assertEqual([label for label, active in tabs if active], ["Simulator"])
+        self.assertNotIn('data-section-tabs="discover"', html)
+        self.assertNotIn("aso_pro", html)
+
+    def test_the_store_preview_lists_a_simulator_tab(self):
+        for query in ("", "?tab=reviews"):
+            with self.subTest(query=query):
+                html = self.client.get(reverse("aso:pro_promo_store") + query).content.decode()
+                self.assertEqual([label for label, _active in _store_tabs(html)], list(self.FIVE))
+                self.assertIn(f'href="{reverse("aso:pro_promo_simulator")}"', html)
+
+    def test_every_store_tab_answers(self):
+        html = self.client.get(reverse("aso:pro_promo_store")).content.decode()
+        bar = re.search(r'data-section-tabs="store"[^>]*>(.*?)</nav>', html, re.DOTALL).group(1)
+        for href in re.findall(r'href="([^"]+)"', bar):
+            with self.subTest(href=href):
+                self.assertEqual(self.client.get(href.replace("&amp;", "&")).status_code, 200)
+
+
 class OldBuyingWordsTest(TestCase):
     """No template, script or view still says the old words."""
 
@@ -216,6 +259,20 @@ class SampleNamesNeverReachLivePagesTest(TestCase):
                     self.assertNotIn("data-preview-hero", html)
                     for sample in preview.sample_names():
                         self.assertNotIn(sample, html)
+
+    def test_the_apps_sample_app_never_reaches_a_licensed_apps_page(self):
+        """The Apps page's Pro sample card shows the Store preview's invented
+        app (DAILY_USE_PLAN.md 3.6); a licensed reader sees only their own."""
+        from django.test import Client, override_settings
+        from django.urls import reverse
+
+        from aso.models import App
+
+        App.objects.create(name="Moonpond: Sleep Sounds")
+        with override_settings(DEBUG_SKIP_LICENSE=False):
+            self.assertContains(Client().get(reverse("aso:apps")), "Habito")
+        with override_settings(DEBUG_SKIP_LICENSE=True):
+            self.assertNotContains(Client().get(reverse("aso:apps")), "Habito")
 
     def test_unlicensed_pages_are_the_preview_with_a_key_button(self):
         from unittest.mock import patch

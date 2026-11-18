@@ -5,10 +5,12 @@ from . import opportunity_views, settings_views, views
 app_name = "aso"
 
 urlpatterns = [
-    path("", views.dashboard_view, name="dashboard"),
+    path("", views.apps_view, name="apps"),
+    path("keywords/", views.dashboard_view, name="dashboard"),
     path("methodology/", views.methodology_view, name="methodology"),
     path("whats-new/", views.whats_new_view, name="whats_new"),
     path("whats-new/seen/", views.whats_new_seen_view, name="whats_new_seen"),
+    path("notice/dismiss/", views.notice_dismiss_view, name="notice_dismiss"),
     path("banner/apple-stale/dismiss/", views.apple_stale_banner_dismiss_view,
          name="apple_stale_banner_dismiss"),
     path("setup/", views.setup_view, name="setup"),
@@ -16,6 +18,8 @@ urlpatterns = [
     # Popularity source (free feature): selection + Apple Ads integration
     path("settings/popularity/", settings_views.settings_popularity_view, name="settings_popularity"),
     path("settings/mac-app/", settings_views.settings_mac_app_view, name="settings_mac_app"),
+    path("settings/mac-app/notifications/open/", settings_views.open_notification_settings_view,
+         name="open_notification_settings"),
     path("settings/popularity/banner/", settings_views.popularity_banner_view, name="popularity_banner"),
     path("settings/popularity/keys/generate/", settings_views.apple_keys_generate_view, name="apple_keys_generate"),
     path("settings/popularity/keys/import/", settings_views.apple_keys_import_view, name="apple_keys_import"),
@@ -68,8 +72,10 @@ urlpatterns = [
     # The global bottom strip, whichever job type is running.
     path("jobs/strip/", opportunity_views.job_strip_state_view, name="job_strip_state"),
     path("export/history.csv", views.export_history_csv_view, name="export_history_csv"),
-    path("apps/", views.apps_view, name="apps"),
+    path("apps/state/", views.apps_state_view, name="apps_state"),
+    path("apps/setup/", views.setup_strip_view, name="setup_strip"),
     path("apps/lookup/", views.app_lookup_view, name="app_lookup"),
+    path("apps/add/", views.app_add_view, name="app_add"),
     path("apps/<int:app_id>/delete/", views.app_delete_view, name="app_delete"),
     path("apps/<int:app_id>/refresh/", views.app_refresh_view, name="app_refresh"),
     path("keywords/<int:keyword_id>/delete/", views.keyword_delete_view, name="keyword_delete"),
@@ -93,4 +99,5 @@ urlpatterns = [
     path("pro/simulator/", views.pro_promo_simulator_view, name="pro_promo_simulator"),
     path("pro/top-terms/", views.pro_promo_top_terms_view, name="pro_promo_top_terms"),
     path("pro/rival-tracker/", views.pro_promo_rival_tracker_view, name="pro_promo_rival_tracker"),
+    path("pro/store/", views.pro_promo_store_view, name="pro_promo_store"),
 ]

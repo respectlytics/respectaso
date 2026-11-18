@@ -141,7 +141,7 @@ class SearchViewTest(JobTestBase):
         self.mock_thread.return_value.start.assert_called_once()
 
     def test_a_second_search_queues_behind_the_running_one(self):
-        self.job(status="running", seconds_per_pair=4.0, keywords=["a"] * 1, countries=["us"])
+        self.job(status="running", keywords=["a"] * 1, countries=["us"])
         resp = self.search("zeta")
         data = resp.json()
         self.assertEqual(data["job"]["status"], "queued")

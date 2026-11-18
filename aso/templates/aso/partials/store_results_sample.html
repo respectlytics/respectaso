@@ -1,0 +1,143 @@
+{% comment %}
+The Sales & growth tab as it looks with numbers in it (owner, 2026-11-16:
+show it as it will look, so the benefit is plain), drawn from
+aso.store_preview's sample in the real tab's layout (aso_pro
+store/results.html): the period, where to look first, six tiles, from seen
+to paid, how people find the app, what stands out, day by day, countries and
+what one change did. Nothing is live.
+{% endcomment %}
+<div class="mt-4 select-none pointer-events-none" aria-hidden="true" data-store-preview>
+    <div class="mb-4 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-900/60 p-1">
+            <span class="rounded-md px-3 py-1 text-sm text-slate-300">7 days</span><span class="rounded-md bg-white/10 px-3 py-1 text-sm text-white">30 days</span><span class="rounded-md px-3 py-1 text-sm text-slate-300">90 days</span><span class="rounded-md px-3 py-1 text-sm text-slate-300">12 months</span>
+        </div>
+        <p class="mr-auto text-xs text-slate-400">Through Nov 15, Apple's newest day</p>
+        <p class="text-sm text-slate-300">Money in <span class="ml-1 rounded-lg border border-white/10 bg-slate-900 px-2 py-1 text-slate-100">USD</span></p>
+    </div>
+
+    {% with f=preview.focus %}
+    <section class="card mb-4 flex items-center gap-5 border-l-4 border-l-amber-400 p-5">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300"><svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></span>
+        <div class="min-w-0 flex-1">
+            <h2 class="card-title">{{ f.title }}</h2>
+            <p class="mt-0.5 text-sm text-slate-200">{{ f.line }}</p>
+            <p class="mt-0.5 text-xs text-slate-400">{{ f.where }}</p>
+            <ol class="mt-3 flex items-center gap-1.5 text-2xs">
+                {% for label in preview.focus_steps %}
+                <li class="rounded-full px-2 py-0.5 {% if forloop.counter0 == f.step %}bg-amber-500/20 font-medium text-amber-200{% else %}bg-white/5 text-slate-400{% endif %}">{{ label }}</li>
+                {% if not forloop.last %}<li><svg class="h-3 w-3 text-slate-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></li>{% endif %}
+                {% endfor %}
+            </ol>
+        </div>
+    </section>
+    {% endwith %}
+
+    <div class="mb-4 grid grid-cols-3 gap-3">
+        {% for t in preview.kpis %}
+        <section class="card p-4">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0"><h2 class="item-title">{{ t.label }}</h2><p class="text-2xs text-slate-400">{{ t.hint }}</p></div>
+                <svg viewBox="0 0 120 32" class="h-8 w-28 shrink-0"><polyline points="{{ t.spark }}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" class="{% if t.up %}text-emerald-300{% else %}text-red-300{% endif %}"/></svg>
+            </div>
+            <p class="mt-2 text-xl font-semibold text-white">{{ t.value }}</p>
+            <p class="mt-0.5 text-xs"><span class="font-medium {% if t.up %}text-emerald-300{% else %}text-red-300{% endif %}">{{ t.change }}</span> <span class="text-slate-400">on the previous 30 days</span></p>
+        </section>
+        {% endfor %}
+    </div>
+
+    <div class="mb-4 grid grid-cols-5 gap-4">
+        <section class="card col-span-3 p-4">
+            <h2 class="card-title">From seen to paid</h2>
+            <p class="card-lead mb-4">Out of everyone who saw your app in the last 30 days.</p>
+            <ol class="grid grid-cols-4 gap-3">
+                {% for step in preview.funnel %}
+                <li class="min-w-0">
+                    <div class="flex h-20 items-end rounded-lg bg-white/[0.03] p-1.5{% if step.focus %} ring-2 ring-amber-400/70{% endif %}">
+                        <div class="w-full rounded-md {% cycle 'bg-sky-400/70' 'bg-purple-400/70' 'bg-emerald-400/70' 'bg-amber-300/70' %}" style="height: {{ step.height }}%"></div>
+                    </div>
+                    <p class="mt-2 text-lg font-semibold text-white">{{ step.value }}</p>
+                    <p class="text-sm text-slate-200">{{ step.label }}</p>
+                    <p class="text-2xs text-slate-400">{{ step.hint }}</p>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+        <section class="card col-span-2 p-4">
+            <h2 class="card-title">How people find you</h2>
+            <p class="card-lead mb-3">Where your downloads came from.</p>
+            <div class="flex h-3 overflow-hidden rounded-full bg-white/5">{% for s in preview.sources %}<span class="{% cycle 'bg-sky-400' 'bg-purple-400' 'bg-emerald-400' 'bg-amber-300' %}" style="width: {{ s.share }}"></span>{% endfor %}</div>
+            <ul class="mt-3 space-y-2 text-sm">
+                {% for s in preview.sources %}<li class="flex items-center justify-between gap-3"><span class="flex items-center gap-2 text-slate-200"><span class="h-2.5 w-2.5 rounded-full {% cycle 'bg-sky-400' 'bg-purple-400' 'bg-emerald-400' 'bg-amber-300' %}"></span>{{ s.label }}</span><span class="text-slate-300">{{ s.share }}<span class="ml-2 text-2xs text-slate-500">{{ s.downloads }} downloads</span></span></li>{% endfor %}
+            </ul>
+        </section>
+    </div>
+
+    <section class="card mb-4 p-4">
+        <h2 class="card-title">What stands out</h2>
+        <p class="card-lead mb-3">Found in your numbers for the last 30 days.</p>
+        <ul class="space-y-2.5">
+            {% for f in preview.findings %}
+            <li class="flex items-start gap-3">
+                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full {% if f.tone == 'good' %}bg-emerald-500/15 text-emerald-300{% elif f.tone == 'bad' %}bg-red-500/15 text-red-300{% else %}bg-sky-500/15 text-sky-300{% endif %}">
+                    {% if f.tone == 'good' %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
+                    {% elif f.tone == 'bad' %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 4.5 15 15m0 0V8.25m0 11.25H8.25"/></svg>
+                    {% else %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>{% endif %}
+                </span>
+                <span class="text-sm text-slate-200">{{ f.text }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    {% with c=preview.chart %}
+    <section class="card mb-4 p-4">
+        <div class="flex items-start justify-between gap-3">
+            <div><h2 class="card-title">Day by day</h2><p class="card-lead">Purple lines mark a release, dashed amber lines a store change you applied.</p></div>
+            <div class="flex shrink-0 gap-1 whitespace-nowrap"><span class="section-tab text-xs">Proceeds</span><span class="section-tab-active text-xs">Downloads</span><span class="section-tab text-xs">Page views</span><span class="section-tab text-xs">Impressions</span><span class="section-tab text-xs">Conversion</span></div>
+        </div>
+        <svg viewBox="0 0 900 250" class="mt-3 w-full">
+            <g stroke="#1e293b" stroke-width="1"><line x1="0" y1="20" x2="900" y2="20"/><line x1="0" y1="83" x2="900" y2="83"/><line x1="0" y1="147" x2="900" y2="147"/><line x1="0" y1="210" x2="900" y2="210"/></g>
+            <line x1="{{ c.release_x }}" y1="10" x2="{{ c.release_x }}" y2="210" stroke="#c084fc" stroke-width="1.2"/>
+            <circle cx="{{ c.release_x }}" cy="10" r="4" fill="#c084fc" stroke="#1e293b" stroke-width="2"/>
+            <line x1="{{ c.change_x }}" y1="10" x2="{{ c.change_x }}" y2="210" stroke="#fcd34d" stroke-width="1.2" stroke-dasharray="4 4"/>
+            <circle cx="{{ c.change_x }}" cy="10" r="4" fill="#fcd34d" stroke="#1e293b" stroke-width="2"/>
+            <polyline points="{{ c.points }}" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linejoin="round"/>
+            <text x="0" y="244" fill="#64748b" font-size="11">{{ c.dates.0 }}</text>
+            <text x="{{ c.release_x }}" y="244" fill="#64748b" font-size="11" text-anchor="middle">{{ c.dates.1 }}</text>
+            <text x="{{ c.change_x }}" y="244" fill="#64748b" font-size="11" text-anchor="middle">{{ c.dates.2 }}</text>
+            <text x="900" y="244" fill="#64748b" font-size="11" text-anchor="end">{{ c.dates.3 }}</text>
+        </svg>
+    </section>
+    {% endwith %}
+
+    <section class="card mb-4 p-4">
+        <h2 class="card-title">Countries</h2>
+        <p class="card-lead mb-3">Where your downloads and proceeds come from in the last 30 days.</p>
+        <table class="w-full text-sm">
+            <thead><tr class="text-left text-2xs text-slate-400"><th class="pb-2 font-medium">Country</th><th class="pb-2 font-medium">Downloads</th><th class="pb-2 text-right font-medium">Proceeds</th><th class="pb-2 text-right font-medium">Conversion</th><th class="pb-2 text-right font-medium">Downloads change</th></tr></thead>
+            <tbody class="divide-y divide-white/5">
+                {% for r in preview.countries %}
+                <tr>
+                    <td class="py-1.5 pr-2 text-slate-100">{{ r.flag }} {{ r.name }}</td>
+                    <td class="py-1.5 pr-2"><div class="flex items-center gap-2"><span class="w-12 text-slate-200">{{ r.downloads }}</span><span class="h-1.5 flex-1 rounded-full bg-white/5"><span class="block h-1.5 rounded-full bg-sky-400/70" style="width: {{ r.bar }}%"></span></span></div></td>
+                    <td class="py-1.5 text-right text-slate-200">{{ r.proceeds }}</td>
+                    <td class="py-1.5 text-right text-slate-300">{{ r.conversion }}</td>
+                    <td class="py-1.5 text-right {% if r.up %}text-emerald-300{% else %}text-red-300{% endif %}">{{ r.change }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    {% with e=preview.effect %}
+    <section class="card mb-4 p-4">
+        <h2 class="card-title">Each change, 14 days before and after</h2>
+        <p class="card-lead mb-2">See how your numbers changed after each one, and keep the words that work.</p>
+        <div class="py-3">
+            <p class="text-sm text-slate-100">{{ e.what }}</p>
+            <dl class="mt-2 grid grid-cols-4 gap-3 text-xs">{% for label, value in e.numbers %}<div><dt class="text-slate-400">{{ label }}</dt><dd class="text-slate-200">{{ value }}</dd></div>{% endfor %}</dl>
+            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">{% for k, before, after in e.keywords %}<span class="whitespace-nowrap"><span class="text-slate-300{% if preview.locked %} preview-term blur-sm{% endif %}">{{ k }}</span> {{ before }} to {{ after }}</span>{% endfor %}</p>
+        </div>
+    </section>
+    {% endwith %}
+</div>

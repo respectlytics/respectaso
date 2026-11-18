@@ -83,14 +83,16 @@
     <!-- ============================================ -->
 
     <!-- Native App Recommendation -->
-    <section class="bg-amber-900/20 border border-amber-500/20 rounded-xl p-4 mb-4">
-        <h2 class="card-title text-amber-200 mb-3 flex items-center gap-2">
+    <section class="notice notice-warning mb-4">
+        {% include "aso/partials/notice_icon.html" with tone="warning" %}
+        <div class="min-w-0 flex-1">
+        <h2 class="notice-title mb-3">
             Switch to the Native Mac App
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
                 RespectASO is now available as a <strong class="text-white">native Mac app</strong>: no Docker required.
-                It's faster, simpler, and updates with a single drag-and-drop.
+                It's simpler, and updates with a single drag-and-drop.
             </p>
             <div class="flex items-center gap-3">
                 <a href="{% url 'aso:download_dmg' %}"
@@ -102,6 +104,7 @@
                     Migration guide ↓
                 </a>
             </div>
+        </div>
         </div>
     </section>
 

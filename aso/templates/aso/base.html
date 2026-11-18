@@ -1,4 +1,4 @@
-{% load static %}
+{% load static aso_tags %}
 <!DOCTYPE html>
 <html lang="en" class="text-[14px] [color-scheme:dark]">
 <head>
@@ -75,25 +75,25 @@
             </div>
         </div>
         <div id="update-check-error" class="hidden text-xs text-slate-400 text-right px-1 mb-2">
-            ⚠ Unable to check for updates
+            Unable to check for updates.
+            <button type="button" id="update-check-now" class="link ml-1">Check now</button>
         </div>
 
         {% if show_whats_new_notice %}
         <!-- One-time notice after a feature update; cleared by opening
              What's New or dismissing. Patch updates never show it. -->
-        <div id="whats-new-notice" class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5">
-            <p class="text-sm text-indigo-200">
-                ✨ RespectASO was updated to <strong class="text-white">v{{ VERSION }}</strong>.
-                <a href="{% url 'aso:whats_new' %}" class="link">See what's new</a>
-            </p>
-            <button type="button" aria-label="Dismiss"
-                    onclick="fetch('{% url 'aso:whats_new_seen' %}', {method: 'POST', headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}}); this.parentElement.remove();"
-                    class="shrink-0 p-1 rounded text-indigo-300/70 hover:text-white hover:bg-white/10 transition-colors">✕</button>
+        <div id="whats-new-notice" class="notice notice-info mb-4" role="status">
+            {% include "aso/partials/notice_icon.html" with tone="info" %}
+            <p>RespectASO was updated to <strong class="text-white">v{{ VERSION }}</strong>. <a href="{% url 'aso:whats_new' %}" class="link">See what's new</a></p>
+            {% url 'aso:whats_new_seen' as seen_url %}{% include "aso/partials/notice_close.html" with url=seen_url %}
         </div>
         {% endif %}
 
         {% block content %}{% endblock %}
     </main>
+
+    {% comment %}Adding an app is this one dialog on every page; any [data-add-app] opens it (aso/add_app.py).{% endcomment %}
+    {% add_app_dialog %}
 
 
     <!-- Custom Modal System -->
@@ -287,7 +287,10 @@
     <script src="{% static 'js/country-picker.js' %}"></script>
     <script src="{% static 'js/tooltip.js' %}"></script>
     <script src="{% static 'js/in-place.js' %}"></script>
+    <script src="{% static 'js/notice.js' %}" data-url="{% url 'aso:notice_dismiss' %}" data-csrf="{{ csrf_token }}"></script>
+    <script src="{% static 'js/add-app.js' %}"></script>
     <script src="{% static 'js/back-link.js' %}"></script>
+    <script src="{% static 'js/todo-badge.js' %}" data-url="{% url 'aso:apps_state' %}"></script>
     {% comment %}Markdown to HTML, the one renderer: the AI tabs' analysis and the release notes below (docs/development/DEDUPE_RENDERERS_PLAN.md).{% endcomment %}
     <script src="{% static 'js/markdown.js' %}"></script>
     <script>
@@ -313,6 +316,7 @@
     <!-- Activity indicator: background work on every page (aso/partials/_activity.html) -->
     <script src="{% static 'js/activity-indicator.js' %}"></script>
     <script src="{% static 'js/menu.js' %}"></script>
+    <script src="{% static 'js/mail-links.js' %}"></script>
     <script src="{% static 'js/job-strip.js' %}"></script>
     <script>JobStrip.init({stateUrl: "{% url 'aso:job_strip_state' %}", state: JSON.parse(document.getElementById('job-strip-data').textContent)});</script>
     {% if run_queue_enabled %}
@@ -342,38 +346,45 @@
     {% endif %}
 
 
-    <!-- Version update check (runs on every page) -->
+    <!-- Version update check (runs on every page; respectaso.com is asked
+         at most once a day, aso/update_check.py) -->
     <script>
     (function() {
-        function showError() {
-            var el = document.getElementById('update-check-error');
-            if (el) el.classList.remove('hidden');
+        var url = '{% url "aso:version_check" %}';
+        var errorLine = document.getElementById('update-check-error');
+        function render(data) {
+            errorLine.classList.add('hidden');
+            if (data.error) { errorLine.classList.remove('hidden'); return; }
+            if (!data.update_available) return;
+            document.getElementById('update-version').textContent = 'v' + data.latest;
+            document.getElementById('current-version').textContent = 'v' + data.current;
+            if (data.is_native && data.download_url) {
+                var dlBtn = document.getElementById('update-download-btn');
+                dlBtn.href = data.download_url;
+                dlBtn.classList.remove('hidden');
+            } else {
+                document.getElementById('update-instructions-btn').classList.remove('hidden');
+            }
+            if (data.release_notes) {
+                document.getElementById('update-toggle-notes').classList.remove('hidden');
+                document.getElementById('update-notes-content').innerHTML = AsoMarkdown.toHtml(data.release_notes);
+            }
+            if (data.release_url) {
+                document.getElementById('update-release-link').href = data.release_url;
+            }
+            document.getElementById('update-banner').classList.remove('hidden');
         }
-        fetch('{% url "aso:version_check" %}')
+        function failed() { errorLine.classList.remove('hidden'); }
+        fetch(url)
             .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) { showError(); return; }
-                if (!data.update_available) return;
-                var versionLabel = 'v' + data.latest;
-                document.getElementById('update-version').textContent = versionLabel;
-                document.getElementById('current-version').textContent = 'v' + data.current;
-                if (data.is_native && data.download_url) {
-                    var dlBtn = document.getElementById('update-download-btn');
-                    dlBtn.href = data.download_url;
-                    dlBtn.classList.remove('hidden');
-                } else {
-                    document.getElementById('update-instructions-btn').classList.remove('hidden');
-                }
-                if (data.release_notes) {
-                    document.getElementById('update-toggle-notes').classList.remove('hidden');
-                    document.getElementById('update-notes-content').innerHTML = AsoMarkdown.toHtml(data.release_notes);
-                }
-                if (data.release_url) {
-                    document.getElementById('update-release-link').href = data.release_url;
-                }
-                document.getElementById('update-banner').classList.remove('hidden');
-            })
-            .catch(function() { showError(); });
+            .then(render)
+            .catch(failed);
+        document.getElementById('update-check-now').addEventListener('click', function() {
+            fetch(url, {method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'}})
+                .then(function(r) { return r.json(); })
+                .then(render)
+                .catch(failed);
+        });
     })();
     </script>
 </body>

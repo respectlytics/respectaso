@@ -71,10 +71,16 @@
         }
     }
 
+    function liveShown() {
+        var box = document.getElementById('live-rows');
+        return !!box && !box.classList.contains('hidden');
+    }
+
     function renderCounter() {
         var el = document.getElementById('progress-scored-count');
         if (!el) return;
-        if (scoredCount > 0) {
+        // The live table's line already says how many are scored: one place.
+        if (scoredCount > 0 && !liveShown()) {
             el.textContent = scoredCount + (scoredCount === 1 ? ' keyword scored' : ' keywords scored');
             el.classList.remove('hidden');
         } else {
@@ -247,7 +253,7 @@
             } else if (thinkSecs >= 5) {
                 subtext.textContent = 'Waiting for the model’s response… (' + fmtThinkDuration(thinkSecs) + ')';
             } else {
-                subtext.textContent = 'This may take a moment…';
+                subtext.textContent = 'Waiting for the model’s response…';
             }
         }
 
@@ -258,9 +264,9 @@
             var msg = '';
             var secs = (isLocal && lg && lg.running) ? lg.secs : 0;
             if (secs >= 1200) {            // 20+ minutes on one local step
-                msg = 'This step has run over 20 minutes: local generation is slow, but nothing is frozen. Keep waiting, or cancel and use a cloud provider for a quick result.';
+                msg = 'This step has run over 20 minutes: local generation is slow, but nothing is frozen. Keep waiting, or cancel and use a cloud provider.';
             } else if (secs >= 480) {      // 8+ minutes on one local step
-                msg = 'Still working: local generation is slow for this demanding workload. A faster setup, or a cloud provider, would be much quicker.';
+                msg = 'Still working: local generation is slow for this demanding workload, but nothing is frozen. A faster setup or a cloud provider helps.';
             } else if (!isLocal && thinkSecs >= 900) {   // 15+ minutes waiting on a cloud model
                 msg = 'Still waiting after ' + fmtThinkDuration(thinkSecs) + ': the model is very busy right now. '
                     + 'Keep waiting, or cancel and pick a faster model in Settings → AI.';
@@ -279,9 +285,52 @@
     }
 
     /**
+     * Rows as they land: draw the run's scored keywords, best first, and the
+     * line above them ("12 of 50 keywords"), from the progress payload's
+     * `live` ({rows, done, total}). Never a time left (owner, 2026-11-18).
+     */
+    function esc(value) {
+        var div = document.createElement('div');
+        div.textContent = value === null || value === undefined ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function renderLive(live) {
+        var box = document.getElementById('live-rows');
+        var body = document.getElementById('live-rows-body');
+        if (!box || !body) return;
+        if (!live || !live.rows || !live.rows.length) {
+            var wasShown = liveShown();
+            box.classList.add('hidden');
+            body.innerHTML = '';
+            if (wasShown) renderCounter();
+            return;
+        }
+        var line = live.done + ' of ' + live.total + (live.total === 1 ? ' keyword' : ' keywords');
+        var lineEl = document.getElementById('live-rows-line');
+        if (lineEl) lineEl.textContent = line;
+        var rows = live.rows.slice().sort(function (a, b) { return (b.opportunity || 0) - (a.opportunity || 0); });
+        body.innerHTML = rows.map(function (row) {
+            var style = window.ClassificationBadge.style(row.classification);
+            var pop = typeof window.formatPopularityCompact === 'function'
+                ? window.formatPopularityCompact(row) : esc(Math.round(row.popularity || 0));
+            return '<tr class="border-b border-white/5 last:border-0">' +
+                '<td class="py-1.5 px-2 text-white truncate max-w-xs">' + esc(row.keyword) + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-purple-300 tabular-nums">' + pop + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-orange-300 tabular-nums">' + esc(Math.round(row.difficulty || 0)) + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-sky-300 font-semibold tabular-nums">' + esc(Math.round(row.opportunity || 0)) + '</td>' +
+                '<td class="py-1.5 px-2"><span class="text-2xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap border ' + style.badge + '">' + esc(row.classification) + '</span></td>' +
+                '</tr>';
+        }).join('');
+        box.classList.remove('hidden');
+        renderCounter();
+    }
+
+    /**
      * Reset all progress extras to initial idle state. Call on session end.
      */
     function hideProgressExtras() {
+        renderLive(null);
         stopElapsed();
         var elapsedEl = document.getElementById('progress-elapsed');
         if (elapsedEl) elapsedEl.classList.add('hidden');
@@ -318,6 +367,7 @@
         syncElapsed: syncElapsed,
         syncScoredCount: syncScoredCount,
         update: updateProgressUI,
+        renderLive: renderLive,
         hide: hideProgressExtras
     };
 

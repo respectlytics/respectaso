@@ -43,11 +43,17 @@ class PairHooksTest(TestCase):
         def broken(pairs):
             raise RuntimeError("boom")
 
-        pair_hooks.removed_listeners.append(broken)
+        pair_hooks.removed_listeners.insert(0, broken)
         try:
-            pair_hooks.pairs_removed({(1, "us")})
+            with self.assertLogs("aso.pair_hooks", "ERROR") as logs:
+                pair_hooks.pairs_removed({(1, "us")})
         finally:
             pair_hooks.removed_listeners.remove(broken)
+        # The failure is logged with its traceback, and the listeners after
+        # the broken one still hear.
+        self.assertEqual(logs.records[0].getMessage(), "A Search History removal listener failed")
+        self.assertIsInstance(logs.records[0].exc_info[1], RuntimeError)
+        self.assertEqual(self.heard, [{(1, "us")}])
 
 
 class SchedulerHooksTest(TestCase):

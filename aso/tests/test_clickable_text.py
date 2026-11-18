@@ -7,7 +7,8 @@ sections that open on a click were grey. Now every text link carries .link,
 every text button .btn-quiet, every section that opens .disclosure, all three
 in the same sky blue, and text that deletes or stops something .link-danger.
 Anything else a person clicks is a button by its shape (a background or a
-border), a menu item, a tab, or an icon with a label for screen readers.
+border), a menu item, a tab, a column header that sorts (.sort-button, with
+its arrow), or an icon with a label for screen readers.
 """
 
 import re
@@ -31,7 +32,7 @@ OWN_DESIGN = {
 
 SHARED = re.compile(
     r"\b(link|link-danger|disclosure|btn-primary|btn-secondary|btn-quiet|btn-pro|btn-locked"
-    r"|menu-item|section-tab|section-tab-active)\b"
+    r"|menu-item|section-tab|section-tab-active|sort-button|notice-action|switch)\b"
 )
 # A button by its shape: a background, a border, a pill; a row of a list or
 # menu (full width, lit on hover); a tab of the AI results.
@@ -159,10 +160,11 @@ class EveryMenuRowHasItsIconTest(SimpleTestCase):
     """The Help menu and the ⋯ menus draw an icon on every row, from the one
     set in aso_tags.MENU_ICONS (the owner, 2026-10-02), so no menu mixes rows
     with and without one. A row for another product carries that product's
-    own mark at the icon's 16 px instead (Respectlytics, the owner, 2026-10-07)."""
+    own logo instead (Respectlytics, the owner, 2026-10-07): since 2026-11-18
+    its app icon at 32 px, beside its name and one line on what it does."""
 
     ROW = re.compile(r'<(a|button)\b[^>]*class="menu-item[^"]*"[^>]*>(.*?)</\1>', re.DOTALL)
-    ICON = re.compile(r'{%\s*menu_icon\s|{%\s*picture\s+"[\w-]+"\s+16\s+classes="h-4 w-4 ')
+    ICON = re.compile(r'{%\s*menu_icon\s|{%\s*picture\s+"[\w-]+"\s+(16|32)\s+classes="h-(4 w-4|8 w-8)\b')
 
     def test_every_menu_row_starts_with_an_icon(self):
         bad = []

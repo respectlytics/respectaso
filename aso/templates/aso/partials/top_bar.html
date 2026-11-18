@@ -1,25 +1,28 @@
 {% load aso_tags %}
 {% comment %}
 The top bar (docs/development/APP_SHELL_PLAN.md, UI_REDESIGN_PLAN.md 3.1):
-four sections, then the Activity pill, The Creator Behind on YouTube (always
-in the bar, by the owner's decision), the Pro button (the metallic green
-btn-pro, on every page until Pro is unlocked), the Help menu and the
-Settings gear. Without Pro, Metadata and Rivals carry the Pro lock and say
-on hover what they do for the reader. The section and every address come from
+five sections (Apps, Keywords, Discover, Store, Rivals; the logo opens Apps
+too, DAILY_USE_PLAN.md step 1), then the Activity pill, The Creator Behind on
+YouTube (always in the bar, by the owner's decision), the Pro button (the
+metallic green btn-pro, on every page until Pro is unlocked), the Help menu
+and the Settings gear. Beside Apps, the number of To do lines that ask for
+something (todo_count), hidden at zero. Without Pro, Store and Rivals carry
+the Pro lock and say on hover what they do for the reader. The section and every address come from
 aso.context_processors.nav and pro_button; nothing here compares url names.
 {% endcomment %}
 <nav class="sticky top-0 z-40 border-b border-white/10 bg-slate-800/80 backdrop-blur-sm" aria-label="Main">
     <div class="mx-auto flex h-12 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div class="flex h-full items-center gap-8">
-            <a href="{% url 'aso:dashboard' %}" class="flex shrink-0 items-center gap-2 text-white transition-colors hover:text-purple-300">
+            <a href="{% url 'aso:apps' %}" class="flex shrink-0 items-center gap-2 text-white transition-colors hover:text-purple-300">
                 {% picture "respectaso-logo" 32 classes="h-8 w-8 rounded" %}
                 <span class="text-base font-semibold">RespectASO</span>
             </a>
             <div class="flex h-full items-center gap-4 text-sm font-medium" data-top-sections>
                 {% with on="flex h-full items-center border-b-2 border-purple-500 pt-0.5 text-white" off="flex h-full items-center border-b-2 border-transparent pt-0.5 text-slate-300 transition-colors hover:text-white" %}
+                <a href="{% url 'aso:apps' %}" class="{% if nav_section == 'apps' %}{{ on }}{% else %}{{ off }}{% endif %} gap-1.5"{% if nav_section == 'apps' %} aria-current="page"{% endif %}>Apps<span data-todo-count class="{% if not todo_count %}hidden {% endif %}rounded-full bg-purple-600 px-1.5 text-2xs font-semibold leading-4 text-white" aria-label="things to do">{{ todo_count }}</span></a>
                 <a href="{% url 'aso:dashboard' %}" class="{% if nav_section == 'keywords' %}{{ on }}{% else %}{{ off }}{% endif %}"{% if nav_section == 'keywords' %} aria-current="page"{% endif %}>Keywords</a>
                 <a href="{{ discover_url }}" class="{% if nav_section == 'discover' %}{{ on }}{% else %}{{ off }}{% endif %}"{% if nav_section == 'discover' %} aria-current="page"{% endif %}>Discover</a>
-                <a href="{% if pro_edition %}{% url 'aso_pro:simulator' %}{% else %}{% url 'aso:pro_promo_simulator' %}{% endif %}" class="{% if nav_section == 'metadata' %}{{ on }}{% else %}{{ off }}{% endif %}{% if section_locks.metadata %} pro-lock{% endif %}"{% if section_locks.metadata %} data-tip="{{ section_locks.metadata }}"{% endif %}{% if nav_section == 'metadata' %} aria-current="page"{% endif %}>Metadata</a>
+                <a href="{% if pro_edition %}{% url 'aso_pro:store_autopilot' %}{% else %}{% url 'aso:pro_promo_store' %}{% endif %}" class="{% if nav_section == 'store' %}{{ on }}{% else %}{{ off }}{% endif %}{% if section_locks.store %} pro-lock{% endif %}"{% if section_locks.store %} data-tip="{{ section_locks.store }}"{% endif %}{% if nav_section == 'store' %} aria-current="page"{% endif %}>Store</a>
                 <a href="{% if pro_edition %}{% url 'aso_pro:rival_tracker' %}{% else %}{% url 'aso:pro_promo_rival_tracker' %}{% endif %}" class="{% if nav_section == 'rivals' %}{{ on }}{% else %}{{ off }}{% endif %}{% if section_locks.rivals %} pro-lock{% endif %}"{% if section_locks.rivals %} data-tip="{{ section_locks.rivals }}"{% endif %}{% if nav_section == 'rivals' %} aria-current="page"{% endif %}>Rivals</a>
                 {% endwith %}
             </div>

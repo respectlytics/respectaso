@@ -19,6 +19,7 @@ import html
 import io
 import re
 import tokenize
+import unicodedata
 from pathlib import Path
 
 from django.conf import settings
@@ -198,6 +199,22 @@ def _log_call_ends(tokens) -> dict[int, int]:
     return ends
 
 
+_PY_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})|\\U([0-9a-fA-F]{8})|\\N\{([^}]+)\}")
+
+
+def _py_text(text: str) -> str:
+    """A string's text as a person reads it: a ``\\u2013`` or
+    ``\\N{EN DASH}`` escape is the character it draws."""
+    def char(m):
+        if m.group(3):
+            try:
+                return unicodedata.lookup(m.group(3))
+            except KeyError:
+                return m.group()
+        return chr(int(m.group(1) or m.group(2), 16))
+    return _PY_ESCAPE.sub(char, text)
+
+
 def _python_pieces(tokens, log_calls):
     """(first token, last token, text) of every string a person may read."""
     starts = (tokenize.NEWLINE, tokenize.NL, tokenize.INDENT, tokenize.DEDENT, tokenize.ENCODING)
@@ -212,7 +229,7 @@ def _python_pieces(tokens, log_calls):
             docstring = (i == 0 or tokens[i - 1].type in starts) and tokens[i + 1].type == tokenize.NEWLINE
             m = re.match(r"^([rbuRBU]*)('\'\'|\"\"\"|'|\")(.*)\2$", tok.string, re.DOTALL)
             if m and not docstring and "r" not in m.group(1).lower():
-                yield first, i, m.group(3)
+                yield first, i, _py_text(m.group(3))
         elif fstring_start is not None and tok.type == fstring_start:
             text, depth = "", 1
             while depth:
@@ -227,7 +244,7 @@ def _python_pieces(tokens, log_calls):
                 elif kind == tokenize.OP and tokens[i].string == "{" and depth == 1:
                     text += "x"
             if "r" not in tok.string.lower():
-                yield first, i, text
+                yield first, i, _py_text(text)
         i += 1
 
 

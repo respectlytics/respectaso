@@ -51,18 +51,6 @@
         return fmt(n) + ' ' + word + (Number(n) === 1 ? '' : 's');
     }
 
-    // A wait in words, from the one copy every page loads first
-    // (static/js/country-picker.js), so the Dashboard and the Opportunity
-    // page word a wait the same way.
-    function durationText(seconds) {
-        return window.CountryPicker.durationText(seconds);
-    }
-
-    function etaText(seconds) {
-        var text = durationText(seconds);
-        return text ? text + ' left' : '';
-    }
-
     function byId(id) {
         return document.getElementById(id);
     }
@@ -209,8 +197,7 @@
     function showError(data) {
         var box = byId('search-error');
         if (!box) return;
-        box.textContent = (data && data.error) || 'Search failed';
-        box.classList.remove('hidden');
+        window.Notice.show(box, (data && data.error) || 'Search failed', 'error');
     }
 
     function hideError() {
@@ -224,9 +211,9 @@
         var job = data.job;
         ActivityIndicator.announce({
             queued: !!data.queued_behind,
+            tonight: !!job.tonight,
             label: plural(job.total_keywords, 'keyword') + ' in ' + (job.countries_text || ''),
-            current: data.queued_behind || '',
-            eta: data.eta_seconds || null
+            current: data.queued_behind || ''
         });
     }
 
@@ -245,7 +232,7 @@
         var at = 'Paused at ' + fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' keywords';
         switch (job.status) {
             case 'queued':
-                return 'Waiting to start';
+                return job.tonight ? 'Starts tonight at 02:00' : 'Waiting to start';
             case 'running':
                 return 'Checking ' + plural(job.total_keywords, 'keyword') + ' in ' + job.countries_text;
             default:
@@ -255,14 +242,12 @@
 
     function lineFor(job) {
         if (job.status === 'queued') {
+            if (job.tonight) return plural(job.total_keywords, 'keyword') + ' in ' + job.countries_text + '.';
             return job.waiting_for ? 'Starts after ' + job.waiting_for + '.' : 'Starts next.';
         }
         if (job.status === 'running') {
-            if (job.keywords_done > 0 && etaText(job.eta_seconds)) {
-                return fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords) + ' · ' + etaText(job.eta_seconds);
-            }
             return job.keywords_done > 0
-                ? fmt(job.keywords_done) + ' of ' + fmt(job.total_keywords)
+                ? fmt(job.keywords_done) + ' of ' + plural(job.total_keywords, 'keyword')
                 : 'Starting…';
         }
         if (job.auto_resume) {
@@ -281,7 +266,7 @@
         var html = '';
         if (job.status === 'queued') {
             if (cfg.isPro && job.can_run_now) html += button('run-now', 'Run now', 'primary');
-            if (cfg.isPro && job.queue_position > 1) html += button('run-next', 'Run next', 'secondary');
+            if (cfg.isPro && (job.queue_position > 1 || job.tonight)) html += button('run-next', 'Run next', 'secondary');
             html += button('remove', 'Remove', 'quiet');
         } else if (job.status === 'running') {
             html += button('pause', 'Pause', 'secondary');
@@ -308,7 +293,7 @@
         toggle('sjp-pause-icon', !running && !queued);
         setText('sjp-title', titleFor(job));
         setText('sjp-line', lineFor(job));
-        var position = queued && job.queue_position > 1 ? 'Position ' + job.queue_position + ' in the queue' : '';
+        var position = queued && !job.tonight && job.queue_position > 1 ? 'Position ' + job.queue_position + ' in the queue' : '';
         toggle('sjp-position', !!position);
         setText('sjp-position', position);
         byId('sjp-actions').innerHTML = actionsFor(job);

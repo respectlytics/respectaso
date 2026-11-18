@@ -179,13 +179,13 @@
         // when hovering anywhere on a parent row that also carries a "group" class.
         return '<div class="group/dl relative inline-block">' +
             '<span class="text-sm tabular-nums text-slate-300 cursor-help border-b border-dotted border-slate-600">' +
-            fmt(p1.downloads_low) + '–' + fmt(p1.downloads_high) + '<span class="text-slate-400">/day</span></span>' +
+            fmt(p1.downloads_low) + '-' + fmt(p1.downloads_high) + '<span class="text-slate-400">/day</span></span>' +
             '<div class="hidden group-hover/dl:block absolute z-20 ' + posClass + ' left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">' +
             '<p class="text-2xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>' +
             '<div class="space-y-1.5">' +
-            '<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">' + fmt(p1.downloads_low) + '–' + fmt(p1.downloads_high) + '</span></div>' +
-            '<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">' + fmt(p5.downloads_low) + '–' + fmt(p5.downloads_high) + '</span></div>' +
-            '<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">' + fmt(p10.downloads_low) + '–' + fmt(p10.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">' + fmt(p1.downloads_low) + '-' + fmt(p1.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">' + fmt(p5.downloads_low) + '-' + fmt(p5.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">' + fmt(p10.downloads_low) + '-' + fmt(p10.downloads_high) + '</span></div>' +
             '</div>' +
             derivedMarketNote(dl) +
             '</div></div>';
@@ -495,6 +495,34 @@
         link.classList.remove('hidden');
     }
 
+    // Suggested Metadata's first card for a run scored for one of the
+    // user's apps: a sketch without the app's name, whose main button opens
+    // the run's Keywords tab to tick the keywords worth tracking (the Track
+    // bar takes it from there). A run scored for a new app keeps "Your new
+    // listing" with "Simulate this metadata" as its main button
+    // (DAILY_USE_PLAN.md step 7).
+    function listingFor(root, scoredForApp) {
+        root = root || document;
+        var forApp = !!scoredForApp;
+        root.querySelectorAll('[data-listing="app"]').forEach(function (el) { el.classList.toggle('hidden', !forApp); });
+        root.querySelectorAll('[data-listing="new"]').forEach(function (el) { el.classList.toggle('hidden', forApp); });
+        root.querySelectorAll('[data-open-keywords]').forEach(function (button) {
+            button.classList.toggle('hidden', !forApp);
+            if (!button.dataset.wired) {
+                button.dataset.wired = '1';
+                button.addEventListener('click', function () {
+                    if (typeof window.setActiveTab === 'function') window.setActiveTab('keywords');
+                    window.scrollTo(0, 0);
+                });
+            }
+        });
+        var simulate = root.querySelector('#simulate-metadata-btn');
+        if (simulate) {
+            simulate.classList.toggle('btn-secondary', forApp);
+            simulate.classList.toggle('btn-primary', !forApp);
+        }
+    }
+
     // ---- Results header (AI_DECISION_FIRST_PLAN.md 2.1 and 4) --------------
 
     var SOURCE_LABELS = {apple: 'Apple Ads popularity', internal: 'RespectASO estimate'};
@@ -739,10 +767,10 @@
         var wasted = repeated.reduce(function (sum, token) { return sum + token.length + 1; }, 0);
         note.classList.remove('hidden');
         note.innerHTML =
-            '<div class="rounded-lg border border-amber-500/20 bg-amber-900/20 px-3 py-2">' +
-            '<p class="text-xs font-medium text-amber-300">' + repeated.length + ' keyword' + (repeated.length > 1 ? 's repeat' : ' repeats') +
+            '<div class="hint-warning flex-col gap-0">' +
+            '<p class="font-medium">' + repeated.length + ' keyword' + (repeated.length > 1 ? 's repeat' : ' repeats') +
                 ' a word of your title or subtitle, about ' + wasted + ' characters you could use for new words.</p>' +
-            '<p class="mt-0.5 text-xs text-amber-200/70">This keyword field was made for the recommended title and subtitle.</p>' +
+            '<p class="mt-0.5">This keyword field was made for the recommended title and subtitle.</p>' +
             '</div>';
     }
 
@@ -759,9 +787,9 @@
         var amber = tone === 'amber';
         el.classList.remove('hidden');
         el.innerHTML =
-            '<div class="rounded-lg border px-3 py-2 ' + (amber ? 'border-amber-500/20 bg-amber-900/20' : 'border-white/10 bg-slate-800/50') + '">' +
-            '<p class="text-xs font-medium ' + (amber ? 'text-amber-300' : 'text-slate-300') + '">' + escapeHtml(heading) + '</p>' +
-            '<ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs ' + (amber ? 'text-amber-200/80' : 'text-slate-400') + '">' +
+            '<div class="' + (amber ? 'hint-warning flex-col gap-0' : 'rounded-lg border border-white/10 bg-slate-800/50 px-3 py-2 text-xs text-slate-400') + '">' +
+            '<p class="font-medium' + (amber ? '' : ' text-slate-300') + '">' + escapeHtml(heading) + '</p>' +
+            '<ul class="mt-1 list-disc space-y-0.5 pl-4">' +
             items.map(function (item) { return '<li>' + escapeHtml(item) + '</li>'; }).join('') + '</ul></div>';
     }
 
@@ -928,6 +956,7 @@
         presentRunFailure: presentRunFailure,
         applyWhoseScore: applyWhoseScore,
         simulateLink: simulateLink,
+        listingFor: listingFor,
         errorFrom: errorFrom,
         unfinishedFrom: unfinishedFrom,
         cutAtSentence: cutAtSentence,

@@ -1,0 +1,1 @@
+{% load aso_tags %}{% comment %}A change against the period before, as Sales & growth writes it: "+18%" or "-31%", in its tone.{% endcomment %}{% if change is not None %}<span class="ml-1.5 text-xs font-semibold {{ change|change_tone }}">{{ change|change_text }}</span>{% endif %}

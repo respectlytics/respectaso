@@ -2,8 +2,8 @@
 
 The owner's rules of 2026-10-01 (.github/instructions/user-facing-docs.instructions.md):
 
-- A person reads what a number means for their app, what to do next, how
-  long they will wait, what went wrong and how to fix it, and what they must
+- A person reads what a number means for their app, what to do next, what
+  went wrong and how to fix it, and what they must
   know to trust the product (what leaves their Mac and where, that the
   numbers come from Apple). Never how often a keyword is read, that a read is
   reused or costs no App Store search, counts of AI requests, searches or
@@ -51,6 +51,7 @@ LEAD_LIMIT = 100
 # paragraphs are the body, not leads; their tips are still tips.
 LONG_FORM = {
     "aso/templates/aso/methodology.html",
+    "aso_pro/templates/aso_pro/store/how.html",
     "aso/templates/aso/setup.html",
     "aso/templates/aso/apple_ads_setup.html",
     "aso/templates/aso/whats_new.html",
@@ -128,12 +129,12 @@ EXPLAINS_THE_TOOL = [
 
 TELLS_THE_USER = [
     "They also show in this app's Search History on the Dashboard.",
-    "Suggestions for the App Store in Argentina take about 4 minutes.",
+    "Suggestions for the App Store in Argentina. You can keep working while it runs.",
     "Popularity 43 is about 110 searches a day in the United States.",
     "This storefront sees under one search a day for this keyword.",
     "Apple lists terms with roughly 500 or more searches a week.",
     "Research up to 1,000 keywords in one search.",
-    "Apple's App Store is answering slowly, so this takes a little longer.",
+    "Apple's App Store is answering slowly. It carries on by itself.",
     "Results stay on your Mac; the keywords go only to the AI provider you choose.",
 ]
 

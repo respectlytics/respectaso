@@ -478,7 +478,9 @@ class KeywordSearchJob(models.Model):
     progress_message = models.CharField(max_length=200, blank=True, default="")
     error_message = models.TextField(blank=True, default="")
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
-    seconds_per_pair = models.FloatField(null=True, blank=True)   # running average, feeds the ETA
+    # No longer written or read: the app never estimates how long a run will
+    # take (owner, 2026-11-18). Kept so no migration is needed for it.
+    seconds_per_pair = models.FloatField(null=True, blank=True)
     elapsed_seconds = models.FloatField(default=0)                # active time across resumes
     acknowledged = models.BooleanField(default=False)             # "Close" pressed on a finished job
     restart_resumes = models.PositiveIntegerField(default=0)      # continued after the app was closed mid-run
@@ -488,6 +490,9 @@ class KeywordSearchJob(models.Model):
     # a row whose process has ended is released, not left holding the lane.
     run_owner = models.CharField(max_length=64, blank=True, default="", db_default="")
     finished_at = models.DateTimeField(null=True, blank=True)
+    # "Run tonight": the queue starts this run no earlier than this moment
+    # (aso/run_queue.py); empty for a run that starts when its turn comes.
+    not_before = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -912,7 +917,9 @@ class OpportunityScan(models.Model):
     progress_message = models.CharField(max_length=200, blank=True, default="")
     error_message = models.TextField(blank=True, default="")
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
-    seconds_per_country = models.FloatField(null=True, blank=True)   # feeds the ETA
+    # No longer written or read: the app never estimates how long a run will
+    # take (owner, 2026-11-18). Kept so no migration is needed for it.
+    seconds_per_country = models.FloatField(null=True, blank=True)
     elapsed_seconds = models.FloatField(default=0)
     # No longer read or written (run_owner replaced it on 2026-10-07). Kept so
     # an app from before then keeps working on a database the MCP server has
@@ -928,6 +935,9 @@ class OpportunityScan(models.Model):
     # a row whose process has ended is released, not left holding the lane.
     run_owner = models.CharField(max_length=64, blank=True, default="", db_default="")
     finished_at = models.DateTimeField(null=True, blank=True)
+    # "Run tonight": the queue starts this run no earlier than this moment
+    # (aso/run_queue.py); empty for a run that starts when its turn comes.
+    not_before = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

@@ -176,16 +176,18 @@ def pro_button(request):
     return context
 
 
-# The four sections of the top bar and the pages each one lights
-# (UI_REDESIGN_PLAN.md 3.1). Pages listed nowhere (Apps, the Help pages)
-# light none.
+# The five sections of the top bar (Apps, Keywords, Discover, Store, Rivals)
+# and the pages each one lights (UI_REDESIGN_PLAN.md 3.1, DAILY_USE_PLAN.md
+# step 1). Pages listed nowhere (the Help pages) light none.
 NAV_SECTIONS = {
+    "apps": {"apps"},
     "keywords": {"dashboard"},
     "discover": {"ai_researcher", "ai_competitor", "top_terms", "opportunity",
                  "pro_promo_researcher", "pro_promo_competitor", "pro_promo_top_terms"},
-    "metadata": {"simulator", "pro_promo_simulator"},
+    "store": {"store_autopilot", "simulator", "store_pages", "store_results", "store_reviews",
+              "pro_promo_store", "pro_promo_simulator", "store_how", "store_pages_how"},
     "rivals": {"rival_tracker", "rival_setup", "pro_promo_rival_tracker"},
-    "settings": {"settings_ai", "settings_license", "settings_popularity",
+    "settings": {"settings_ai", "settings_license", "settings_popularity", "settings_asc",
                  "settings_mcp", "settings_mac_app", "apple_ads_setup"},
 }
 
@@ -200,7 +202,16 @@ DISCOVER_TABS = (
 # The Pro features behind a tab or a section, by aso.pro_preview_words key:
 # without Pro they carry a lock and say what they do for the reader.
 PRO_TABS = {"ai_researcher": "researcher", "ai_competitor": "competitor", "top_terms": "top_terms"}
-PRO_SECTIONS = {"metadata": "simulator", "rivals": "rival_tracker"}
+PRO_SECTIONS = {"store": "store", "rivals": "rival_tracker"}
+# Store's tabs, in order (Pro edition only): key, label, url name. The free
+# edition draws the same five from aso.store_preview.free_tabs().
+STORE_TABS = (
+    ("store_autopilot", "Get found", "aso_pro:store_autopilot"),
+    ("simulator", "Simulator", "aso_pro:simulator"),
+    ("store_pages", "Custom product pages", "aso_pro:store_pages"),
+    ("store_results", "Sales & growth", "aso_pro:store_results"),
+    ("store_reviews", "Reviews", "aso_pro:store_reviews"),
+)
 
 
 def pro_benefit(feature: str) -> str:
@@ -220,18 +231,32 @@ _DISCOVER_TAB_OF = {
 }
 
 
+def _todo_count(request) -> int:
+    """The number beside Apps in the top bar, for the Apps page's period chosen
+    last, so it counts the lines that page shows. Never breaks a page render."""
+    try:
+        from . import todo, ui_memory
+
+        return todo.count(ui_memory.remembered_apps_period(request))
+    except Exception:  # noqa: BLE001 (the top bar must never break a page)
+        return 0
+
+
 def nav(request):
     """What the top bar, the Help menu and the section tabs need on every page.
 
-    nav_section: which of the four sections (or settings) the page is in;
+    nav_section: which of the five sections (Apps, Keywords, Discover, Store,
+    Rivals) or settings the page is in; todo_count: the number beside Apps,
+    the To do lines that ask for something (aso.todo, 0 without Pro);
     discover_url: the Discover tab used last, remembered for the visitor
     (aso.ui_memory.DISCOVER_TAB), the first tab the first time;
-    discover_tabs and settings_tabs: each tab's label, url and whether it is
-    the page shown; a Discover tab of a Pro feature also says, without Pro,
-    that it is locked and what it does (``locked``, ``benefit``), and
-    section_locks does the same for the Metadata and Rivals sections; links:
-    the outside addresses the bar and the Help menu open. Never breaks a
-    page render.
+    discover_tabs, store_tabs and settings_tabs: each tab's label, url and
+    whether it is the page shown; a Discover tab of a Pro feature also says,
+    without Pro, that it is locked and what it does (``locked``, ``benefit``),
+    and section_locks does the same for the Store and Rivals sections; links:
+    the outside addresses the bar and the Help menu open; routine_url: Help,
+    Your routine, a Pro page, empty without a Pro license (so its links on the
+    Help menu and on Apps are not drawn). Never breaks a page render.
     """
     from django.urls import reverse
 
@@ -240,8 +265,9 @@ def nav(request):
     from .pro_access import has_pro_license
 
     context = {
-        "nav_section": "", "nav_tab": "", "discover_url": "", "discover_tabs": [],
-        "settings_tabs": [], "settings_url": "", "setup_guide_url": "", "section_locks": {},
+        "nav_section": "", "nav_tab": "", "todo_count": _todo_count(request), "discover_url": "", "discover_tabs": [],
+        "settings_tabs": [], "store_tabs": [], "settings_url": "", "setup_guide_url": "", "section_locks": {},
+        "routine_url": "",
         "links": {
             "youtube": links.YOUTUBE_URL, "x": links.X_URL, "github": links.GITHUB_URL,
             "respectlytics": links.RESPECTLYTICS_URL, "contact": links.CONTACT_EMAIL,
@@ -261,6 +287,8 @@ def nav(request):
         remembered = (session.get(ui_memory.DISCOVER_TAB) if session is not None else "") or "ai_researcher"
 
         locked = not has_pro_license()   # always, in the free edition
+        if pro and not locked:
+            context["routine_url"] = reverse("aso_pro:routine")   # Help: Your routine, a Pro page
         discover_tabs = []
         for key, label, pro_url, free_url in DISCOVER_TABS:
             url = reverse(pro_url if pro else free_url)
@@ -278,6 +306,7 @@ def nav(request):
             settings_tabs.append(("settings_ai", "AI", reverse("aso_pro:settings_ai")))
         settings_tabs.append(("settings_popularity", "Apple Ads", reverse("aso:settings_popularity")))
         if pro:
+            settings_tabs.append(("settings_asc", "App Store Connect", reverse("aso_pro:settings_asc")))
             settings_tabs.append(("settings_license", "License", reverse("aso_pro:settings_license")))
             settings_tabs.append(("settings_mcp", "MCP", reverse("aso_pro:settings_mcp")))
         if is_desktop_app():
@@ -287,6 +316,8 @@ def nav(request):
             "nav_section": section,
             "nav_tab": name,
             "discover_tabs": discover_tabs,
+            "store_tabs": ([{"key": key, "label": label, "url": reverse(url), "active": key == name}
+                            for key, label, url in STORE_TABS] if pro else []),
             "section_locks": ({key: pro_benefit(feature) for key, feature in PRO_SECTIONS.items()}
                               if locked else {}),
             "settings_tabs": [

@@ -2,15 +2,14 @@
 The top of every Pro preview (docs/development/PRO_PREVIEWS_PLAN.md,
 PRO_AND_CLICKABLE_TEXT_PLAN.md 6): one compact row, so the sample page below
 it is what fills the screen. Left, what the feature does for the reader's
-app (the benefit, as a card title, well below the page title) and that this is sample
-data; right, the two buttons and the demo. cta comes from
+app (the benefit, as a card title, well below the page title, with no label above it:
+the loheden-design skill, No label above a title) and that this is sample data; right, the two buttons and the demo. cta comes from
 aso.pro_preview_words; its primary_tone tints the row: pro green to buy,
 amber to renew, sky for the Apple Ads connection.
 {% endcomment %}
 <section class="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border px-4 py-3 {% if cta.primary_tone == 'sky' %}border-sky-500/25 bg-gradient-to-r from-sky-950/60 to-[#1e293b]{% elif cta.primary_tone == 'renew' %}border-amber-500/25 bg-gradient-to-r from-amber-950/50 to-[#1e293b]{% else %}border-emerald-400/25 bg-gradient-to-r from-emerald-950/60 to-[#1e293b]{% endif %}" data-preview-hero>
     <div class="min-w-0">
-        <p class="inline-flex items-center text-2xs font-semibold uppercase tracking-wider {% if cta.primary_tone == 'sky' %}text-sky-300{% elif cta.primary_tone == 'renew' %}text-amber-300 pro-lock{% else %}text-emerald-300 pro-lock{% endif %}">{{ cta.eyebrow }}</p>
-        <h2 class="card-title mt-0.5" data-preview-benefit>{{ cta.headline }}</h2>
+        <h2 class="card-title" data-preview-benefit>{{ cta.headline }}</h2>
         <p class="text-sm text-slate-300">{{ cta.body }}</p>
     </div>
     <div class="flex flex-wrap items-center gap-3">

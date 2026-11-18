@@ -1,8 +1,8 @@
 """The words every Pro preview uses to sell Pro, in one place
 (docs/development/PRO_PREVIEWS_PLAN.md, UI_REDESIGN_PLAN.md 11.3).
 
-Five previews (AI Researcher, AI Competitor, ASO Simulator, Top Terms,
-Rival Tracker) show the real page with sample results; each says the same
+Six previews (AI Researcher, AI Competitor, ASO Simulator, Top Terms,
+Rival Tracker, Store) show the real page with sample results; each says the same
 thing in the same words: what the feature does for the user's app, that this
 is a preview with sample data, and two clear buttons; the one that buys or
 renews Pro is the app's one Pro button (btn-pro). No price and no list
@@ -17,7 +17,6 @@ STATE_FREE = "free"                # the free edition: Pro needs the Mac app
 STATE_UNLICENSED = "unlicensed"    # the Mac app without a license key
 STATE_EXPIRED = "expired"          # the license has ended
 
-EYEBROW = "Part of RespectASO Pro"
 
 HEADLINES = {
     "researcher": "See the best keywords in any niche, and a title that targets them",
@@ -25,6 +24,8 @@ HEADLINES = {
     "simulator": "Know what a new title will bring before you ship it",
     "top_terms": "See what people search for this week",
     "rival_tracker": "Know the day a rival passes you",
+    "store": "Get found in more searches on the App Store, and see what each change did",
+    "apps": "See each app's downloads, proceeds and what to do next",
 }
 
 # The feature's demo on The Creator Behind (only the AI tools have one).
@@ -40,7 +41,7 @@ def cta(feature: str, state: str, license_url: str | None = None, *, needs_apple
     feature in one buying state. ``needs_apple``: the feature also needs a
     free Apple Ads connection (Top Terms), which the line says."""
     extra = " and a free Apple Ads connection" if needs_apple else ""
-    common = {"eyebrow": EYEBROW, "headline": HEADLINES[feature], "video_url": VIDEOS.get(feature, "")}
+    common = {"headline": HEADLINES[feature], "video_url": VIDEOS.get(feature, "")}
     if state == STATE_FREE:
         return {
             **common,

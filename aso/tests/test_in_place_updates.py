@@ -104,15 +104,8 @@ class AppsPageTest(TestCase):
     def test_the_sections_an_action_swaps_are_marked(self):
         App.objects.create(name="Calm Minutes", track_id=123)
         response = self.client.get(reverse("aso:apps"))
-        for marker in ('id="apps-add"', 'id="apps-manual-form"', 'id="apps-list"',
+        for marker in ('id="apps-list"',
                        'data-app-id=', 'class="app-refresh-form"', 'app-delete-form'):
             with self.subTest(marker=marker):
                 self.assertContains(response, marker)
 
-    def test_adding_answers_with_the_message_and_the_list(self):
-        response = self.client.post(
-            reverse("aso:apps"), {"name": "Zeta", "bundle_id": ""},
-            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
-        )
-        self.assertContains(response, 'id="apps-message"')
-        self.assertContains(response, "Zeta")

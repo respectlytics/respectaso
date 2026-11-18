@@ -158,6 +158,9 @@ class PagesTest(TestCase):
             "/static/fonts/schibsted-grotesk/SchibstedGrotesk-Medium.woff2",
             "/static/fonts/schibsted-grotesk/SchibstedGrotesk-SemiBold.woff2"])
         self.assertIn("mailto:respectaso@loheden.com", html)
+        # "/" is the Apps page, not Keywords (DAILY_USE_PLAN.md step 1).
+        self.assertIn('href="/">Back to RespectASO</a>', html)
+        self.assertNotIn("Back to Keywords", html)
 
     def test_500_for_a_script_is_json(self):
         with self.assertLogs("django.request", "ERROR"):
@@ -170,6 +173,7 @@ class PagesTest(TestCase):
                 self.assertLogs("django.request", "ERROR"), self.assertLogs("aso.error_views", "ERROR"):
             html = self.assertOurPage(self.client.get("/test-errors/crash/", **PAGE), 500, "Something went wrong")
         self.assertIn(error_views.SERVER_ERROR, html)
+        self.assertIn(">Back to RespectASO</a>", html)
 
     def test_403_in_the_app_shell(self):
         with self.assertLogs("django.request", "WARNING"):

@@ -17,7 +17,8 @@ class RespectlyticsInTheHelpMenuTest(TestCase):
     def test_no_banner_one_menu_row(self):
         html = self.client.get(reverse("aso:methodology")).content.decode()
         self.assertNotIn('id="respectlytics-banner"', html)
-        self.assertIn("Respectlytics: privacy-first app analytics", html)
+        self.assertIn('<span class="font-medium text-white">Respectlytics</span>', html)
+        self.assertIn("Privacy-first app analytics. See why users convert.", html)
         self.assertIn(RESPECTLYTICS_URL.replace("&", "&amp;"), html)
 
 

@@ -17,6 +17,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from . import rank_change
 from .models import SearchResult
 from .scoring import estimate_range, sentence_app_name
 
@@ -47,7 +48,7 @@ def _current_dl_interval(result):
         return 0.0, 0.0
     positions = est["positions"]
     if rank > len(positions):
-        # Ranked outside our model's tracked positions (#1–#20). Below #20
+        # Ranked outside our model's tracked positions (#1-#20). Below #20
         # we treat as effectively zero traffic — same as unranked.
         return 0.0, 0.0
     p = positions[rank - 1]
@@ -77,7 +78,7 @@ def _bucket_for_rank(rank):
         return "t50"
     if rank <= 100:
         return "t100"
-    return "t200"  # 101–200; we still track these but they contribute ~0 traffic
+    return "t200"  # 101-200; we still track these but they contribute ~0 traffic
 
 
 def _stale_state(last_refresh):
@@ -211,7 +212,8 @@ def _net_movement(results):
                 .only("app_rank", "searched_at")
                 .first()
             )
-            if prev and prev.app_rank is not None and r.app_rank is not None:
+            if (prev and prev.app_rank is not None and r.app_rank is not None
+                    and rank_change.within_gap(r.searched_at, prev.searched_at)):
                 delta = prev.app_rank - r.app_rank
             prev_searched_at = prev.searched_at if prev else None
             r._summary_prev_checked = True
@@ -369,7 +371,7 @@ def _format_dl_number(value):
 
 
 def format_interval(low, high):
-    """Render a (low, high) interval as e.g. '~120–180' (no '/day' suffix)."""
+    """Render a (low, high) interval as e.g. '~120-180' (no '/day' suffix)."""
     if (low is None or low <= 0) and (high is None or high <= 0):
         return "—"
     lo = _format_dl_number(low)
@@ -378,7 +380,7 @@ def format_interval(low, high):
         return f"~{hi}"
     # A low end that rounds to nothing is written as 0, never as a lone high
     # figure, which would read like a precise one.
-    return f"~{'0' if lo == '0.0' else lo}–{hi}"
+    return f"~{'0' if lo == '0.0' else lo}-{hi}"
 
 
 def compute_app_summary(selected_app, selected_app_name, last_refresh=None):

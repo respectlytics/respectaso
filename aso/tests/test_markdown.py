@@ -4,7 +4,7 @@ The AI tabs once carried three copies of a renderer that escaped nothing and
 drew no tables, and both base templates a fourth for the update banner's
 release notes. Now AsoMarkdown.toHtml() draws every piece of markdown the
 app shows, in both editions, and this module runs it under node (skipped
-without node, like test_duration_text.py) and fails on a second renderer
+without node) and fails on a second renderer
 anywhere in the templates or scripts. docs/development/DEDUPE_RENDERERS_PLAN.md
 """
 

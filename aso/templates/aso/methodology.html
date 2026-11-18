@@ -56,7 +56,7 @@
             </p>
             <h3 class="section-label">The RespectASO estimate</h3>
             <p>
-                The estimate (1–100) is derived from the competitive landscape of each keyword.
+                The estimate (1-100) is derived from the competitive landscape of each keyword.
                 Since Apple doesn't publish exact search volumes, we read observable signals:
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5">
@@ -103,7 +103,7 @@
                 When you connect Apple Ads (a free, one-time API key setup, no ads or spend required),
                 RespectASO syncs Apple's official <strong class="text-white">top search terms dataset</strong> from the
                 Apple Ads Platform API: per storefront and week, the most-searched terms in each of Apple's 15 categories,
-                with a granular 1–100 popularity value, category rank, and Apple's 1–5 tier.
+                with a granular 1-100 popularity value, category rank, and Apple's 1-5 tier.
                 A new week is published by Apple every Monday and picked up automatically.
             </p>
             <p>
@@ -132,7 +132,7 @@
                 </p>
                 <p class="text-slate-400">
                     That is why the RespectASO estimate stays first-class: it's fully inspectable, works in every
-                    storefront for every keyword instantly, and it is your automatic safety net wherever Apple has no
+                    storefront for every keyword with no setup, and it is your automatic safety net wherever Apple has no
                     value. Apple's threshold has also given the estimate its first hard calibration point: download
                     estimates under the Apple source are anchored to Apple's roughly-500-searches-per-week reporting bar.
                     Whichever source you pick, the other number is never hidden: it's one hover away on every badge.
@@ -158,7 +158,7 @@
         </h2>
         <div class="text-sm text-slate-300 leading-relaxed space-y-3">
             <p>
-                The difficulty score (1–100) tells you how hard it is to rank for a keyword. It's calculated by analyzing
+                The difficulty score (1-100) tells you how hard it is to rank for a keyword. It's calculated by analyzing
                 the actual apps that currently rank in the top results and asking: <em class="text-white">how strong is
                 this competition?</em>
             </p>
@@ -198,7 +198,7 @@
                 <h3 class="section-label mb-2">Brand keyword detection</h3>
                 <p class="text-xs text-slate-400">
                     When the keyword matches the #1 app's publisher name (e.g. "nasdaq" → Nasdaq, Inc.) and that app has few ratings
-                    while positions #2–5 are held by major apps, RespectASO detects a <strong class="text-purple-300">brand keyword</strong>.
+                    while positions #2-5 are held by major apps, RespectASO detects a <strong class="text-purple-300">brand keyword</strong>.
                     Brand apps get ranked #1 by Apple based on name match, not organic ASO, so their low rating count doesn't mean
                     the keyword is easy. In these cases, the difficulty score reflects the full competitive landscape without any
                     weak-leader adjustment.
@@ -240,9 +240,9 @@
             <div class="bg-slate-800/80 rounded-lg p-4">
                 <h3 class="section-label mb-2">Why position matters</h3>
                 <div class="space-y-2 text-xs text-slate-400">
-                    <p><strong class="text-purple-300">Positions 1–5</strong>: These apps get the majority of taps. Most users don't scroll past the first few results. If you rank here, you're in the premium real estate.</p>
-                    <p><strong class="text-blue-300">Positions 6–10</strong>: Still visible without scrolling far, but tap-through rates drop significantly. You'll get meaningful downloads, but a fraction of what the top 5 gets.</p>
-                    <p><strong class="text-slate-300">Positions 11–20</strong>: Most users never scroll this far. Downloads from these positions are modest, but for low-competition keywords, even position #15 can be worthwhile.</p>
+                    <p><strong class="text-purple-300">Positions 1-5</strong>: These apps get the majority of taps. Most users don't scroll past the first few results. If you rank here, you're in the premium real estate.</p>
+                    <p><strong class="text-blue-300">Positions 6-10</strong>: Still visible without scrolling far, but tap-through rates drop significantly. You'll get meaningful downloads, but a fraction of what the top 5 gets.</p>
+                    <p><strong class="text-slate-300">Positions 11-20</strong>: Most users never scroll this far. Downloads from these positions are modest, but for low-competition keywords, even position #15 can be worthwhile.</p>
                 </div>
             </div>
             <p>
@@ -578,7 +578,7 @@
             </p>
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-2.5 text-xs text-slate-400">
                 <p><strong class="text-white">1. Start with your app name.</strong> Put your most important keyword in the title: it carries the most weight with Apple's algorithm.</p>
-                <p><strong class="text-white">2. Mix difficulty levels.</strong> Target 2–3 easier keywords you can rank for quickly, plus 1–2 high-value competitive keywords as long-term goals.</p>
+                <p><strong class="text-white">2. Mix difficulty levels.</strong> Target 2-3 easier keywords you can rank for quickly, plus 1-2 high-value competitive keywords as long-term goals.</p>
                 <p><strong class="text-white">3. Think in long-tail.</strong> "budget tracker" is easier than "budget" alone. Multi-word phrases have lower volume but also far less competition.</p>
                 <p><strong class="text-white">4. Track and iterate.</strong> Rankings shift. Refresh your keywords regularly to see if your ASO changes are working, and adjust your strategy when competition changes.</p>
                 <p><strong class="text-white">5. Don't ignore your app page.</strong> Ranking gets people to your listing. Converting them to downloads depends on your icon, screenshots, description, and ratings.</p>
@@ -674,19 +674,19 @@
                 Keyword research data comes from Apple's public <strong class="text-white">iTunes Search API</strong>,
                 plus, when you choose to connect it, the official <strong class="text-white">Apple Ads Platform API</strong>
                 using your own Apple Ads API credentials.
-                If Apple's search API fails, RespectASO reads the same search on Apple's public
+                When the iTunes Search API fails, RespectASO reads the same search on Apple's public
                 <strong class="text-white">App Store search page</strong> (apps.apple.com) instead, so the keyword still gets its results.
                 From that page it takes only the list of apps, in the order Apple shows them, and it looks up each app's
                 details through the iTunes Search API as usual.
                 Nothing else is read from the page.
-                With Pro, the Rival Tracker also reads your rivals' newest reviews from Apple's public review feed, about
+                The Rival Tracker also reads your rivals' newest reviews from Apple's public review feed, about
                 50 per app and country.
                 RespectASO uses no private Apple APIs and no paid data services.
-                The free features run on your machine and send only your search terms to Apple's App Store, and your
+                Keyword research runs on your machine and sends only your search terms to Apple's App Store, and your
                 Apple Ads key stays on your computer.
             </p>
             <p>
-                Pro AI features (AI Niche Researcher, AI Competitor Analyzer, ASO Score Simulator) send your keyword and metadata inputs to the AI provider you choose: OpenAI, Anthropic, Google Gemini, or OpenRouter (using your own API key), any OpenAI-compatible service you connect as a custom endpoint, or a local AI model you run yourself. The Rival Tracker uses the same provider for its keyword suggestions (your app's title, subtitle and keyword field) and for its summary of what your rivals' users complain about (their public reviews). With OpenRouter, your request is routed onward to the host of the model you select. With a custom endpoint, your request goes to the service whose address you entered. No data is sent anywhere else.
+                The AI features (AI Niche Researcher, AI Competitor Analyzer, ASO Score Simulator) send your keyword and metadata inputs to the AI provider you choose: OpenAI, Anthropic, Google Gemini, or OpenRouter (using your own API key), any OpenAI-compatible service you connect as a custom endpoint, or a local AI model you run yourself. The Rival Tracker uses the same provider for its keyword suggestions (your app's title, subtitle and keyword field) and for its summary of what your rivals' users complain about (their public reviews). With OpenRouter, your request is routed onward to the host of the model you select. With a custom endpoint, your request goes to the service whose address you entered. No data is sent anywhere else.
             </p>
             <p>
                 The scoring algorithm and its tests are
@@ -715,7 +715,7 @@
     <!-- Built by Respectlytics -->
     <section class="bg-purple-900/15 border border-purple-500/20 rounded-xl p-4 mb-5">
         <div class="flex items-start gap-4">
-            <span class="text-2xl">📱</span>
+            <svg class="h-6 w-6 shrink-0 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>
             <div class="text-sm text-slate-300 leading-relaxed">
                 <p class="text-white font-medium mb-1">Built by Respectlytics</p>
                 <p>

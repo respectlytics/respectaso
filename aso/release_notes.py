@@ -38,7 +38,61 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.1.2',
+RELEASES = [{'version': '3.2.0',
+  'date': '2026-11-18',
+  'title': 'Apps, your new home page, and Store for your own apps',
+  'kind': 'feature',
+  'sections': [
+      {'heading': 'Every app and what it needs, in one place',
+       'intro': [],
+       'items': [
+           ('<strong>Apps</strong> is the new home: each app\'s downloads, proceeds and keyword '
+            'ranks, and what it needs next.'),
+           ('One <strong>To do</strong> list tells you what each app needs. Close a line and it '
+            'stays closed until something changes.'),
+           ('<strong>Get set up</strong> shows everything you can connect in one row, and what is '
+            'still missing.'),
+           ('Your Mac tells you when an app needs you, at most once a day, with one switch to turn '
+            'it off.'),
+           'Help has a new page, <strong>Your routine</strong>.',
+       ]},
+      {'heading': 'Store, a new section for your own apps',
+       'intro': [('Connect App Store Connect once, and RespectASO works on your own store page.')],
+       'items': [
+           ('<strong>Get found</strong> writes new store text aimed at the searches that fit your '
+            'app, in every language you choose. You approve every change and can put any field '
+            'back.'),
+           ('<strong>Simulator</strong> fills in your subtitle and keywords from your store page, '
+            'and <strong>Use on my store page</strong> sends what you picked straight to Get '
+            'found.'),
+           ('<strong>Custom product pages</strong> give each kind of search its own store page, with the '
+            'screenshots and words that fit it.'),
+           ('<strong>Sales &amp; growth</strong> shows what you earn, where your downloads come '
+            'from, and what changed after each release or store change.'),
+           ('<strong>Reviews</strong> lets you answer every review in the reviewer\'s language, '
+            'with a draft from your AI.'),
+       ]},
+      {'heading': 'Your AI assistant',
+       'intro': [],
+       'items': [
+           ('Ask Claude Desktop, Cursor or another AI assistant what to do today, about your store '
+            'page, sales and reviews, and have it draft store text, custom product pages and '
+            'replies.'),
+       ]},
+      {'heading': 'Runs',
+       'intro': [],
+       'items': [
+           'Each keyword of an AI run shows up as soon as it is scored.',
+           '<strong>Run tonight</strong> starts a run while you sleep.',
+       ]},
+      {'heading': 'Also new',
+       'intro': [],
+       'items': [
+           ('Apple\'s newest store languages, such as Bangla, Tamil and Urdu, are in every '
+            'language list.'),
+       ]},
+  ]},
+ {'version': '3.1.2',
   'date': '2026-10-15',
   'title': 'Security updates, and Rival Tracker review counts taken from the reviews themselves',
   'kind': 'patch',

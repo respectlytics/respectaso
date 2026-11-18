@@ -18,6 +18,14 @@ register = template.Library()
 APPLE_TREND_MIN_DELTA = 3
 
 
+@register.filter
+def notice_dismissed(key):
+    """Whether the notice named ``key`` was closed with its X (aso.ui_state)."""
+    from ..ui_state import notice_dismissed as dismissed
+
+    return dismissed(str(key or ""))
+
+
 @register.filter(is_safe=True)
 def to_json(value):
     """Serialize a Python value to a JSON string (safe for embedding in <script>)."""
@@ -75,8 +83,7 @@ def trend_arrow(delta, metric="higher_better"):
     color = "text-green-400" if is_good else "text-red-400"
     arrow = "↑" if delta > 0 else "↓"
     return mark_safe(
-        f'<span class="{color} ml-1.5" title="Change since this keyword&#x27;s '
-        f'previous check">({arrow}{abs(delta)})</span>'
+        f'<span class="{color} ml-1.5" title="Change since the check before">({arrow}{abs(delta)})</span>'
     )
 
 @register.filter
@@ -192,6 +199,8 @@ MENU_ICONS = {
     "copy": ("M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25", False),
     "save": ("M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3", False),
     "external": ("M7 17L17 7M8 7h9v9", False),
+    "routine": ("M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5", False),
+    "tonight": ("M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z", False),
 }
 _MENU_STROKE = 'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"'
 
@@ -266,13 +275,13 @@ def download_cell(estimates, idx=0, total=0):
         # the tooltip appear on row-hover instead of cell-hover.
         '<div class="group/dl relative inline-block">'
         '<span class="text-sm tabular-nums text-slate-300 cursor-help border-b border-dotted border-slate-600">'
-        f'{p1_lo}–{p1_hi}<span class="text-slate-400">/day</span></span>'
+        f'{p1_lo}-{p1_hi}<span class="text-slate-400">/day</span></span>'
         f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
         '<p class="text-2xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
         '<div class="space-y-1.5">'
-        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">{p1_lo}–{p1_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">{p5_lo}–{p5_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">{p10_lo}–{p10_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">{p1_lo}-{p1_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">{p5_lo}-{p5_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">{p10_lo}-{p10_hi}</span></div>'
         '</div>'
         f'{_derived_market_note(estimates)}'
         '</div></div>'
@@ -531,7 +540,7 @@ def download_sort_value(estimates):
 
 @register.filter
 def dl_interval(value):
-    """Render a [low, high] dict/tuple as '~120–180' (no '/day' suffix).
+    """Render a [low, high] dict/tuple as '~120-180' (no '/day' suffix).
 
     Accepts dicts with 'low'/'high' keys, tuples, or lists. Returns '—' for
     empty intervals. Used by the App Summary panel.
@@ -559,7 +568,7 @@ def dl_interval_from(low, high):
 
 @register.filter
 def pct_of(part, whole):
-    """Return part/whole as an integer percentage (clamped 0–100). Safe for div-by-zero."""
+    """Return part/whole as an integer percentage (clamped 0-100). Safe for div-by-zero."""
     try:
         whole = float(whole)
         if whole <= 0:
@@ -734,3 +743,42 @@ def app_short(name):
     from ..scoring import sentence_app_name
 
     return sentence_app_name(name)
+
+
+@register.filter
+def change_text(value, kind: str = ""):
+    """A period change as "+18%" or "-7%" ("+1.2 pts" for a conversion
+    change, kind "points"); nothing when there is no earlier period."""
+    if value is None:
+        return ""
+    value = float(value)
+    if kind == "points":
+        return "No change" if abs(value) < 0.0005 else f"{value * 100:+.1f} pts"
+    return f"{value * 100:+.0f}%"
+
+
+@register.filter
+def change_tone(value):
+    """The colour class of a change: up green, down red, flat grey."""
+    if value is None or abs(float(value)) < 0.005:
+        return "text-slate-400"
+    return "text-emerald-300" if float(value) > 0 else "text-red-300"
+
+
+@register.inclusion_tag("aso/partials/add_app_dialog.html", takes_context=True)
+def add_app_dialog(context):
+    """The one Add an app dialog (aso/add_app.py), drawn once by base.html for
+    every page; any [data-add-app] opens it (static/js/add-app.js). The
+    account's apps come from the Pro build; a failure there leaves the
+    dialog with search and manual add, never breaks the page."""
+    import logging
+
+    from aso import add_app
+    from aso.forms import AppForm
+
+    try:
+        account = add_app.account_section()
+    except Exception:           # an error page draws this dialog too
+        logging.getLogger(__name__).exception("The Add an app dialog could not read the account's apps")
+        account = None
+    return {"account": account, "form": AppForm(prefix="add-app"), "csrf_token": context.get("csrf_token", "")}

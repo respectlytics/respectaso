@@ -79,6 +79,20 @@ class RegistryShapeTest(SimpleTestCase):
             source = f.read()
         self.assertNotIn("\U0001F1E6", source, "a flag literal crept into the table")
 
+    def test_app_store_connect_territory_codes_name_the_same_storefront(self):
+        """A review's territory ("USA") reads as the sales reports' "US" does."""
+        codes = [c.alpha3 for c in countries.COUNTRIES.values()]
+        self.assertEqual(len(codes), len(set(codes)))
+        for country in countries.COUNTRIES.values():
+            with self.subTest(code=country.code):
+                self.assertRegex(country.alpha3, r"^[A-Z]{3}$")
+                self.assertIs(countries.get(country.alpha3), country)
+        self.assertEqual(countries.name("USA"), "United States")
+        self.assertEqual(countries.name("GBR"), countries.name("gb"))
+        self.assertEqual(countries.flag("FRA"), countries.flag("fr"))
+        self.assertEqual(countries.get("XKS").code, "xk")       # Apple's code for Kosovo
+        self.assertFalse(countries.is_valid("USA"))             # a storefront setting stays two letters
+
     def test_unknown_codes_answer_safely(self):
         self.assertIsNone(countries.get("zz"))
         self.assertEqual(countries.name("zz"), "ZZ")

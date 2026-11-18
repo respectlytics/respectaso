@@ -1,0 +1,9 @@
+{% comment %}
+The Store tabs where the section has none of its own (the free edition):
+aso.store_preview.free_tabs(), taken as ``tabs``. The Store previews and the
+Simulator's preview draw it, so both show the same five tabs.
+{% endcomment %}
+<nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="store" aria-label="Store">
+    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Store</span>
+    {% for t in tabs %}<a href="{{ t.url }}" class="{% if t.active %}section-tab-active{% else %}section-tab{% endif %}"{% if t.active %} aria-current="page"{% endif %}>{{ t.label }}</a>{% endfor %}
+</nav>

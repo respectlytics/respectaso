@@ -35,6 +35,12 @@ LOGIN_ITEM_STATES = (
 
 MIN_LOGIN_ITEM_MACOS = 13
 
+# System Settings at Notifications. From macOS 13 an app's own entry opens by
+# its bundle identifier; older macOS, or an app without one, gets the list.
+NOTIFICATION_SETTINGS = "x-apple.systempreferences:com.apple.preference.notifications"
+APP_NOTIFICATION_SETTINGS = "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id={}"
+MIN_APP_NOTIFICATION_SETTINGS_MACOS = 13
+
 # SMAppService.Status raw values. 0 (not registered) and 3 (not found) both
 # mean "off": an app that never registered reads 3 on macOS 26 (spike of
 # 2026-09-30), and registering from there works.
@@ -86,7 +92,7 @@ COPY = {
     # The window's loading page (aso/templates/loading_standalone.html) and
     # the menu bar's line while the data is being prepared.
     "starting_title": "Getting your data ready",
-    "starting_hint": "The first start after an update can take a little longer.",
+    "starting_hint": "RespectASO opens by itself when it is ready.",
     "start_failed_title": "RespectASO could not start",
     "start_failed_text": (
         "Quit it from the menu bar and open it again. If it still does not "
@@ -178,10 +184,19 @@ def _call(method: str, default, *args):
         return default
 
 
-def send_notification(title: str, body: str) -> bool:
-    """Show a macOS notification. True when macOS took it; False without the
-    Mac app or without the user's permission."""
-    return bool(_call("send_notification", False, title, body))
+def safe_path(path: str) -> bool:
+    """A path of this app that is safe to hand to the window: it starts with
+    one slash and holds only letters, digits and - _ / ? = & . characters."""
+    import re
+
+    return bool(re.fullmatch(r"/(?!/)[A-Za-z0-9_\-/?=&.]*", path or ""))
+
+
+def send_notification(title: str, body: str, path: str = "") -> bool:
+    """Show a macOS notification. ``path`` is the page a click opens ("" keeps
+    the page shown). True when macOS took it; False without the Mac app or
+    without the user's permission."""
+    return bool(_call("send_notification", False, title, body, path if safe_path(path) else ""))
 
 
 def notification_permission() -> str:
@@ -213,6 +228,12 @@ def open_login_items_settings() -> None:
     _call("open_login_items_settings", None)
 
 
+def open_notification_settings() -> bool:
+    """Open System Settings at Notifications, at RespectASO's own entry where
+    macOS allows it. True when macOS opened it; False without the Mac app."""
+    return _call("open_notification_settings", False) is True
+
+
 # ---- the rules, pure -------------------------------------------------------
 
 
@@ -225,6 +246,17 @@ def permission_from(status: int) -> str:
     if status in _UN_GRANTED:
         return "granted"
     return "unavailable"
+
+
+def notification_settings_urls(bundle_id: str | None, macos_major: int) -> list[str]:
+    """The addresses that open System Settings at Notifications, best first:
+    the app's own entry (macOS 13 and later, by its bundle identifier), then
+    the list of every app. Only these two shapes ever reach macOS."""
+    urls = [NOTIFICATION_SETTINGS]
+    plain = bool(bundle_id) and all(c.isascii() and (c.isalnum() or c in ".-") for c in bundle_id)
+    if plain and macos_major >= MIN_APP_NOTIFICATION_SETTINGS_MACOS:
+        urls.insert(0, APP_NOTIFICATION_SETTINGS.format(bundle_id))
+    return urls
 
 
 def in_applications_folder(bundle_path: str, home: Path | None = None) -> bool:

@@ -384,8 +384,31 @@ def _mac_app_action(action):
     return "", ""
 
 
+# What a person reads when macOS did not open System Settings: the way there by hand.
+NOTIFICATION_SETTINGS_FAILED = (
+    "System Settings did not open. Open it from the Apple menu, then Notifications, RespectASO."
+)
+
+
+@require_POST
+def open_notification_settings_view(request):
+    """Open System Settings at Notifications, at RespectASO's own entry.
+
+    The one action behind the Notifications card's button and the Get set
+    up tile's (aso_pro/setup_tiles.py): the window cannot open a System
+    Settings link itself, so macOS is asked from here. The request carries
+    no address: only desktop_bridge.notification_settings_urls ever reaches
+    macOS. Only the running Mac app has it; elsewhere it is a 404.
+    """
+    if not desktop_bridge.is_desktop_app():
+        raise Http404("System Settings exists only in the Mac app.")
+    if desktop_bridge.open_notification_settings():
+        return JsonResponse({"opened": True})
+    return JsonResponse({"opened": False, "error": NOTIFICATION_SETTINGS_FAILED})
+
+
 def settings_mac_app_view(request):
-    """Settings → Mac App: opening at login, and what closing the window does.
+    """Settings → Mac App: opening at login and what closing the window does.
 
     Only the running Mac app has this page; in Docker and in a source run
     without the Mac app it is a 404. The login item state is read from macOS
@@ -396,7 +419,8 @@ def settings_mac_app_view(request):
         raise Http404("Settings → Mac App exists only in the Mac app.")
     message, message_type = "", ""
     if request.method == "POST":
-        message, message_type = _mac_app_action(request.POST.get("action", ""))
+        action = request.POST.get("action", "")
+        message, message_type = _mac_app_action(action)
     return render(request, "aso/settings_mac_app.html", {
         "login_item_state": desktop_bridge.login_item_state(),
         "message": message,

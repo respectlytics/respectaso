@@ -102,11 +102,14 @@ class TheRefreshGivesWayTest(TestCase):
             if not self.searches:
                 self.start_search()
 
+        # The refresh waits its turn at the shared gate before every read, its
+        # first included (aso/throttle.py AppleGate), so a search started
+        # during that first wait already goes first.
         self.refresh(wait=wait)
         self.assertEqual(self.events, [
-            "read sleep sounds 0",
             "search 1 running",
-            "paused at 1",
+            "paused at 0",
+            "read sleep sounds 0",
             "read sleep sounds 1",
             "read sleep sounds 2",
         ])

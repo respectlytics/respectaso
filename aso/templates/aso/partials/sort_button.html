@@ -1,0 +1,10 @@
+{% comment %}
+A column header that sorts its table in the page (static/js/table-sort.js).
+Include it inside a <th> that carries aria-sort ("descending" on the column
+the rows arrive sorted by, "none" on the others), with:
+  key     the column, matched by data-sort-key on each cell
+  label   the header's words
+  text    any value: the column holds words (A to Z first)
+  tip     one short line on hover, only when it adds to the label
+  active  any value: the rows arrive sorted by this column, highest first
+{% endcomment %}<button type="button" data-sort-key="{{ key }}"{% if text %} data-sort-type="text"{% endif %}{% if tip %} title="{{ tip }}"{% endif %} class="sort-button {% if active %}text-slate-100{% else %}text-slate-400{% endif %}">{{ label }}<svg data-sort-arrow viewBox="0 0 8 12" class="h-3 w-2 shrink-0" aria-hidden="true"><path data-sort-up d="M4 1 7 5H1z" fill="currentColor" class="text-slate-600"/><path data-sort-down d="M4 11 1 7h6z" fill="currentColor" class="{% if active %}text-slate-100{% else %}text-slate-600{% endif %}"/></svg></button>

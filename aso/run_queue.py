@@ -11,6 +11,11 @@ run inside Apple's limits and keeps the process-global Local AI cancel flag
 unambiguous. The Free build has only keyword searches; the lane exists there
 too and only ever holds one of them.
 
+A run may wait for the night ("Run tonight"): its ``not_before`` holds the
+next 02:00 in the user's time zone, the dispatcher passes over it until
+then, and the scheduler wakes at that moment to start it. In the Mac app a
+run that waited for the night says "Your report is ready" when it ends.
+
 A run's row names the process working on it (``run_owner``, aso/run_owner.py).
 A row whose process has ended (an AI assistant closed during an MCP run, a
 crash) is released the way a restart releases it (release_dead_runs), so it
@@ -32,6 +37,7 @@ import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta
 
 from django.apps import apps as django_apps
 from django.utils import timezone
@@ -45,7 +51,16 @@ INTERRUPTED_MESSAGE = ("Interrupted: RespectASO was closed while this run was "
 # A run the MCP server worked on, when the AI assistant that started it closed.
 CLIENT_CLOSED_MESSAGE = ("Interrupted: the AI assistant that started this run was "
                          "closed while it was in progress. Retry to run it again.")
-YIELDED_MESSAGE = "Paused for a moment while another run goes first"
+YIELDED_MESSAGE = "Paused while another run goes first"
+
+# "Run tonight": the hour a run asked for the night starts, in the user's
+# own time zone (aso/local_day.py), and the answers a start accepts.
+TONIGHT_HOUR = 2
+WHEN_CHOICES = ("now", "tonight")
+TONIGHT_LABEL = "Starts tonight at 02:00"
+READY_TITLE = "Your report is ready"
+# How a run that worked ends; any other end (failed, cancelled) says nothing.
+FINISHED_STATUSES = ("completed", "ready", "done", "waiting_for_confirm")
 
 
 @dataclass(frozen=True)
@@ -74,6 +89,9 @@ class Feature:
     # The executing run may be paused so another run goes first, and the
     # model carries auto_resume / yielded_for_* columns for that.
     can_yield: bool = False
+    # The run sends its own Mac notification when it ends (the autopilot),
+    # so a run that waited for the night does not get a second one.
+    own_notice: bool = False
 
 
 _features: dict = {}
@@ -123,6 +141,86 @@ def get_feature(key):
 
 
 # ---------------------------------------------------------------------------
+# Run tonight
+# ---------------------------------------------------------------------------
+
+def parse_when(value) -> str:
+    """"now" or "tonight" from what a start sent, in any case; empty is
+    "now". ValueError for anything else."""
+    text = str(value if value is not None else "").strip().lower() or "now"
+    if text not in WHEN_CHOICES:
+        raise ValueError('when must be "now" or "tonight".')
+    return text
+
+
+def tonight(now=None) -> datetime:
+    """The next 02:00 in the user's time zone, as an aware datetime: today's
+    when it is still ahead, else tomorrow's."""
+    from .local_day import user_timezone
+
+    zone = user_timezone()
+    local_now = timezone.localtime(now or timezone.now(), zone)
+    start = datetime.combine(local_now.date(), time(TONIGHT_HOUR), tzinfo=zone)
+    if start <= local_now:
+        start = datetime.combine(local_now.date() + timedelta(days=1), time(TONIGHT_HOUR), tzinfo=zone)
+    return start
+
+
+def not_before_for(when, now=None):
+    """The ``not_before`` of a run started with ``when``: tonight's 02:00
+    for "tonight", None for "now" or anything a start did not mean. In the
+    Mac app the first night run asks macOS once for permission to notify."""
+    try:
+        if parse_when(when) != "tonight":
+            return None
+    except ValueError:
+        return None
+    from . import desktop_bridge
+
+    if desktop_bridge.is_desktop_app() and desktop_bridge.notification_permission() == "not_determined":
+        desktop_bridge.request_notification_permission()
+    return tonight(now)
+
+
+def starts_at(row) -> str:
+    """When a run that waits for the night starts, in the user's time zone
+    (ISO 8601 with its offset); "" for any other run."""
+    from .local_day import user_timezone
+
+    if not waits_for_tonight(row):
+        return ""
+    return timezone.localtime(row.not_before, user_timezone()).isoformat()
+
+
+def is_due(row, now=None) -> bool:
+    """Whether a queued row may start now: it waits for no later moment."""
+    moment = getattr(row, "not_before", None)
+    return moment is None or moment <= (now or timezone.now())
+
+
+def waits_for_tonight(row, now=None) -> bool:
+    return row is not None and row.status == "queued" and not is_due(row, now)
+
+
+def next_due_in(now=None):
+    """Seconds until the first run waiting for the night may start, or None
+    when none waits (the scheduler's wake-up)."""
+    now = now or timezone.now()
+    moments = [row.not_before for _f, row in queued_runs() if not is_due(row, now)]
+    if not moments:
+        return None
+    return max(0.0, (min(moments) - now).total_seconds())
+
+
+def night_runs_due(now=None) -> bool:
+    """Whether a run that waited for the night has reached its hour and
+    still waits (the scheduler then kicks the queue)."""
+    now = now or timezone.now()
+    return any(getattr(row, "not_before", None) is not None and is_due(row, now)
+               for _f, row in queued_runs())
+
+
+# ---------------------------------------------------------------------------
 # Reading the lane
 # ---------------------------------------------------------------------------
 
@@ -147,20 +245,23 @@ def running_run():
     return best
 
 
-def _order_key(row):
-    """Queue order: rank first (unranked rows sort last), then creation."""
+def _order_key(row, now):
+    """Queue order: runs that may start before runs that wait for the night,
+    then rank (unranked rows sort last), then creation."""
     rank = row.queue_rank if row.queue_rank is not None else float("inf")
-    return (rank, row.created_at, row.pk)
+    return (not is_due(row, now), rank, row.created_at, row.pk)
 
 
 def queued_runs():
-    """Every queued run of every feature, in execution order."""
+    """Every queued run of every feature, in execution order; the runs that
+    wait for the night come last."""
     _ensure_features()
+    now = timezone.now()
     rows = []
     for feature in _features.values():
         for row in feature.model.objects.filter(status="queued", **feature.filter_kwargs):
             rows.append((feature, row))
-    rows.sort(key=lambda pair: _order_key(pair[1]))
+    rows.sort(key=lambda pair: _order_key(pair[1], now))
     return rows
 
 
@@ -216,7 +317,8 @@ def local_work() -> bool:
         return True
     if running:
         return False          # waiting runs wait for a run this process cannot end
-    return bool(queued_runs())
+    now = timezone.now()      # a run that waits for the night is no work yet
+    return any(is_due(row, now) for _f, row in queued_runs())
 
 
 def interrupted_message(cause) -> str:
@@ -360,7 +462,12 @@ def _move_locked(feature_key, pk, direction):
     elif direction == "down" and index < len(rows) - 1:
         rows[index + 1], rows[index] = rows[index], rows[index + 1]
         index += 1
-    elif direction == "top" and index > 0:
+    elif direction == "top":
+        # "Run next" on a run that waits for the night means now.
+        feature, row = rows[index]
+        if not is_due(row):
+            feature.model.objects.filter(pk=row.pk, status="queued").update(not_before=None)
+            row.not_before = None
         rows.insert(0, rows.pop(index))
         index = 0
     _renumber(rows)
@@ -460,9 +567,12 @@ def _restore_yielded():
 # ---------------------------------------------------------------------------
 
 def _first_queued():
-    """(feature, row) at the front of the queue, or None."""
+    """(feature, row) at the front of the queue, or None; never a run that
+    waits for the night before its hour."""
     rows = queued_runs()
-    return rows[0] if rows else None
+    if not rows or not is_due(rows[0][1]):
+        return None
+    return rows[0]
 
 
 def _claim_next():
@@ -516,20 +626,43 @@ def kick():
 
 
 def _worker(feature, pk):
+    from .keep_awake import awake
+
     with _lock:
         _active.add((feature.key, pk))
     try:
-        feature.execute(pk)
-    except Exception:                     # execute() handles its own errors; this is the backstop
-        logger.exception("Run %s/%s crashed", feature.key, pk)
-        feature.model.objects.filter(pk=pk, status="running").update(
-            status="failed", error_message="Unexpected error. See the app log.",
-            progress_message="Error",
-        )
+        try:
+            with awake():                 # a long run is not cut short by the Mac's idle sleep
+                feature.execute(pk)
+        except Exception:                 # execute() handles its own errors; this is the backstop
+            logger.exception("Run %s/%s crashed", feature.key, pk)
+            feature.model.objects.filter(pk=pk, status="running").update(
+                status="failed", error_message="Unexpected error. See the app log.",
+                progress_message="Error",
+            )
+        try:
+            report_ready(feature, pk)
+        except Exception:                 # a notification must never stop the lane
+            logger.exception("Could not say run %s/%s is ready", feature.key, pk)
     finally:
         with _lock:
             _active.discard((feature.key, pk))
         kick()                            # chain to the next queued run; no lock held here
+
+
+def report_ready(feature, pk) -> bool:
+    """In the Mac app, "Your report is ready" with the run's name when a run
+    that waited for the night has ended well. True when macOS took it."""
+    if feature.own_notice:
+        return False
+    row = feature.model.objects.filter(pk=pk).first()
+    if row is None or getattr(row, "not_before", None) is None or row.status not in FINISHED_STATUSES:
+        return False
+    from . import desktop_bridge
+
+    if not desktop_bridge.is_desktop_app():
+        return False
+    return desktop_bridge.send_notification(READY_TITLE, feature.describe(row)["label"])
 
 
 # ---------------------------------------------------------------------------

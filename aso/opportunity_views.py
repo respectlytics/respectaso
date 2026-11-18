@@ -37,8 +37,8 @@ def opportunity_view(request):
         "apps": App.objects.all(),
         "form": OpportunitySearchForm(initial={"keyword": (request.GET.get("keyword") or "").strip()[:100]}),
         "scan": opportunity_scans.scan_payload(scan, include_results=True) if scan else None,
-        "seconds_per_country": round(opportunity_scans.estimate_seconds(1), 1),
         "total_storefronts": len(countries.CODES),
+        "is_pro": has_pro_license(),     # "Run tonight" belongs to Pro's queue
     })
 
 
@@ -70,21 +70,22 @@ def opportunity_start_view(request):
 
     running = run_queue.running_run()
     queued_behind = None
-    eta_seconds = None
     if running is not None:
-        feature, row = running
+        feature, _row = running
         queued_behind = feature.label
         if feature.key == opportunity_scans.FEATURE_KEY:
             queued_behind = "the current scan"
-            eta_seconds = opportunity_scans.scan_payload(row)["eta_seconds"]
     elif run_queue.busy_reason():
         queued_behind = run_queue.busy_reason()
 
-    scan = opportunity_scans.create_scan(keyword, codes, app=app)
+    # "Run tonight" belongs to Pro's queue, like reordering it.
+    not_before = run_queue.not_before_for(request.POST.get("when")) if is_pro else None
+    if not_before is not None:
+        queued_behind = None
+    scan = opportunity_scans.create_scan(keyword, codes, app=app, not_before=not_before)
     return JsonResponse({
         "scan": opportunity_scans.scan_payload(scan),
         "queued_behind": queued_behind if scan.status == "queued" else None,
-        "eta_seconds": eta_seconds if scan.status == "queued" else None,
     })
 
 

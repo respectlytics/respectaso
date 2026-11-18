@@ -20,6 +20,10 @@ also sends each failure's traceback as text: a traceback object cannot be
 pickled, so one failing test used to end the whole parallel run with
 "cannot pickle 'traceback' object" instead of naming the test.
 
+Every test starts with an empty App Store queue (aso/throttle.py
+AppleGate): a test that fakes time.sleep leaves its slots minutes ahead,
+which a later test with real sleeps would otherwise wait out.
+
 Each parallel worker also gets a data folder of its own. Linux starts the
 workers by forking the main process, so they all inherited the one folder
 core/settings.py made for the run, and tests that write a file there (the
@@ -28,6 +32,7 @@ the first Linux run of the suite (the CI's) failed six local day tests that
 pass on macOS, where every worker imports the settings afresh.
 """
 
+import os
 import socket
 import tempfile
 import traceback
@@ -47,6 +52,9 @@ _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", ""}
 # (test id, host) for every refused attempt, and the test running now.
 _refused: list[tuple[str, str]] = []
 _current_test = ["(outside a test)"]
+
+# A test run never holds the Mac awake (aso/keep_awake.py); its own test patches this back.
+os.environ.setdefault("RESPECTASO_NO_KEEP_AWAKE", "1")
 
 
 class NetworkBlockedInTests(OSError):
@@ -124,6 +132,12 @@ class RefusalsFailTheTest:
 
     def startTest(self, test):
         _current_test[0] = test.id()
+        # Each test starts with an empty App Store queue: a test that fakes
+        # the sleep leaves the shared gate's slots minutes ahead, which the
+        # next test would otherwise wait out (aso/throttle.py AppleGate).
+        from aso.throttle import apple_gate
+
+        apple_gate.reset()
         super().startTest(test)
 
     def addSuccess(self, test):

@@ -1,0 +1,9 @@
+{% comment %}A notice the page fills as things happen (.notice): hidden until
+Notice.show(element, text, tone) in static/js/notice.js sets its words and
+tone; its X hides it again. Include with id="...", and extra="..." for
+spacing.{% endcomment %}
+<div id="{{ id }}" class="notice notice-error hidden {{ extra }}" role="status" data-notice-live>
+    <span data-tone-icon="success" class="hidden shrink-0">{% include "aso/partials/notice_icon.html" with tone="success" %}</span><span data-tone-icon="info" class="hidden shrink-0">{% include "aso/partials/notice_icon.html" with tone="info" %}</span><span data-tone-icon="warning" class="hidden shrink-0">{% include "aso/partials/notice_icon.html" with tone="warning" %}</span><span data-tone-icon="error" class="shrink-0">{% include "aso/partials/notice_icon.html" with tone="error" %}</span>
+    <p class="min-w-0 flex-1" data-notice-text></p>
+    {% include "aso/partials/notice_close.html" %}
+</div>

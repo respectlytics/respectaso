@@ -40,9 +40,8 @@
     }
 
     function message(text) {
-        var box = el('rival-message');
-        box.textContent = text || '';
-        box.classList.toggle('hidden', !text);
+        if (text) { window.Notice.show(el('rival-message'), text, 'info'); }
+        else { window.Notice.hide(el('rival-message')); }
     }
 
     function openDialog(id) {
@@ -319,7 +318,7 @@
                     var picker = window.CountryPicker && CountryPicker.get('rival-app-switch');
                     var picked = picker ? picker.item(picker.getSelected()[0]) : null;
                     var name = picked ? picked.label : '';
-                    ActivityIndicator.announce({queued: false, label: 'Rival Tracker' + (name ? ': ' + name : ''), eta: null});
+                    ActivityIndicator.announce({queued: false, label: 'Rival Tracker' + (name ? ': ' + name : '')});
                 } else {
                     message(res.data.message || res.data.error || '');
                 }

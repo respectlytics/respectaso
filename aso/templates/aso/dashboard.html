@@ -13,7 +13,8 @@
             <h1 class="page-title">Keywords</h1>
             <p class="page-lead">Every keyword you search is tracked here and updated every day.</p>
         </div>
-        <div class="shrink-0 pt-1">
+        <div class="flex shrink-0 items-center gap-2 pt-1">
+            <button type="button" class="btn-secondary inline-flex items-center gap-1.5 py-1.5 text-sm" id="add-app-button" data-add-app><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>Add app…</button>
             {% comment %}The app switcher, each app with its logo (the owner, 2026-10-02):
             "All apps" is a view; the last row opens the Apps page (the change
             handler in this page's script).{% endcomment %}
@@ -37,17 +38,18 @@
                 </div>
                 {# border-transparent: the same height as the bordered keyword field, so both stay level #}
                 <button type="submit" id="search-btn" data-film-mark="search-button"
-                        class="btn-primary gap-2 whitespace-nowrap border border-transparent py-2.5 leading-5">
+                        class="btn-primary order-last gap-2 whitespace-nowrap border border-transparent py-2.5 leading-5">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                     Search
                 </button>
+                {% if keyword_limit_context.is_pro %}<div class="flex items-center self-stretch">{% include "aso/partials/run_tonight_button.html" %}</div>{% endif %}
             </div>
             {# The keyword count, and for the free edition how many fit a search (static/js/keyword-search-job.js) #}
             <p id="keyword-counter" class="mt-1.5 text-sm text-slate-300 tabular-nums empty:hidden"></p>
             <p id="new-app-hint" class="hidden mt-1.5 text-sm text-slate-300">Type the words people would search for.</p>
-            <div id="search-error" class="hidden mt-3 bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-sm text-red-200"></div>
+            {% include "aso/partials/notice_live.html" with id="search-error" extra="mt-3" %}
         </form>
     </div>
 
@@ -57,11 +59,11 @@
         <h2 class="card-title">Which app do you want to grow?</h2>
         <p class="mt-2 text-sm text-slate-300">Add it once, and RespectASO shows where it ranks and which keywords can bring it downloads.</p>
         <div class="mt-4 flex items-center justify-center gap-3">
-            <a href="{% url 'aso:apps' %}" class="btn-primary">Add your app</a>
+            <button type="button" class="btn-primary" data-add-app>Add your app…</button>
             <button type="button" class="btn-secondary" onclick="document.getElementById('new-app-hint').classList.remove('hidden'); document.getElementById('id_keywords').focus();">I'm planning a new app</button>
         </div>
     </section>
-    {% elif setup %}{% include "aso/partials/setup_checklist.html" %}{% endif %}
+    {% endif %}
 
     <!-- The keyword search in progress (running, paused or queued) -->
     {% include "aso/partials/search_job_panel.html" %}
@@ -73,7 +75,6 @@
     <!-- The run queue: keyword searches and AI runs, reorderable (Pro) -->
     {% endif %}
 
-    {% if 'aso_pro' in INSTALLED_APPS %}<div id="rival-digest-slot" data-url="{% url 'aso_pro:rival_digest_card' %}"></div>{% endif %}
     {% if app_summary %}
     {% include "aso/_app_summary.html" with summary=app_summary %}
     {% endif %}
@@ -319,7 +320,7 @@
                                 </div>
                                 <span class="text-slate-400 text-xs block">{{ result.difficulty_label }}</span>
                                 {% if result.difficulty_breakdown.is_brand_keyword %}
-                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-2xs inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword: it matches the #1 app's publisher. Difficulty counts every ranking app, not just that one.">🏷️ Brand</span>
+                                <span class="bg-purple-900/20 text-purple-300 border border-purple-500/20 rounded px-1 py-0.5 text-2xs inline-flex items-center gap-0.5 mt-0.5 cursor-help" data-tip="Brand keyword: it matches the #1 app's publisher. Difficulty counts every ranking app, not just that one.">Brand</span>
                                 {% endif %}
                             </td>
                             <td class="px-3 py-2 text-center text-base font-semibold bg-cyan-500/5" data-sort-value="{{ result.opportunity_score }}" data-film-mark="opportunity">
@@ -445,7 +446,7 @@
                                                     </div>
                                                 </td>
                                                 <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">
-                                                    {% if comp.averageUserRating %}⭐ {{ comp.averageUserRating|floatformat:1 }}{% else %}—{% endif %}
+                                                    {% if comp.averageUserRating %}★ {{ comp.averageUserRating|floatformat:1 }}{% else %}—{% endif %}
                                                 </td>
                                                 <td class="px-2 py-1.5 text-slate-300 whitespace-nowrap">{{ comp.userRatingCount|format_number }}</td>
                                                 <td class="px-2 py-1.5 text-slate-400 text-xs whitespace-nowrap">
@@ -1683,7 +1684,7 @@ async function bulkRefresh() {
             if (data.total === 0) {
                 await showAlert('No keywords to update.', {type: 'info', title: 'Nothing to do'});
             } else if (window.ActivityIndicator && ActivityIndicator.announce) {
-                ActivityIndicator.announce({queued: false, label: 'Updating ' + data.total.toLocaleString('en-US') + ' tracked keywords', eta: null});
+                ActivityIndicator.announce({queued: false, label: 'Updating ' + data.total.toLocaleString('en-US') + ' tracked keywords'});
             }
         } else {
             await showAlert(data.error || 'Could not start the update.', {type: 'danger', title: 'Error'});

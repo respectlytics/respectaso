@@ -15,6 +15,7 @@ Never raises. A strip that cannot render must not take a page down with it.
 from __future__ import annotations
 
 from django.urls import reverse
+from django.utils import timezone
 
 from . import opportunity_scans, search_jobs
 from .models import KeywordSearchJob, OpportunityScan
@@ -74,8 +75,11 @@ def strip_state() -> dict | None:
     """
     job = _shown(search_jobs.panel_job(), search_jobs.finished_job)
     scan = _shown(opportunity_scans.panel_scan(), opportunity_scans.finished_scan)
-    waiting = (KeywordSearchJob.objects.filter(status="queued").exists()
-               or OpportunityScan.objects.filter(status="queued").exists())
+    # A run that waits for the night ("Run tonight") is not about to start:
+    # the page need not keep asking for it all day.
+    now = timezone.now()
+    waiting = (KeywordSearchJob.objects.filter(status="queued").exclude(not_before__gt=now).exists()
+               or OpportunityScan.objects.filter(status="queued").exclude(not_before__gt=now).exists())
 
     candidates = []
     if job is not None:

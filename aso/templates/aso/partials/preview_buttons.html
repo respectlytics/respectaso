@@ -7,7 +7,7 @@ green); sky connects Apple Ads; the secondary is the app's secondary button.
 {% endcomment %}
 <div class="flex flex-wrap items-center gap-2">
     {% if cta.primary_tone == 'sky' %}
-    <a href="{{ cta.primary_url }}"{% if cta.primary_external %} target="_blank" rel="noopener"{% endif %} data-preview-primary
+    <a href="{{ cta.primary_url }}"{% if cta.primary_external %} target="_blank" rel="noopener"{% endif %}{% if cta.primary_add_app %} data-add-app{% endif %} data-preview-primary
        class="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500">{{ cta.primary_label }}</a>
     {% else %}
     <a href="{{ cta.primary_url }}" target="_blank" rel="noopener" data-preview-primary class="btn-pro">{{ cta.primary_label }}</a>

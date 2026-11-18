@@ -178,6 +178,7 @@
 
     function statusTitle(scan) {
         if (scan.status === 'queued') {
+            if (scan.tonight) { return 'Starts tonight at 02:00: ' + JP.esc(scan.keyword); }
             var waiting = scan.waiting_for ? ' behind ' + JP.esc(scan.waiting_for) : '';
             return 'Queued' + waiting;
         }
@@ -195,7 +196,6 @@
         if (scan.status === 'running' && scan.current_country_name) {
             parts.push('now ' + JP.esc(scan.current_country_name));
         }
-        if (scan.eta_seconds) { parts.push(JP.etaText(scan.eta_seconds)); }
         if (scan.failed_count) {
             parts.push(JP.fmt(scan.failed_count) + ' could not be checked');
         }
@@ -225,7 +225,9 @@
         JP.toggle('osp-progress-wrap', !done);
 
         var note = '';
-        if (queued && scan.waiting_for) {
+        if (queued && scan.tonight) {
+            note = '';
+        } else if (queued && scan.waiting_for) {
             note = 'Waiting for ' + JP.esc(scan.waiting_for) + '.';
             if (scan.queue_position) { note += ' Position ' + scan.queue_position + ' in the queue.'; }
         } else if (running) {
@@ -285,7 +287,7 @@
     function atFirstCell(r) {
         var range = r.downloads_at_first || [0, 0];
         return '<td class="px-3 py-2 text-center text-slate-300 whitespace-nowrap tabular-nums" data-sort-value="' +
-            range[1] + '">' + fmt(range[0]) + '\u2013' + fmt(range[1]) +
+            range[1] + '">' + fmt(range[0]) + '-' + fmt(range[1]) +
             '<span class="text-slate-400">/day</span></td>';
     }
 
@@ -394,7 +396,7 @@
         let compRows = '';
         if (competitors.length) {
             compRows = competitors.map((app, i) => {
-                const stars = app.averageUserRating ? '⭐ ' + app.averageUserRating.toFixed(1) : '—';
+                const stars = app.averageUserRating ? '★ ' + app.averageUserRating.toFixed(1) : '—';
                 const ratings = app.ratings_text || '0';  // aso.scoring.fmt_count, from the server
                 const releaseDate = app.releaseDate ? new Date(app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
                 const updatedDate = (app.currentVersionReleaseDate || app.releaseDate) ? new Date(app.currentVersionReleaseDate || app.releaseDate).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : '—';
@@ -532,10 +534,8 @@
             if (!r.ok) { throw new Error(d.error || 'Could not save'); }
             return d;
         }); }).then(function (data) {
-            var banner = JP.byId('opp-saved-banner');
-            JP.setText('opp-saved-text', data.saved + ' ' +
-                JP.plural(data.saved, 'country', 'countries') + ' added to Tracked Keywords.');
-            if (banner) { banner.classList.remove('hidden'); }
+            Notice.show(JP.byId('opp-saved-banner'), data.saved + ' ' +
+                JP.plural(data.saved, 'country', 'countries') + ' added to Tracked Keywords.', 'success');
         }).catch(function (err) {
             showAlert(err.message);
         });
@@ -609,16 +609,14 @@
         return 0;
     }
 
-    function updateCost() {
+    function updateScanLabel() {
         var picker = window.CountryPicker && CountryPicker.get('scan-countries');
         if (!picker) { return; }
         var n = picker.getSelected().length;
-        var seconds = n * (cfg.secondsPerCountry || 3.6);
         var label = JP.byId('opp-btn-text');
         if (label) {
             label.textContent = n
-                ? 'Scan ' + n + ' ' + JP.plural(n, 'country', 'countries') +
-                  (seconds ? ' (' + JP.durationText(seconds) + ')' : '')
+                ? 'Scan ' + n + ' ' + JP.plural(n, 'country', 'countries')
                 : 'Pick countries to scan';
         }
     }
@@ -652,9 +650,9 @@
                         var scan = d.scan || {};
                         ActivityIndicator.announce({
                             queued: scan.status === 'queued',
+                            tonight: !!scan.tonight,
                             label: 'Country scan: ' + (scan.keyword || body.get('keyword') || ''),
-                            current: d.queued_behind || '',
-                            eta: scan.status === 'queued' ? d.eta_seconds : scan.eta_seconds
+                            current: d.queued_behind || ''
                         });
                     }
                     poll.start();
@@ -706,9 +704,9 @@
         });
 
         if (window.CountryPicker) {
-            CountryPicker.onChange('scan-countries', updateCost);
+            CountryPicker.onChange('scan-countries', updateScanLabel);
         }
-        updateCost();
+        updateScanLabel();
 
         if (cfg.bootstrap) { apply({ scan: cfg.bootstrap }); }
         poll.start();

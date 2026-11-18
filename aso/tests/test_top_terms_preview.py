@@ -32,7 +32,7 @@ class SampleDataTest(TestCase):
                 len(ctx["new_terms"]), len(preview.SAMPLE_NEW_TERMS)
             )
             cta = ctx["cta"]
-            for key in ("eyebrow", "headline", "body", "primary_label",
+            for key in ("headline", "body", "primary_label",
                         "primary_url", "primary_tone", "table_line"):
                 self.assertTrue(cta[key], f"{state}: empty {key}")
             self.assertIn(cta["primary_tone"], ("pro", "renew", "sky"))

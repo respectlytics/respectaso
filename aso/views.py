@@ -16,6 +16,7 @@ from . import (
     history_selection,
     keyword_labels,
     pair_hooks,
+    rank_change,
     run_queue,
     search_jobs,
     ui_memory,
@@ -120,6 +121,23 @@ def apple_stale_banner_dismiss_view(request):
 
     rejected_at = storage.load_apple_settings()["apple_ads"]["credentials_rejected_at"]
     ui_state.dismiss(ui_state.apple_stale_banner_key(rejected_at))
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def notice_dismiss_view(request):
+    """Keep a notice closed with its X (aso/partials/notice_close.html,
+    static/js/notice.js), per install, so it stays closed after a restart."""
+    from . import ui_state
+
+    try:
+        body = json.loads(request.body or b"{}")
+        keys = body.get("keys") if "keys" in body else [body.get("key")]
+        if not isinstance(keys, list) or len(keys) > 10:
+            raise ValueError("No notice has that name.")
+        ui_state.dismiss_notice(*keys)
+    except (ValueError, AttributeError, TypeError) as exc:
+        return JsonResponse({"error": str(exc) or "No notice has that name."}, status=400)
     return JsonResponse({"ok": True})
 
 
@@ -412,7 +430,10 @@ def dashboard_view(request):
             else:
                 result.popularity_delta = None
             result.difficulty_delta = result.difficulty_score - prev["difficulty_score"]
-            if result.app_rank is not None and prev["app_rank"] is not None:
+            # A rank's move follows the one rule of every screen (aso/rank_change.py):
+            # only against a read at most MAX_GAP_DAYS older.
+            if (result.app_rank is not None and prev["app_rank"] is not None
+                    and rank_change.within_gap(result.searched_at, prev["searched_at"])):
                 result.rank_delta = prev["app_rank"] - result.app_rank  # Lower rank = better = positive delta
             else:
                 result.rank_delta = None
@@ -462,13 +483,6 @@ def dashboard_view(request):
         SearchResult.objects.filter(id__in=latest_ids), app_id=int(app_id) if app_id else None,
     )
 
-    try:
-        from . import setup_checklist
-
-        setup = setup_checklist.checklist(request)
-    except Exception:  # noqa: BLE001 (the checklist must never break the page)
-        setup = None
-
     # First run: no app and nothing tracked yet (KEYWORDS_PAGE_PLAN.md M2.5).
     welcome = not apps.exists() and not SearchResult.objects.exists()
 
@@ -482,8 +496,6 @@ def dashboard_view(request):
         "aso/dashboard.html",
         {
             "apps": apps,
-            # "Get set up" (aso/setup_checklist.py), None when every step is done
-            "setup": setup,
             "welcome": welcome,
             "search_form": search_form,
             # App Summary panel (None when hidden)
@@ -619,22 +631,24 @@ def search_view(request):
 
     running = run_queue.running_run()
     queued_behind = None
-    eta_seconds = None
     if running is not None:
-        run_feature, run_row = running
+        run_feature, _run_row = running
         queued_behind = run_feature.label
         if run_feature.key == search_jobs.FEATURE_KEY:
             queued_behind = "the current search"
-            eta_seconds = search_jobs.job_payload(run_row)["eta_seconds"]
     elif run_queue.busy_reason():
         queued_behind = run_queue.busy_reason()
 
     run_now = request.POST.get("run_now") in ("1", "true", "on")
-    job = search_jobs.create_job(app, countries, keywords, run_now=run_now)
+    # "Run tonight" belongs to Pro's queue, like reordering it.
+    not_before = run_queue.not_before_for(request.POST.get("when")) if context["is_pro"] else None
+    job = search_jobs.create_job(app, countries, keywords, run_now=run_now and not_before is None,
+                                 not_before=not_before)
+    if not_before is not None:
+        queued_behind = None
     return JsonResponse({
         "job": search_jobs.job_payload(job),
         "queued_behind": queued_behind if job.status == "queued" else None,
-        "eta_seconds": eta_seconds if job.status == "queued" else None,
     })
 
 
@@ -798,18 +812,27 @@ def keyword_cleanup_snooze_view(request):
 # keyword search at a time and has no queue to show.
 # ---------------------------------------------------------------------------
 
+def _kind_label(feature, described):
+    """What kind of run it is, in words: a feature may name a run of its own
+    kind ("badge": "Review reply"), else the feature's own label."""
+    return described.get("badge") or feature.label
+
+
 def _queue_entry(feature, row, **extra):
     """One queue-panel row: who owns the run, what it is, where it lives."""
     described = feature.describe(row)
     return {
         "feature": feature.key,
-        "feature_label": feature.label,
+        # A feature may send a run to its own page ("url").
+        "feature_label": _kind_label(feature, described),
         "id": row.pk,
         "label": described["label"],
         "detail": described["detail"],
         "country": described["country"],
         "is_refinement": described["is_refinement"],
-        "url": feature.open_url,
+        "url": described.get("url") or feature.open_url,
+        # "Run tonight": the run waits for 02:00 rather than for its turn.
+        "tonight": run_queue.waits_for_tonight(row),
         **extra,
     }
 
@@ -838,8 +861,9 @@ def _finished_run(spec):
     if row is None or row.status not in ("completed", "failed", "cancelled"):
         return None
     url = feature.open_url if feature.key == "keyword_search" else f"{feature.open_url}?run={row.pk}"
-    return {"feature": feature.key, "id": row.pk, "status": row.status,
-            "label": feature.describe(row)["label"], "url": url}
+    described = feature.describe(row)
+    return {"feature": feature.key, "feature_label": _kind_label(feature, described), "id": row.pk,
+            "status": row.status, "label": described["label"], "url": url}
 
 
 def queue_status_view(request):
@@ -924,9 +948,12 @@ def queue_move_view(request):
     feature, session_id, error = _queue_target(request)
     if error is not None:
         return error
-    position = run_queue.move(feature.key, session_id, (request.POST.get("direction") or "").strip())
+    direction = (request.POST.get("direction") or "").strip()
+    position = run_queue.move(feature.key, session_id, direction)
     if position is None:
         return JsonResponse({"error": "This run is not waiting in the queue."}, status=400)
+    if direction == "top":
+        run_queue.kick()      # a run moved out of the night starts at once when the lane is free
     return JsonResponse({"position": position})
 
 
@@ -965,6 +992,8 @@ def app_lookup_view(request):
         return JsonResponse(
             {"apps": [], "error": APP_STORE_UNAVAILABLE}
         )
+    tracked = set(App.objects.filter(track_id__in=[r["trackId"] for r in results])
+                  .values_list("track_id", flat=True))
     return JsonResponse(
         {
             "apps": [
@@ -976,6 +1005,8 @@ def app_lookup_view(request):
                     "sellerName": r["sellerName"],
                     "genre": r.get("primaryGenreName") or "",
                     "shortName": sentence_app_name(r["trackName"]),
+                    # The Add an app dialog shows these as added instead of offering them again.
+                    "tracked": r["trackId"] in tracked,
                 }
                 for r in results
             ]
@@ -983,14 +1014,42 @@ def app_lookup_view(request):
     )
 
 
-def apps_view(request):
-    """
-    Manage apps for keyword categorization.
+@require_POST
+def app_add_view(request):
+    """Add an app from the Add an app dialog (aso/add_app.py): ``store`` (a
+    result of app_lookup_view) or ``manual`` (name and an optional bundle
+    ID). An app already tracked is a no-op, said as such. Answers the
+    sentence the dialog shows, the names added and those already there."""
+    from . import add_app
 
-    Supports two flows:
-      1. Manual entry (name + optional bundle_id)
-      2. App Store lookup (sets track_id, icon, seller from iTunes data)
-    """
+    try:
+        body = json.loads(request.body or b"{}")
+    except (ValueError, UnicodeDecodeError):
+        body = {}
+    body = body if isinstance(body, dict) else {}
+    store, manual = body.get("store"), body.get("manual")
+    if isinstance(store, dict):
+        try:
+            track_id = int(store.get("trackId"))
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "That app could not be read. Search for it again."}, status=400)
+        app, created = add_app.add_from_store(
+            track_id, name=str(store.get("trackName") or ""), bundle_id=str(store.get("bundleId") or ""),
+            icon_url=str(store.get("artworkUrl100") or ""), seller_name=str(store.get("sellerName") or ""))
+    elif isinstance(manual, dict):
+        form = AppForm({"name": manual.get("name") or "", "bundle_id": manual.get("bundle_id") or ""})
+        if not form.is_valid():
+            return JsonResponse({"error": "Type the app's name to add it."}, status=400)
+        app, created = add_app.add_manual(form.cleaned_data["name"], form.cleaned_data["bundle_id"])
+    else:
+        return JsonResponse({"error": "Pick an app to add."}, status=400)
+    added, already = ([app.name], []) if created else ([], [app.name])
+    return JsonResponse({"added": added, "already": already, "message": add_app.result_message(added, already)})
+
+
+def apps_view(request):
+    """The Apps page. Adding an app is the Add an app dialog every page
+    opens (aso/add_app.py, app_add_view); ?add=1 opens it on arrival."""
     message = None
     message_type = None
 
@@ -1006,54 +1065,58 @@ def apps_view(request):
         message = _refresh_problem(refresh_status, request.GET)
         message_type = "error"
 
-    if request.method == "POST":
-        # Check if this is from App Store lookup (has track_id)
-        track_id = request.POST.get("track_id")
-        if track_id:
-            try:
-                track_id_int = int(track_id)
-                # Prevent duplicate
-                if App.objects.filter(track_id=track_id_int).exists():
-                    message = "This app has already been added."
-                    message_type = "error"
-                else:
-                    App.objects.create(
-                        name=request.POST.get("name", "Unknown App"),
-                        bundle_id=request.POST.get("bundle_id", ""),
-                        track_id=track_id_int,
-                        store_url=request.POST.get("store_url", ""),
-                        icon_url=request.POST.get("icon_url", ""),
-                        seller_name=request.POST.get("seller_name", ""),
-                    )
-                    message = f"App '{request.POST.get('name')}' added from App Store."
-                    message_type = "success"
-            except (ValueError, TypeError):
-                message = "Invalid app data."
-                message_type = "error"
+    from . import apps_home, setup_checklist, ui_memory
+
+    days = ui_memory.apps_period(request)
+    if request.method == "GET" and ui_memory.is_full_page_load(request):
+        apps_home.opened()      # a person opened the page: check Apple for anything due
+    home = apps_home.page(request, days)
+    return render(request, "aso/apps.html", {
+        "message": message, "message_type": message_type,
+        "home": home,
+        "setup": setup_checklist.strip(request),
+        "pro_sample": _apps_pro_sample(),
+    })
+
+
+def _apps_pro_sample():
+    """The sample card the Apps page shows without a Pro license, or None. It has no button:
+    the Pro license tile of the Get set up strip holds the page content's one Pro button."""
+    from . import pro_preview_words as words
+    from .pro_access import has_pro_license
+
+    if has_pro_license():
+        return None
+    return {"headline": words.HEADLINES["apps"]}
+
+
+def apps_state_view(request):
+    """What the Apps page and the top bar ask every minute: has anything
+    changed, and how many things are there to do, for the Apps page's period
+    chosen last (the page's own request has just remembered it)."""
+    from . import todo, ui_memory
+
+    return JsonResponse(todo.state(ui_memory.remembered_apps_period(request)))
+
+
+@require_POST
+def setup_strip_view(request):
+    """Hide the Get set up strip, show it again, or settle a tile with its quiet choice."""
+    from . import setup_checklist
+
+    do = request.POST.get("do")
+    try:
+        if do == "hide":
+            setup_checklist.hide(request)
+        elif do == "show":
+            setup_checklist.show()
+        elif do == "skip":
+            setup_checklist.skip(request.POST.get("tile", ""))
         else:
-            # Manual entry
-            form = AppForm(request.POST)
-            if form.is_valid():
-                form.save()
-                message = f"App '{form.cleaned_data['name']}' created."
-                message_type = "success"
-            else:
-                message = "Please fix the errors below."
-                message_type = "error"
-
-    form = AppForm()
-    apps = App.objects.prefetch_related("keywords")
-
-    return render(
-        request,
-        "aso/apps.html",
-        {
-            "form": form,
-            "apps": apps,
-            "message": message,
-            "message_type": message_type,
-        },
-    )
+            return JsonResponse({"error": "Unknown action."}, status=400)
+    except ValueError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+    return JsonResponse({"ok": True})
 
 
 @require_POST
@@ -1570,14 +1633,15 @@ def keywords_bulk_refresh_view(request):
     return JsonResponse({"success": True, "started": True, "total": len(pairs)})
 
 
+@require_http_methods(["GET", "POST"])
 def version_check_view(request):
     """Report whether a newer release exists, for the update banner.
 
-    Every page load calls this. GitHub is asked at most once every ten
-    minutes (see aso/update_check.py); pages in between get the cached
-    answer, so an active session can never exhaust GitHub's rate limit.
+    Every page load GETs this; respectaso.com is asked at most once a day
+    (aso/update_check.py) and every other load gets the stored answer. A
+    POST is the banner's "Check now": it asks again at once.
     """
-    return JsonResponse(update_check.check_for_update())
+    return JsonResponse(update_check.check_for_update(force=request.method == "POST"))
 
 
 def auto_refresh_status_view(request):
@@ -1593,9 +1657,9 @@ GITHUB_RELEASES_URL = "https://github.com/respectlytics/respectaso/releases/late
 def download_dmg_view(request):
     """Redirect to the latest .dmg as a direct file download.
 
-    Reuses the update banner's cached GitHub answer (aso/update_check.py),
-    so a click never adds a GitHub request of its own. When the latest
-    release is not known, the GitHub releases page is the fallback.
+    Reuses the update banner's stored answer (aso/update_check.py), so a
+    click never adds an update check of its own. When the latest release
+    is not known, the GitHub releases page is the fallback.
     """
     return redirect(update_check.check_for_update().get("download_url") or GITHUB_RELEASES_URL)
 
@@ -1671,6 +1735,15 @@ def pro_promo_rival_tracker_view(request):
     )
 
 
+def pro_promo_store_view(request):
+    """Free edition: the Store section shows what each Pro tab does, one tab
+    at a time (?tab=), with sample data and the keywords locked (aso/store_preview.py)."""
+    from .store_preview import STATE_FREE, TAB_WORDS, preview_context
+
+    tab = request.GET.get("tab") if request.GET.get("tab") in TAB_WORDS else "autopilot"
+    return render(request, "aso/store_preview.html", preview_context(STATE_FREE, tab=tab, free=True))
+
+
 def pro_promo_competitor_view(request):
     """Free edition: the AI Competitor Analyzer tab shows the result page with sample
     data and the keywords locked (aso/ai_tools_preview.py)."""
@@ -1682,6 +1755,8 @@ def pro_promo_competitor_view(request):
 def pro_promo_simulator_view(request):
     """Free edition: the ASO Score Simulator tab shows the result page with sample
     data and the keywords locked (aso/ai_tools_preview.py)."""
+    from . import store_preview
     from .ai_tools_preview import STATE_FREE, context
 
-    return render(request, "aso/ai_tool_preview.html", context("simulator", STATE_FREE))
+    return render(request, "aso/ai_tool_preview.html", {
+        **context("simulator", STATE_FREE), "preview_store_tabs": store_preview.free_tabs("simulator")})

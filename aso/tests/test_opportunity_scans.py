@@ -244,16 +244,12 @@ class RestartAndQueueTest(ScanTestBase):
 
 
 class PayloadTest(ScanTestBase):
-    def test_eta_is_remaining_countries_times_seconds_each(self):
-        scan = self.scan(
-            countries=("us", "de", "bg", "fr"), status="running",
-            next_index=1, seconds_per_country=4.0,
-        )
-        self.assertEqual(opportunity_scans.scan_payload(scan)["eta_seconds"], 12)
-
-    def test_no_eta_when_the_scan_is_not_running(self):
-        scan = self.scan(status="paused", seconds_per_country=4.0)
-        self.assertIsNone(opportunity_scans.scan_payload(scan)["eta_seconds"])
+    def test_no_time_left_is_given(self):
+        """The app never says how long a run will take (owner, 2026-11-18)."""
+        scan = self.scan(countries=("us", "de", "bg", "fr"), status="running", next_index=1)
+        payload = opportunity_scans.scan_payload(scan)
+        self.assertNotIn("eta_seconds", payload)
+        self.assertNotIn("seconds_per_country", payload)
 
     def test_country_payload_carries_the_classification(self):
         """Regression: the old per-country endpoint never sent this, so every
@@ -319,12 +315,6 @@ class PayloadTest(ScanTestBase):
         scores = [r["opportunity"] for r in results]
         self.assertEqual(scores, sorted(scores, reverse=True))
 
-    def test_cost_text_states_the_countries_and_the_time(self):
-        text = opportunity_scans.cost_text(62)
-        self.assertIn("62 countries", text)
-        self.assertIn("minute", text)
-        self.assertEqual(opportunity_scans.cost_text(0), "Pick at least one country")
-
     def test_scan_payload_shares_its_key_names_with_the_search_job(self):
         """One JavaScript core drives both, so the shared keys must match."""
         from aso import search_jobs
@@ -333,7 +323,7 @@ class PayloadTest(ScanTestBase):
         job = KeywordSearchJob.objects.create(keywords=["a"], countries=["us"])
         scan = self.scan()
         shared = {
-            "id", "status", "progress_percent", "progress_message", "eta_seconds",
+            "id", "status", "progress_percent", "progress_message",
             "throttle_state", "auto_resume", "queue_position", "waiting_for",
             "can_run_now", "yielded_for", "failed_items", "failed_text",
             "error_message", "acknowledged", "restart_resumes", "is_native",

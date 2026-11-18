@@ -1,0 +1,7 @@
+{% comment %}One To do line (aso/todo.py): what the app needs, the one button that opens the place that fixes it, and the X.{% endcomment %}
+<div class="notice notice-line notice-{{ line.tone }}" role="status" data-todo="{{ line.key }}">
+    {% include "aso/partials/notice_icon.html" with tone=line.tone %}
+    <p class="min-w-0 flex-1">{{ line.text }}</p>
+    <a href="{{ line.url }}"{% if line.external %} target="_blank" rel="noopener"{% endif %} class="notice-action" data-film-mark="open">{{ line.label }}</a>
+    {% include "aso/partials/notice_close.html" with dismiss=line.key film_mark="close" %}
+</div>

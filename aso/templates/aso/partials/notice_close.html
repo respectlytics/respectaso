@@ -1,0 +1,4 @@
+{% comment %}A notice's X (static/js/notice.js closes the notice it sits in).
+With dismiss="key other-key" it stays closed after a reload and a restart:
+each key is kept in aso.ui_state until the state it names changes and the
+page asks with a new key; with url="..." it posts to that address instead.{% endcomment %}<button type="button" class="notice-close" data-notice-close{% if dismiss %} data-dismiss="{{ dismiss }}"{% endif %}{% if url %} data-dismiss-url="{{ url }}"{% endif %}{% if film_mark %} data-film-mark="{{ film_mark }}"{% endif %} aria-label="Dismiss" title="Dismiss">{% include "aso/partials/icon_x.html" %}</button>

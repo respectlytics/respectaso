@@ -49,7 +49,8 @@ class CleanupSuggestionTest(TestCase):
         data = cleanup_suggestion(self.latest(), app_id=3)
         self.assertEqual(data["pairs"], 800)
         self.assertEqual(data["candidates"], 50)
-        self.assertEqual(data["refresh_text"], "about 1 hour 7 minutes")
+        self.assertEqual(data["pairs_text"], "800")
+        self.assertNotIn("refresh_text", data)   # never how long it takes (owner, 2026-11-18)
         self.assertIn("insight=Low+Volume", data["filter_url"])
         self.assertNotIn("insight=Avoid", data["filter_url"])   # retired, round 4
         self.assertIn("app=3", data["filter_url"])
@@ -70,6 +71,6 @@ class CleanupSuggestionTest(TestCase):
     def test_dashboard_renders_the_banner(self):
         seed(800, 50)
         resp = self.client.get(reverse("aso:dashboard"))
-        self.assertContains(resp, "Your daily refresh is getting long")
-        self.assertContains(resp, "Updating rankings takes")
-        self.assertContains(resp, "50 keywords are Low Volume: remove those you don")
+        self.assertContains(resp, "Your keyword list is getting long")
+        self.assertContains(resp, "800 keywords update every day.")
+        self.assertContains(resp, "50 are Low Volume: remove those you don")

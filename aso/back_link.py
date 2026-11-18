@@ -13,7 +13,7 @@ nothing to go on (a page opened directly), the page's natural parent. The
 origin is kept per place in the session, so it survives a reload and a tab
 switch.
 
-The top level (Keywords, the Discover tabs, Metadata, Rivals) is reached from
+The top level (Apps, Keywords, the Discover and Store tabs, Rivals) is reached from
 the top bar and has no way back, except when a button on another page jumped
 there, such as Simulate this metadata (the owner, 2026-10-02): such a link
 carries ``back``, the page it was clicked on (static/js/back-link.js adds it
@@ -40,6 +40,11 @@ PAGE_NAMES = {
     "rival_setup": "Rival Tracker setup",
     "settings_ai": "AI settings",
     "settings_popularity": "Apple Ads settings",
+    "settings_asc": "App Store Connect settings",
+    "store_autopilot": "Get found", "store_pages": "Custom product pages", "store_results": "Sales & growth",
+    "store_reviews": "Reviews",
+    "store_how": "How Get found works", "store_pages_how": "How custom product pages work",
+    "pro_promo_store": "Store",
     "settings_license": "License",
     "settings_mcp": "MCP settings",
     "settings_mac_app": "Mac App settings",
@@ -47,31 +52,36 @@ PAGE_NAMES = {
     "methodology": "How the scores work",
     "whats_new": "What's new",
     "setup": "Install and update", "settings_setup": "Install and update",
+    "routine": "Your routine",
 }
 
 # The pages with a way back: url name -> (the place it belongs to, its parent).
 # Pages of one place share the place, so moving between them is not "coming
 # from" anywhere.
 BACK = {
-    "settings_ai": ("settings", "aso:dashboard"),
-    "settings_popularity": ("settings", "aso:dashboard"),
-    "settings_license": ("settings", "aso:dashboard"),
-    "settings_mcp": ("settings", "aso:dashboard"),
-    "settings_mac_app": ("settings", "aso:dashboard"),
+    "settings_ai": ("settings", "aso:apps"),
+    "settings_popularity": ("settings", "aso:apps"),
+    "settings_asc": ("settings", "aso:apps"),
+    "settings_license": ("settings", "aso:apps"),
+    "settings_mcp": ("settings", "aso:apps"),
+    "settings_mac_app": ("settings", "aso:apps"),
     "apple_ads_setup": ("apple_ads_setup", "aso:settings_popularity"),
-    "methodology": ("methodology", "aso:dashboard"),
-    "whats_new": ("whats_new", "aso:dashboard"),
-    "setup": ("setup", "aso:dashboard"),
-    "settings_setup": ("setup", "aso:dashboard"),
-    "apps": ("apps", "aso:dashboard"),
+    "methodology": ("methodology", "aso:apps"),
+    "whats_new": ("whats_new", "aso:apps"),
+    "setup": ("setup", "aso:apps"),
+    "settings_setup": ("setup", "aso:apps"),
     "rival_setup": ("rival_setup", "aso_pro:rival_tracker"),
+    "store_how": ("store_how", "aso_pro:store_autopilot"),
+    "store_pages_how": ("store_pages_how", "aso_pro:store_pages"),
+    "routine": ("routine", "aso:apps"),
 }
 
 # The top level: a way back only when a link jumped here (``back``).
 TOP_LEVEL = {
-    "dashboard", "opportunity", "ai_researcher", "ai_competitor", "top_terms", "simulator", "rival_tracker",
+    "apps", "dashboard", "opportunity", "ai_researcher", "ai_competitor", "top_terms", "simulator", "rival_tracker",
     "pro_promo_researcher", "pro_promo_competitor", "pro_promo_top_terms", "pro_promo_simulator",
-    "pro_promo_rival_tracker",
+    "pro_promo_rival_tracker", "store_autopilot", "store_pages", "store_results", "store_reviews",
+    "pro_promo_store",
 }
 
 SESSION_PREFIX = "back_to:"
@@ -120,7 +130,7 @@ def _origin(session, place: str, parent: str) -> dict:
     try:
         return {"url": reverse(parent), "label": PAGE_NAMES[parent.split(":", 1)[1]]}
     except NoReverseMatch:   # the free edition has no Rival Tracker route
-        return {"url": reverse("aso:dashboard"), "label": PAGE_NAMES["dashboard"]}
+        return {"url": reverse("aso:apps"), "label": PAGE_NAMES["apps"]}
 
 
 def back_link(request) -> dict | None:

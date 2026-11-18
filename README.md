@@ -19,12 +19,12 @@ RespectASO helps iOS developers research App Store keywords privately. Download 
 
 ## Why RespectASO?
 
-Most ASO tools require paid subscriptions, API keys, and send your keyword research to their servers. RespectASO takes a different approach:
+Most ASO tools need accounts and API keys, and send your keyword research to their servers. RespectASO takes a different approach:
 
 - **No API keys or credentials needed**: works out of the box with the public iTunes Search API; connecting Apple Ads for official popularity data is optional
 - **Runs on your Mac**: App Store data comes from Apple straight to your computer, never through a server of ours
 - **No telemetry, no analytics, no tracking**: the app reports nothing about you or your research to us or anyone else
-- **Free and open-source**: AGPL-3.0 licensed, forever
+- **Open source**: AGPL-3.0 licensed
 - **Native Mac app**: download the `.dmg`, drag to Applications, done
 
 ## Features
@@ -37,12 +37,35 @@ Most ASO tools require paid subscriptions, API keys, and send your keyword resea
 | **Download Estimates** | Estimated daily downloads per ranking position based on search volume, tap-through rates, and conversion rates |
 | **Competitor Analysis** | See the top 10 apps ranking for each keyword with ratings, reviews, genre, release date, and direct App Store links |
 | **Country Opportunity Finder** | Scan all 175 App Store storefronts, or the ones you pick, to find which countries offer the best ranking opportunities for your keyword |
-| **Multi-Keyword Search** | Research several keywords at once (comma-separated): 3 per search in the free edition, up to 1,000 with Pro |
+| **Multi-Keyword Search** | Research many keywords at once (comma-separated), searched in the background while you work |
 | **Multi-Country Search** | Search the same keyword across multiple countries simultaneously |
 | **App Rank Tracking** | Add your apps and see where you rank for each keyword alongside competitor data |
 | **Search History** | Browse past keyword research with sorting, filtering, and expandable detail views |
 | **CSV Export** | Export your keyword research data for use in spreadsheets |
 | **ASO Targeting Advice** | Automatic keyword classification (Sweet Spot, Good Target, Supporting, Worth Climbing, Low Volume) based on opportunity scoring |
+
+<p align="center">
+  <img src="https://respectaso.com/static/images/screenshots/dashboard-1160.jpg" alt="RespectASO's keyword table: popularity, difficulty, download estimates and the rank of your app for each keyword" width="820">
+</p>
+
+## RespectASO Pro in the Mac app
+
+| Feature | Description |
+|---------|-------------|
+| **AI Niche Researcher** | The best keywords in any niche, with a title and subtitle that target them |
+| **AI Competitor Analyzer** | Which of a rival's keywords your app can win |
+| **ASO Score Simulator** | What a new title, subtitle and keyword field will bring, before you ship it |
+| **Rival Tracker** | The day a rival passes you for a keyword you care about |
+| **Store autopilot** | One click drafts your App Store page in every language from the keywords you track, applies it in App Store Connect after your approval, and never submits to App Review |
+| **Store results** | Proceeds in one currency, downloads, conversion, countries, sources and what each release and change did, for one app or all of them, with findings in plain sentences |
+| **Review replies** | Every review answered in the reviewer's language, written by you or drafted from your app's store page |
+| **MCP server** | Claude, Cursor, VS Code and other assistants use all of it from the chat |
+
+<p align="center">
+  <img src="https://respectaso.com/static/images/screenshots/store_results-896.jpg" alt="The Results tab: proceeds, downloads and conversion with their change, what stands out, and a day by day chart with releases marked" width="820">
+</p>
+
+More at [respectaso.com/pro](https://respectaso.com/pro/).
 
 ## Quick Start
 
@@ -75,9 +98,9 @@ Your keywords, search history, and settings are stored at:
 This data survives app updates and deletions. Delete this folder only if you want a completely fresh start.
 
 <details>
-<summary><strong>🐳 Docker (free features only)</strong></summary>
+<summary><strong>Docker</strong></summary>
 
-Docker provides the **free edition** of RespectASO (keyword research, difficulty scoring, ranking tracking). AI-powered Pro features require the native macOS app above.
+Docker runs RespectASO's keyword research, difficulty scoring and rank tracking in your browser. The AI tools, the Store autopilot and the MCP server run in the Mac app above.
 
 #### Prerequisites
 
@@ -122,7 +145,7 @@ docker compose down -v  # Also remove the volume (only after confirming native a
 
 ## How Scoring Works
 
-RespectASO uses the public **iTunes Search API** plus, when you choose to connect it, the official **Apple Ads Platform API** with your own free API key. If Apple's search API fails, RespectASO reads the same search on Apple's public App Store search page instead, takes only the list of apps in Apple's order, and looks up their details through the iTunes Search API as usual. No private APIs, no paid data services.
+RespectASO uses the public **iTunes Search API** plus, when you choose to connect it, the official **Apple Ads Platform API** with your own API key. When the iTunes Search API fails, RespectASO reads the same search on Apple's public App Store search page instead. From the page it takes only the list of apps in Apple's order, and looks up their details through the iTunes Search API as usual. No private APIs, no paid data services.
 
 ### Popularity Score (1-100)
 
@@ -173,7 +196,7 @@ RespectASO is designed with privacy as a core principle:
 
 - **A native Mac app**: it runs on your machine and keeps your research there
 - **No accounts**: no registration, no login, no user tracking
-- **No telemetry**: no analytics and no data collection. The app's only calls go to Apple, for App Store data, and to GitHub, to see whether a new version is out
+- **No telemetry**: no analytics and no usage data. The app's only calls go to Apple, for App Store data, and to respectaso.com, to see whether a new version is out. Once a day the app asks respectaso.com for the newest version; it sends its version, edition and macOS version, nothing else.
 - **No API keys required**: the public iTunes Search API needs no credentials; the optional Apple Ads connection uses your own key, which stays on your Mac
 - **No middleman**: App Store data comes straight from Apple to your machine, never through a RespectASO server
 - **Your data stays yours**: keyword research, competitor analysis and search history are stored on your Mac, not on any server of ours

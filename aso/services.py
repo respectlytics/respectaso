@@ -66,6 +66,15 @@ APP_STORE_BUSY = "Apple's App Store asked RespectASO to wait before asking again
 APP_STORE_BUSY_NOW = "Apple's App Store is busy right now. Try again in a few minutes."
 
 
+class AppStorePageRefused(SearchAPIUnavailableError):
+    """The App Store web search page answered 403 or 429: Apple turned the
+    page's reader away. search_ranked's fallback reports it as the App
+    Store not answering."""
+
+
+PAGE_REFUSED_STATUSES = (403, 429)
+
+
 class ITunesRateLimited(ITunesAPIError):
     """The iTunes API returned a rate-limit signal (429 or 503 with Retry-After;
     the Lookup also answers a burst with 403, LOOKUP_BUSY_STATUSES).
@@ -722,7 +731,7 @@ class ITunesSearchService:
                 limiter.record_failure(retry_after=getattr(exc, "retry_after", None))
                 logger.info("iTunes lookup of %s (%s) failed (%s), asking again in %.1fs",
                             track_id, country, exc, limiter.current_delay)
-                limiter.wait()
+                limiter.back_off()
                 continue
             raw = found.get(int(track_id))
             if raw is not None:
@@ -1146,9 +1155,32 @@ class ITunesSearchService:
             )
 
         try:
+            return self.search_ranked_page(keyword, country=country)
+        except AppStorePageRefused as e:
+            logger.error(f"SSR fallback also failed for '{keyword}' ({country}): {e.__cause__}")
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE) from e.__cause__
+        except SearchAPIUnavailableError as e:
+            if e.__cause__ is not None:      # the page failed; an empty Lookup has no cause
+                logger.error(f"SSR fallback also failed for '{keyword}' ({country}): {e.__cause__}")
+            raise
+
+    def search_ranked_page(self, keyword: str, country: str = "us") -> RankedSearch:
+        """The same search read from the App Store web search page: its
+        ordered ids plus one Lookup call for the first SCORING_POOL of them.
+
+        search_ranked's fallback when the iTunes Search API fails. Raises
+        AppStorePageRefused when
+        the page answers 403 or 429, and SearchAPIUnavailableError (with the
+        cause chained) when the page or the Lookup fails otherwise.
+        """
+        try:
             page_ids = self._extract_ssr_app_ids(self._fetch_ssr_page(keyword, country=country))
+        except requests.exceptions.HTTPError as e:
+            status = getattr(e.response, "status_code", None)
+            if status in PAGE_REFUSED_STATUSES:
+                raise AppStorePageRefused(APP_STORE_BUSY) from e
+            raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE) from e
         except Exception as e:
-            logger.error(f"SSR fallback also failed for '{keyword}' ({country}): {e}")
             raise SearchAPIUnavailableError(APP_STORE_UNAVAILABLE) from e
         page_ids = [int(track_id) for track_id in page_ids[:RANKED_SEARCH_LIMIT]]
         if not page_ids:

@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import logging
 import math
-import statistics
 import time
 
 import requests
@@ -73,9 +72,7 @@ FAILED_ITEMS_CAP = 200      # failed countries kept on the row (the retry uses t
 COOLDOWN_SECONDS = 120      # after Apple rejects requests repeatedly
 MAX_COOLDOWNS = 3           # consecutive cool-downs before the scan pauses and asks
 STATUS_POLL_SLICE = 5       # seconds between status checks during a cool-down
-ETA_MIN_COUNTRIES = 3       # countries done this run before an ETA is shown
 SCAN_HISTORY_KEEP = 10      # finished scans kept; older ones are pruned on create
-FALLBACK_SECONDS_PER_COUNTRY = throttle.BASE_DELAY + 0.6
 
 FREE_BUSY_MESSAGE = (
     "Your current country scan is still running. Wait for it to finish, or "
@@ -153,8 +150,9 @@ def prune_scans() -> None:
      .delete())
 
 
-def create_scan(keyword, codes, *, app=None, origin="web", run_now=False) -> OpportunityScan:
-    """Create a queued scan and kick the lane."""
+def create_scan(keyword, codes, *, app=None, origin="web", run_now=False, not_before=None) -> OpportunityScan:
+    """Create a queued scan and kick the lane; with ``not_before`` ("Run
+    tonight") it waits for that moment."""
     prune_scans()
     scan = OpportunityScan.objects.create(
         keyword=keyword.strip(),
@@ -163,6 +161,7 @@ def create_scan(keyword, codes, *, app=None, origin="web", run_now=False) -> Opp
         status="queued",
         origin=origin,
         progress_message="Waiting to start...",
+        not_before=not_before,
     )
     if run_now:
         run_queue.run_now(FEATURE_KEY, scan.pk)
@@ -172,28 +171,14 @@ def create_scan(keyword, codes, *, app=None, origin="web", run_now=False) -> Opp
     return scan
 
 
-def estimate_seconds(count: int) -> float:
-    """How long a scan of ``count`` countries should take, from what the last
-    few scans actually took rather than from a constant."""
-    recent = list(
-        OpportunityScan.objects
-        .filter(status="completed", seconds_per_country__isnull=False)
-        .order_by("-finished_at")
-        .values_list("seconds_per_country", flat=True)[:3]
-    )
-    per = statistics.median(recent) if recent else FALLBACK_SECONDS_PER_COUNTRY
-    return max(per, throttle.BASE_DELAY) * max(count, 0)
-
-
 def duration_text(seconds: float) -> str:
     """A wait in words: "20 seconds", "about 3 minutes", "about 1 hour 7
     minutes"; "" when there is none.
 
-    The one Python copy (the Opportunity scan's cost, the keyword cleanup
-    banner, the Rival Tracker's estimate, MCP). Its twin is durationText()
-    in static/js/country-picker.js, which every page's own scripts call;
-    aso/tests/test_duration_text.py runs both. Tens of seconds round half
-    up and minutes round up, the same in both.
+    Only for a wait the app itself sets, such as the cool-down after Apple
+    turns requests away ("carries on by itself in 3 minutes"): the app never
+    estimates how long a run will take (owner, 2026-11-18). Tens of seconds
+    round half up and minutes round up.
     """
     if not seconds or seconds <= 0:
         return ""
@@ -208,14 +193,6 @@ def duration_text(seconds: float) -> str:
     if minutes:
         text += f" {minutes} minute" + ("" if minutes == 1 else "s")
     return text
-
-
-def cost_text(count: int) -> str:
-    """"Scan 62 countries, about 3 minutes", before the user commits."""
-    if not count:
-        return "Pick at least one country"
-    noun = "country" if count == 1 else "countries"
-    return f"Scan {count} {noun}, {duration_text(estimate_seconds(count))}"
 
 
 def country_names(codes) -> list[str]:
@@ -364,10 +341,6 @@ def scan_payload(scan, *, include_results=False) -> dict:
     can_run_now = False
     if scan.status == "queued":
         waiting_for, can_run_now = _waiting_for(scan)
-    eta = (
-        scan.remaining_count * scan.seconds_per_country
-        if (scan.seconds_per_country and scan.status == "running") else None
-    )
     data = {
         "id": scan.pk,
         "status": scan.status,
@@ -383,11 +356,10 @@ def scan_payload(scan, *, include_results=False) -> dict:
         "current_country_name": countries.name(scan.current_country) if scan.current_country else "",
         "throttle_state": scan.throttle_state,
         "auto_resume": scan.auto_resume,
-        "eta_seconds": int(eta) if eta is not None else None,
-        "seconds_per_country": scan.seconds_per_country,
         "countries": list(scan.countries),
         "countries_text": countries_text(scan.countries),
         "queue_position": run_queue.queue_position(scan) if scan.status == "queued" else None,
+        "tonight": run_queue.waits_for_tonight(scan),
         # Whose opportunity the table shows: the scan's app, from its ratings
         # in each storefront, or a brand new app. An app added by hand has no
         # App Store listing (no track id), so none of its ratings exist.
@@ -602,7 +574,6 @@ def _execute(pk) -> None:
     cooldowns = 0
     run_started = time.monotonic()
     elapsed_before = scan.elapsed_seconds or 0.0
-    seconds_per_country = scan.seconds_per_country
     # Waits on the limiter before real App Store reads only; a keyword read
     # today in a storefront is scored from that read (aso/day_reads.py).
     pacer = day_reads.Pacer(wait=lambda: limiter.wait())
@@ -618,8 +589,7 @@ def _execute(pk) -> None:
         if len(failed_items) < FAILED_ITEMS_CAP:
             failed_items.append({"country": country, "error": error[:200]})
 
-    # countries_this_run counts the countries this run has finished, this one included.
-    for countries_this_run, index in enumerate(range(start_index, total), start=1):
+    for index in range(start_index, total):
         status, current_app_id = _status_and_app(pk)
         if status != "running":     # Pause, Discard, Run now, cancel, removed
             return
@@ -653,8 +623,6 @@ def _execute(pk) -> None:
             record_failure(code, "Unexpected error")
 
         active_seconds = time.monotonic() - run_started
-        if countries_this_run >= ETA_MIN_COUNTRIES:
-            seconds_per_country = active_seconds / countries_this_run
         state = classify_throttle_state(limiter, attempted=attempted, failed=failed)
         next_code = codes[index + 1] if index + 1 < total else ""
         # The cursor and the counters are guarded by the cursor, not the
@@ -663,7 +631,7 @@ def _execute(pk) -> None:
         # still runs, so a Pause's own message stays.
         OpportunityScan.objects.filter(pk=pk, next_index=index).update(
             next_index=index + 1, done_count=done, failed_count=failed_total,
-            failed_items=failed_items, seconds_per_country=seconds_per_country,
+            failed_items=failed_items,
             elapsed_seconds=elapsed_before + active_seconds,
         )
         OpportunityScan.objects.filter(pk=pk, status="running").update(

@@ -22,6 +22,8 @@ WORD_REGEX = re.compile(r"\\[wW]|a-z0-9|\[\^a-z")
 NOT_WORDS = {
     # Patterns that match an API key's shape, not words.
     "aso_pro/run_failures.py": ("A-Za-z0-9",),
+    # The shape of a page path a notification's click may open, not words.
+    "aso/desktop_bridge.py": ("A-Za-z0-9_",),
 }
 
 

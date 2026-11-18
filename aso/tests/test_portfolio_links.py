@@ -76,10 +76,10 @@ class RenderedPagesTest(TestCase):
         SearchResult.objects.create(keyword=keyword, country="us", popularity_score=45, difficulty_score=40,
                                     difficulty_breakdown={}, competitors_data=[], app_rank=12)
 
-    @patch("aso.update_check._fetch_latest_release", return_value={"update_available": False})
-    def _scan(self, _github):
+    @patch("aso.update_check.check_for_update", return_value={"update_available": False})
+    def _scan(self, _update_check):
         found, seen = {}, 0
-        for url in [*pages(), f"/?app={self.app.pk}", f"/?app={self.app.pk}&country=us"]:
+        for url in [*pages(), f"/keywords/?app={self.app.pk}", f"/keywords/?app={self.app.pk}&country=us"]:
             response = self.client.get(url)
             if response.status_code != 200 or "text/html" not in response.get("Content-Type", ""):
                 continue

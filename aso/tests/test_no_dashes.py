@@ -1,7 +1,11 @@
-"""No dash stands between words in anything RespectASO writes for a person.
+"""No dash stands between words in anything RespectASO writes for a person,
+and no long dash appears in it at all.
 
 The owner's rule (2026-09-15): not an em dash, not an en dash, not a hyphen
-doing a dash's job, anywhere a person reads. aso/copy_rules.py holds the one
+doing a dash's job, anywhere a person reads. Refined 2026-10-05 and
+2026-11-08: no em or en dash at all, so a range or a minus takes the plain
+hyphen ("120-180"); the one long dash that stays is the empty figure, a "—"
+alone where a value is missing. aso/copy_rules.py holds the one
 predicate that both fixes and checks; this module is the one place that
 drives every writer with it and reads back what the writer hands over:
 
@@ -18,15 +22,19 @@ ships without aso_pro.
 
 import json
 import re
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 
 from aso.copy_rules import (
     dash_punctuation_in,
+    long_dash_in,
     no_dash_in_markup,
     no_dash_in_name,
     no_dash_punctuation,
+    no_long_dash,
 )
 from aso.tests.surfaces import (
     pages,
@@ -54,6 +62,18 @@ GOES = [
     ('"Savings" — each one counts', '"Savings", each one counts'),
     ("The title “Pausely - Digital Wellbeing” wastes space.", "The title “Pausely: Digital Wellbeing” wastes space."),
     ("We test -- two dashes -- here.", "We test, two dashes, here."),
+]
+
+# A long dash doing a hyphen's job takes the hyphen (no_long_dash, long_dash_in).
+LONG_GOES = GOES + [
+    ("120–180 downloads a day", "120-180 downloads a day"),
+    ("~0.2–2.1/day at #1", "~0.2-2.1/day at #1"),
+    ("3 – 5 times a week", "3-5 times a week"),
+    ("Positions 11—20", "Positions 11-20"),
+    ("Opportunity fell –12 points", "Opportunity fell -12 points"),
+    ("−12 percent since May", "-12 percent since May"),
+    ("Open Mon–Fri", "Open Mon-Fri"),
+    ("— first point\n— second point", "- first point\n- second point"),
 ]
 
 STAYS = [
@@ -92,6 +112,29 @@ class TheRuleTest(TestCase):
             once = no_dash_punctuation(wrote)
             self.assertEqual(no_dash_punctuation(once), once)
 
+    def test_a_long_dash_takes_the_hyphen(self):
+        """``long_dash_in`` finds every long dash but the empty figure, and
+        ``no_long_dash`` leaves none, idempotent."""
+        for wrote, reads in LONG_GOES:
+            with self.subTest(wrote=wrote):
+                self.assertEqual(no_long_dash(wrote), reads)
+                self.assertTrue(long_dash_in(wrote))
+                self.assertEqual(long_dash_in(reads), "")
+                self.assertEqual(no_long_dash(reads), reads)
+                self.assertFalse(re.search("[‒–—―−]", reads))
+
+    def test_only_the_empty_figure_keeps_a_long_dash(self):
+        for text in STAYS + ["—", "Rank #3 and | — |"]:
+            with self.subTest(text=text):
+                self.assertEqual(long_dash_in(text), "")
+                self.assertEqual(no_long_dash(text), text)
+
+    def test_the_dash_between_words_reads_as_before(self):
+        """``dash_punctuation_in`` keeps the rule between words alone: it is
+        respectaso.com's copy too, and the repository's docs read it."""
+        self.assertEqual(dash_punctuation_in("120–180 a day"), "")
+        self.assertTrue(long_dash_in("120–180 a day"))
+
     def test_a_title_separates_the_name_with_a_colon(self):
         self.assertEqual(no_dash_in_name("Pausely - Digital Wellbeing"), "Pausely: Digital Wellbeing")
         self.assertEqual(no_dash_in_name("Pausely — Screen Time"), "Pausely: Screen Time")
@@ -108,13 +151,14 @@ class TheRuleTest(TestCase):
 # ---- the difficulty breakdown ----------------------------------------------
 
 def _prose_dashes(obj, names=("weakest_app", "brand_name")):
-    """Every dash standing between words in ``obj``'s strings, skipping the
-    fields that hold an App Store name and the names quoted in brackets."""
+    """Every dash standing between words, and every long dash, in ``obj``'s
+    strings, skipping the fields that hold an App Store name and the names
+    quoted in brackets."""
     found = []
 
     def walk(value, key=None):
         if isinstance(value, str):
-            hit = dash_punctuation_in(re.sub(r"\([^()]*\)", "()", value))
+            hit = long_dash_in(re.sub(r"\([^()]*\)", "()", value))
             if hit and key not in names:
                 found.append(f"{key}: {hit}")
         elif isinstance(value, dict):
@@ -191,12 +235,12 @@ class ReleaseNotesTest(TestCase):
     def test_update_dialog(self):
         from aso import update_check
 
-        payload = {"tag_name": "v2.1.0", "html_url": "https://github.com/x", "assets": [],
-                   "body": "## What's New\n- **Faster** — searches finish sooner\n- Fixed a bug - finally"}
+        payload = {"version": "2.1.0", "release_url": "https://github.com/x", "download_url": "",
+                   "notes": "## What's New\n- **Faster** — searches finish sooner\n- Fixed a bug - finally"}
         response = MagicMock()
         response.__enter__.return_value.read.return_value = json.dumps(payload).encode()
-        with patch.object(update_check, "_last_result", None), \
-                patch.object(update_check, "_last_attempt", None), \
+        with tempfile.TemporaryDirectory() as data_dir, override_settings(DATA_DIR=Path(data_dir)), \
+                patch.object(update_check, "_retry_after", None), \
                 patch("aso.update_check.urllib.request.urlopen", return_value=response):
             notes = update_check.check_for_update()["release_notes"]
         self.assertEqual(notes, "## What's New\n- **Faster**: searches finish sooner\n- Fixed a bug, finally")
@@ -204,8 +248,15 @@ class ReleaseNotesTest(TestCase):
 
 # ---- every rendered page ----------------------------------------------------
 
+# A long dash alone between two values: "fmt(low) + '–' + fmt(high)" draws
+# a range, "<b>1</b>–<b>5</b>" too. Alone, only the em dash is the empty
+# figure; a spaced " – " in code splits App Store names and is not drawn.
+_LONE_JOINER = re.compile("^[‒–―]$")
+
+
 def _line_dashes(text: str) -> list[str]:
-    return [hit for line in text.split("\n") if (hit := dash_punctuation_in(line.strip()))]
+    return [hit for line in text.split("\n")
+            if (hit := long_dash_in(line.strip()) or (_LONE_JOINER.match(line.strip()) and line.strip()))]
 
 
 class RenderedPagesTest(TestCase):
@@ -225,10 +276,10 @@ class RenderedPagesTest(TestCase):
                                         difficulty_score=difficulty, difficulty_breakdown=breakdown,
                                         competitors_data=competitors, app_rank=12)
 
-    @patch("aso.update_check._fetch_latest_release", return_value={"update_available": False})
-    def _scan(self, _github):
+    @patch("aso.update_check.check_for_update", return_value={"update_available": False})
+    def _scan(self, _update_check):
         hits = {}
-        urls = list(pages()) + [f"/?app={self.app.pk}", f"/?app={self.app.pk}&country=us"]
+        urls = list(pages()) + [f"/keywords/?app={self.app.pk}", f"/keywords/?app={self.app.pk}&country=us"]
         for url in urls:
             response = self.client.get(url)
             if response.status_code != 200 or "text/html" not in response.get("Content-Type", ""):
@@ -266,7 +317,7 @@ def _text_dashes(text: str, joined: bool = False) -> list[str]:
     found = []
     for node in re.split(r"<[^>]+>", text):
         edge = _EDGE_DASH.search(node) or (joined and _SPACED_HYPHEN_EDGE.search(node))
-        hit = dash_punctuation_in(node) or (edge and node.strip())
+        hit = long_dash_in(node) or (edge and node.strip()) or (_LONE_JOINER.match(node) and node)
         if hit:
             found.append(hit)
     return found
@@ -296,10 +347,11 @@ class SourcesTest(TestCase):
     def test_no_string_in_the_code_carries_a_dash(self):
         """Messages, labels, prompts and tooltips written in Python. The
         release history (aso/release_notes.py) is never rewritten; the pages
-        that show it read it through the rule (ReleaseNotesTest)."""
+        that show it read it through the rule (ReleaseNotesTest). The rule's
+        own module (aso/copy_rules.py) holds the dash characters it reads."""
         hits = {}
         for path in sources(".py"):
-            if path.name == "release_notes.py" and path.parent.name == "aso":
+            if path.parent.name == "aso" and path.name in ("release_notes.py", "copy_rules.py"):
                 continue
             if found := _dashes(python_strings(path.read_text(encoding="utf-8"))):
                 hits[relative(path)] = found

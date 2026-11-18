@@ -77,7 +77,7 @@ class TheRunningTaskComesFirstTest(TestCase):
         script = (BASE / "static/js/run-queue.js").read_text()
         self.assertIn("var runningRun = elsewhereRun || (payload && payload.running_here);", script)
         self.assertIn("toggle('queue-running', !!shownRunning);", script)
-        self.assertIn("reportActivity(runningRun, queued.length);", script)
+        self.assertIn("reportActivity(runningRun, queued.length - tonight, tonight);", script)
         self.assertNotIn("queue-running-elsewhere", script)
         strip = (BASE / "static/js/job-strip.js").read_text()
         self.assertEqual(strip.count("!state || !state.shown"), 2)
@@ -90,13 +90,16 @@ class NoteWordsTest(TestCase):
         self.script = (BASE / "static/js/activity-indicator.js").read_text()
 
     def test_the_four_forms_and_the_footnote_are_written_once(self):
-        for words in ("'Queued'", "'Started'", "'You can keep working.'",
-                      "'Starts after '", "'. You can keep working.'", FOOTNOTE):
+        for words in ("'Queued'", "'Started'", "'You can keep working while it runs.'",
+                      "'Starts after '", FOOTNOTE):
             self.assertIn(words, self.script)
+        # Never how long a run will take (owner, 2026-11-18).
+        self.assertNotIn("About ", self.script)
+        self.assertNotIn("durationText", self.script)
 
     def test_the_words_obey_the_copy_rules(self):
-        for words in ("Queued", "Started", "You can keep working.",
-                      "Starts after the current search, in about 3 minutes.", FOOTNOTE,
+        for words in ("Queued", "Started", "You can keep working while it runs.",
+                      "Starts after the current search.", FOOTNOTE,
                       "Updating tracked keywords"):
             self.assertEqual(mechanics_in(words), "", words)
             self.assertEqual(dash_punctuation_in(words), "", words)

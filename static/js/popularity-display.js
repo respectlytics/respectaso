@@ -323,11 +323,14 @@
     var DIVERGENCE_SHARE = 0.3;      // EST runs: share of dual-value rows diverging
 
     function advisoryHtml(paragraphs) {
-        return '<div class="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">'
+        // A warning notice (.notice in tailwind.source.css, the icon of aso/partials/notice_icon.html).
+        return '<div class="notice notice-warning mb-4" role="status">'
+            + '<svg class="notice-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>'
+            + '<div class="min-w-0 flex-1">'
             + paragraphs.map(function (p, i) {
-                return '<p class="text-xs leading-relaxed text-amber-100/90' + (i ? ' mt-2' : '') + '">' + p + '</p>';
+                return '<p class="text-xs leading-relaxed' + (i ? ' mt-2' : '') + '">' + p + '</p>';
             }).join('')
-            + '</div>';
+            + '</div></div>';
     }
 
     function altReadinessSentence(opts, label) {

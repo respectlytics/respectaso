@@ -19,9 +19,14 @@ and the day's read is replaced.
     get_or_fetch(term, country, *, itunes_service, force=False)
                                 today's read, from the table or from Apple
     stored_today(term, country) today's read, or None; never asks Apple
+    store(term, country, ranked) keeps a search as today's read
     rank_of(read, track_id)     1-based rank in the read, or None
-    Pacer(wait)                 waits between one run's real Apple reads,
+    Pacer(wait)                 waits before each of a run's real Apple
+                                reads at the shared gate (aso/throttle.py),
+                                which get_or_fetch tells when each ends,
                                 never before a read already stored today
+    ReadAhead(country, ...)     reads keywords a run is sure to score on a
+                                thread while the run waits for its AI
     tidy(retention_days)        empties finished days' competitors, deletes
                                 reads older than the retention
     forget_untracked()          deletes the finished days of keywords no
@@ -35,6 +40,7 @@ licensing.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
@@ -44,10 +50,12 @@ from .db_writes import delete_in_batches, update_in_batches
 from .local_day import local_date
 from .models import Keyword, KeywordDayRead
 from .popularity import normalize_term
+from .throttle import apple_gate
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Pacer", "forget_terms_not_tracked", "forget_untracked", "get_or_fetch", "normalize_term", "rank_of", "stored_today", "tidy"]
+__all__ = ["Pacer", "ReadAhead", "forget_terms_not_tracked", "forget_untracked", "get_or_fetch", "normalize_term",
+           "rank_of", "store", "stored_today", "tidy"]
 
 
 def _today():
@@ -81,7 +89,18 @@ def get_or_fetch(term, country, *, itunes_service, force=False):
         if stored is not None:
             return stored
 
-    ranked = itunes_service.search_ranked(key_term, country=key_country)
+    try:
+        ranked = itunes_service.search_ranked(key_term, country=key_country)
+    finally:
+        apple_gate.ended()      # the next paced request counts its pause from now
+    return store(key_term, key_country, ranked)
+
+
+def store(term, country, ranked):
+    """Keep ``ranked`` (a services.RankedSearch) as today's read of a keyword
+    in a storefront, replacing an earlier read of the day, and return it."""
+    key_term, key_country = _key(term, country)
+    day = _today()
     values = {
         "ranked_ids": ranked.ranked_ids,
         "result_count": ranked.result_count,
@@ -119,24 +138,127 @@ def rank_of(read, track_id):
 class Pacer:
     """Paces one run's Apple reads.
 
-    Waits (the run's own wait: a rate limiter's, or a fixed sleep) before
-    every real Apple read except the run's first, and never before a read
-    already stored today, which costs Apple nothing. ``before`` answers
-    whether the coming read goes to Apple, so the run's rate limiter learns
-    only from real requests.
+    Waits (the run's own wait: a rate limiter's, which queues at the app's
+    one shared gate, aso/throttle.py AppleGate) before every real Apple
+    read, the run's first included, since another run may have just asked
+    Apple; the gate lets it through at once when nobody did. Never waits
+    before a read already stored today, which costs Apple nothing.
+    ``before`` answers whether the coming read goes to Apple, so the run's
+    rate limiter learns only from real requests.
     """
 
     def __init__(self, wait):
         self._wait = wait
-        self._fetched = False
 
     def before(self, term, country, *, force=False) -> bool:
         if not force and stored_today(term, country) is not None:
             return False
-        if self._fetched:
-            self._wait()
-        self._fetched = True
+        self._wait()
         return True
+
+
+class ReadAhead:
+    """Reads keywords a run is sure to score while the run waits for its AI.
+
+    A run knows some of its keywords (the Simulator its metadata's words)
+    minutes before its AI steps finish; this reads them meanwhile, on one
+    thread, through the same search every score reads (``search_ranked``)
+    and at the run's own pace (its ``wait``, the shared gate): one request
+    at a time, so Apple sees the run's usual pace and no score changes, and
+    the run finds those keywords stored when it scores them.
+
+    ``add(terms)`` queues keywords (each once) and starts the thread when
+    none runs; the thread ends when the queue is empty, so nothing is left
+    running when a run fails before scoring. ``finish()`` waits for the
+    thread, stores every read as today's read on the caller's thread (the
+    thread itself only asks Apple, never the database) and returns one
+    ``(term, success, retry_after)`` per real request for the run's rate
+    limiter; keywords not read by then are the run's to read. The first
+    failure stops the reading: that keyword and the rest are left to the
+    run, which handles a failure as it always did. ``stop()`` ends it after
+    the read in progress (a run that failed), keeping what was read.
+    """
+
+    def __init__(self, country, *, itunes_service, wait):
+        self._country = country
+        self._itunes = itunes_service
+        self._wait = wait
+        # Re-entrant: a test's synchronous stand-in for threading.Thread runs
+        # the reads inside add().
+        self._lock = threading.RLock()
+        self._queue = []
+        self._queued = set()
+        self._read = []                 # (term, RankedSearch), in order
+        self._failure = None            # (term, retry_after)
+        self._stopped = False
+        self._ended = False
+        self._thread = None
+
+    def add(self, terms) -> None:
+        with self._lock:
+            if self._ended or self._stopped or self._failure is not None:
+                return
+            for term in terms:
+                term = normalize_term(term)
+                if term and term not in self._queued:
+                    self._queued.add(term)
+                    self._queue.append(term)
+            if self._queue and self._thread is None:
+                self._thread = threading.Thread(target=self._run, name="read-ahead", daemon=True)
+                self._thread.start()
+
+    def _next(self):
+        with self._lock:
+            if not self._queue or self._stopped or self._failure is not None:
+                self._thread = None
+                return None
+            return self._queue.pop(0)
+
+    def _run(self):
+        from .services import ITunesAPIError
+
+        while (term := self._next()) is not None:
+            self._wait()
+            try:
+                ranked = self._itunes.search_ranked(term, country=self._country)
+            except ITunesAPIError as exc:
+                self._failure = (term, getattr(exc, "retry_after", None))
+                continue
+            except Exception as exc:  # noqa: BLE001 (the run reads this keyword itself and meets the error there)
+                logger.info("Read ahead of %r (%s) stopped: %s", term, self._country, exc)
+                self._stopped = True
+                continue
+            finally:
+                apple_gate.ended()
+            self._read.append((term, ranked))
+
+    def _end(self) -> list:
+        with self._lock:
+            self._ended = True
+            thread = self._thread
+        if thread is not None:
+            thread.join()
+        for term, ranked in self._read:
+            if stored_today(term, self._country) is None:
+                store(term, self._country, ranked)
+        outcomes = [(term, True, None) for term, _ in self._read]
+        if self._failure is not None:
+            outcomes.append((self._failure[0], False, self._failure[1]))
+        self._read = []
+        return outcomes
+
+    def finish(self) -> list:
+        """Wait for the reads queued, store them, and return the requests'
+        outcomes (once; later calls return nothing)."""
+        if self._ended:
+            return []
+        return self._end()
+
+    def stop(self) -> None:
+        """Stop after the read in progress and keep what was read."""
+        if not self._ended:
+            self._stopped = True
+            self._end()
 
 
 def tidy(retention_days):

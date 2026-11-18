@@ -1,12 +1,25 @@
 """Adaptive rate limiter for iTunes / App Store API calls.
 
-Single source of truth for inter-call pacing across all three AI runners
-(Simulator, Researcher, Competitor). One instance lives per run; each
+Single source of truth for inter-call pacing across every tool that reads
+the App Store keyword by keyword: the three AI runners (Simulator,
+Researcher, Competitor), keyword searches, opportunity scans, the
+scheduled refresh and the Rival Tracker. One instance lives per run; each
 keyword scoring iteration calls `wait()` before the network request and
 then `record_success()` or `record_failure()` afterwards.
 
+Every instance waits at one shared gate (`AppleGate`, below), across every
+thread and process of the app (the MCP server is a second process on the
+same data folder): one paced request at a time, and the next starts no
+sooner than its run's current delay after the previous paced request of
+ANY run ended, the pace one run always kept on its own. So several tools
+at once never send more requests a minute than one tool alone. A run that
+backs off (a failure, Retry-After) sets the shared pace for a while too,
+since Apple's answer is about the app, not one run.
+
 Design:
-- Floor: never sleep less than `BASE_DELAY` (matches the historical 3s pace).
+- Floor: never less than `BASE_DELAY` from the end of one request to the
+  start of the next (the historical 3 s pace, about 18 requests a minute,
+  under the 20 a minute Apple documents for its Search API).
 - Ceiling: never sleep more than `MAX_DELAY` (Apple usually un-throttles inside this window).
 - Growth: each consecutive failure multiplies the delay by `GROWTH_FACTOR`.
 - Decay: after `DECAY_AFTER_OK` consecutive successes, the delay decays back toward base.
@@ -15,8 +28,12 @@ Design:
 
 from __future__ import annotations
 
+import fcntl
+import json
 import logging
+import threading
 import time
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +55,148 @@ ABORT_FAILURE_RATE = 0.5      # OR ≥50% of attempted keywords failed → abort
 # How long a single keyword's network work is allowed to take before the
 # runner gives up on it and moves on. Bounds the worst-case hang.
 KEYWORD_DEADLINE_SECONDS = 90.0
+
+
+# A shared back-off is honoured this long after the run that set it last
+# reported, so a finished run's back-off never slows tomorrow's first run.
+SHARED_BACKOFF_SECONDS = 60.0
+# A slot further ahead than this is a clock that jumped, not a queue.
+MAX_AHEAD_SECONDS = 300.0
+# A request whose end was never reported (a process that died mid-request)
+# stops holding the gate after this long: longer than a search with its
+# fallback and retries can take.
+OPEN_REQUEST_SECONDS = 120.0
+# How often a request waits to see whether another one has ended.
+TURN_POLL_SECONDS = 0.05
+
+
+class AppleGate:
+    """The one queue every paced App Store request waits in.
+
+    State lives in ``DATA_DIR/apple_pace.json`` under an exclusive file
+    lock, so threads and processes (the app, the MCP server) share it:
+    ``last`` is when the latest request ended (or the start reserved for
+    the next one), ``open`` the request under way and whose it is, and
+    ``delay``/``noted`` the latest pace a run reported. A request waits
+    while another one is under way, then reserves the start
+    ``max(now, last + interval)`` and sleeps until it, where ``interval``
+    is the larger of its run's own delay and a shared back-off noted in the
+    last SHARED_BACKOFF_SECONDS. ``ended()`` (aso/day_reads.py calls it
+    after every search) records the end, from which the next pace counts.
+    """
+
+    FILE_NAME = "apple_pace.json"
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._memory: dict = {}     # the state where there is no data folder (_path)
+        # A callable giving the data folder, set by the app at start (aso/apps.py), so this file
+        # imports no Django: respectaso.com runs it unedited (vendor/respectaso_engine) and leaves
+        # it unset, so there the gate paces the requests of its own process, as before.
+        self.folder = None
+
+    def _path(self):
+        """The shared file, or None where no data folder was given."""
+        folder = self.folder() if self.folder else None
+        return Path(folder) / self.FILE_NAME if folder else None
+
+    @staticmethod
+    def _me() -> str:
+        import os
+
+        return f"{os.getpid()}:{threading.get_ident()}"
+
+    def _update(self, change):
+        """Run ``change(state, now) -> result`` under both locks and save."""
+        with self._lock:
+            path = self._path()
+            if path is None:
+                return change(self._memory, time.time())
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a+", encoding="utf-8") as handle:
+                fcntl.flock(handle, fcntl.LOCK_EX)
+                try:
+                    handle.seek(0)
+                    try:
+                        state = json.loads(handle.read() or "{}")
+                    except ValueError:
+                        state = {}
+                    result = change(state, time.time())
+                    handle.seek(0)
+                    handle.truncate()
+                    handle.write(json.dumps(state))
+                    handle.flush()
+                finally:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+        return result
+
+    def reserve(self, interval: float) -> float | None:
+        """Reserve the next start for a request paced at ``interval`` seconds
+        and return how long to sleep until it, or None while another
+        caller's request is still under way."""
+        me = self._me()
+
+        def change(state, now):
+            last = float(state.get("last", 0))
+            under_way = state.get("open")
+            if under_way:
+                if under_way.get("owner") != me and now - float(under_way.get("slot", 0)) < OPEN_REQUEST_SECONDS:
+                    return None
+                # This caller's own earlier request (it is asking again, so
+                # that one is over), or one whose end never came: either
+                # ended by now at the latest.
+                last = now
+            pace = interval
+            if now - float(state.get("noted", 0)) <= SHARED_BACKOFF_SECONDS:
+                pace = max(pace, float(state.get("delay", 0)))
+            if last > now + MAX_AHEAD_SECONDS:
+                last = now
+            slot = max(now, last + pace) if last else now
+            state["last"] = slot
+            state["open"] = {"owner": me, "slot": slot}
+            return slot - now
+        return self._update(change)
+
+    def wait(self, interval: float) -> None:
+        """Wait for this caller's turn: no request under way, and ``interval``
+        since the last one ended."""
+        idle = threading.Event()
+        while (delay := self.reserve(interval)) is None:
+            idle.wait(TURN_POLL_SECONDS)    # not time.sleep: a test's faked sleep must not spin here
+        if delay > 0:
+            time.sleep(delay)
+
+    def ended(self) -> None:
+        """This caller's request is over: the next pace counts from now."""
+        me = self._me()
+
+        def change(state, now):
+            under_way = state.get("open")
+            if under_way and under_way.get("owner") == me:
+                state["open"] = None
+                state["last"] = now
+        self._update(change)
+
+    def note(self, delay: float, *, failed: bool = False) -> None:
+        """A run's current pace after a success or a failure. A failure also
+        counts as the latest request, so the back-off runs from it."""
+        def change(state, now):
+            state["delay"] = delay
+            state["noted"] = now
+            if failed:
+                state["last"] = max(float(state.get("last", 0)), now)
+        self._update(change)
+
+    def reset(self) -> None:
+        """Forget the queue and any back-off (the test runner, between tests)."""
+        with self._lock:
+            self._memory.clear()
+            path = self._path()
+            if path is not None:
+                path.unlink(missing_ok=True)
+
+
+apple_gate = AppleGate()
 
 
 class AdaptiveITunesRateLimiter:
@@ -77,7 +236,16 @@ class AdaptiveITunesRateLimiter:
     # ----- Pacing ----------------------------------------------------------
 
     def wait(self) -> None:
-        """Sleep for `current_delay` seconds. Cheap when current_delay == base."""
+        """Wait for this request's turn at the shared gate: no other paced
+        request under way, and `current_delay` since the last one ended
+        (none when the App Store has not been asked for that long)."""
+        if self.current_delay > 0:
+            apple_gate.wait(self.current_delay)
+
+    def back_off(self) -> None:
+        """Sleep `current_delay` before asking again for the same thing (one
+        request's retries, such as a Lookup that failed): a pause after a
+        failure, not a turn in the queue of keyword reads."""
         if self.current_delay > 0:
             time.sleep(self.current_delay)
 
@@ -96,6 +264,7 @@ class AdaptiveITunesRateLimiter:
                 self.base_delay, self.current_delay * self.decay_factor
             )
             self._consecutive_successes = 0
+            apple_gate.note(self.current_delay)
 
     def record_failure(self, retry_after: float | None = None) -> None:
         """A network call failed (timeout / 429 / 5xx / SSR-also-failed).
@@ -116,6 +285,7 @@ class AdaptiveITunesRateLimiter:
                 self.max_delay,
                 self.current_delay * self.growth_factor,
             )
+        apple_gate.note(self.current_delay, failed=True)
         logger.info(
             "iTunes throttle: failure #%d, current_delay now %.1fs",
             self._consecutive_failures,
@@ -168,7 +338,7 @@ def classify_throttle_state(
 # aso/copy_rules.mechanics_in). One wording for the keyword searches, the
 # country scans and the three AI tabs, whose banner shows the same sentence.
 WAIT_MESSAGES = {
-    "slowed_down": "Apple's App Store is answering slowly, so this takes a little longer. It carries on by itself.",
+    "slowed_down": "Apple's App Store is answering slowly. It carries on by itself.",
     "paused": "Apple's App Store is not answering right now. This carries on by itself once it does.",
     "aborted": ("Apple's App Store stopped answering, so this run finishes with the keywords scored so far. "
                 "Run it again in a few minutes for the full picture."),

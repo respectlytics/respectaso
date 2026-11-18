@@ -168,3 +168,115 @@ class ITunesRateLimitedSignalTest(TestCase):
         with self.assertRaises(ITunesRateLimited):
             svc._search_itunes("yoga", country="us", limit=10)
         self.assertEqual(mock_get.call_count, 2)
+
+
+class AppleGateTest(TestCase):
+    """One queue for every paced App Store request of the app (aso/throttle.py
+    AppleGate): one request at a time, and the next starts no sooner than its
+    pace after the previous one of any run, thread or process ended."""
+
+    def setUp(self):
+        from aso.throttle import apple_gate
+
+        apple_gate.reset()
+        self.clock = [1000.0]
+        patcher = patch("aso.throttle.time.time", side_effect=lambda: self.clock[0])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def gate(self, owner="app:1"):
+        from aso.throttle import AppleGate, apple_gate
+
+        gate = AppleGate()
+        gate.folder = apple_gate.folder     # the data folder, as the app gives it (aso/apps.py)
+        gate._me = lambda: owner
+        return gate
+
+    def test_the_first_request_goes_at_once_and_the_next_waits_its_pace_from_the_end(self):
+        gate = self.gate()
+        self.assertEqual(gate.reserve(3.0), 0)
+        self.clock[0] += 0.4                # the request took 0.4 s
+        gate.ended()
+        self.assertEqual(gate.reserve(3.0), 3.0, "the whole pace after the request ended")
+        self.clock[0] += 3.5
+        gate.ended()
+        self.clock[0] += 10
+        self.assertEqual(gate.reserve(3.0), 0, "nobody asked Apple for a while")
+
+    def test_another_run_waits_while_a_request_is_under_way(self):
+        # Two gates with two owners are two processes' gates: only the file is shared.
+        app, mcp_server = self.gate("app:1"), self.gate("mcp:1")
+        self.assertEqual(app.reserve(3.0), 0)
+        self.assertIsNone(mcp_server.reserve(3.0), "the app's request is under way")
+        self.clock[0] += 1.0
+        app.ended()
+        self.assertEqual(mcp_server.reserve(3.0), 3.0, "the pace counts from the app's request's end")
+
+    def test_a_request_whose_end_never_came_stops_holding_the_gate(self):
+        app, mcp_server = self.gate("app:1"), self.gate("mcp:1")
+        app.reserve(3.0)
+        self.clock[0] += 121
+        self.assertEqual(mcp_server.reserve(3.0), 3.0)
+
+    def test_a_back_off_slows_every_run_for_a_while(self):
+        gate = self.gate()
+        gate.reserve(3.0)
+        gate.ended()
+        lim = AdaptiveITunesRateLimiter()
+        lim.record_failure(retry_after=12.0)
+        self.assertEqual(self.gate("other:2").reserve(3.0), 12.0, "another run waits out the back-off from the failure")
+        self.clock[0] += 120
+        gate = self.gate("other:2")
+        gate.ended()
+        self.assertEqual(gate.reserve(3.0), 3.0, "an old back-off no longer counts")
+
+    def test_a_clock_that_jumped_back_does_not_block_for_ever(self):
+        gate = self.gate()
+        gate.reserve(3.0)
+        gate.ended()
+        self.clock[0] -= 3600
+        self.assertLessEqual(gate.reserve(3.0), 3.0)
+
+    def test_a_faked_sleep_never_piles_slots_up(self):
+        gate = self.gate()
+        with patch("aso.throttle.time.sleep") as sleep:
+            for _ in range(4):
+                gate.wait(3.0)
+        self.assertEqual([c.args[0] for c in sleep.call_args_list], [3.0, 3.0, 3.0])
+
+    def test_the_limiter_waits_at_the_gate(self):
+        with patch("aso.throttle.time.sleep") as sleep:
+            lim = AdaptiveITunesRateLimiter()
+            lim.wait()
+            lim.wait()
+        sleep.assert_called_once_with(BASE_DELAY)
+
+
+class AppleGateWithoutDataFolderTest(TestCase):
+    """respectaso.com runs aso/throttle.py unedited (vendor/respectaso_engine) and has no DATA_DIR:
+    there the gate paces the requests of its own process instead of failing."""
+
+    def test_it_reserves_and_ends_in_memory(self):
+        from aso.throttle import AppleGate
+
+        gate = AppleGate()      # no folder given, as on respectaso.com
+        self.assertIsNone(gate._path())
+        self.assertEqual(gate.reserve(3.0), 0.0)
+        gate.ended()
+        wait = gate.reserve(3.0)
+        self.assertGreater(wait, 2.5)
+        self.assertLessEqual(wait, 3.0)
+
+    def test_the_app_gives_it_its_data_folder(self):
+        from django.conf import settings
+
+        from aso.throttle import apple_gate
+
+        self.assertEqual(apple_gate._path(), settings.DATA_DIR / "apple_pace.json")
+
+    def test_the_file_imports_no_django(self):
+        from pathlib import Path
+
+        import aso.throttle
+
+        self.assertNotIn("from django", Path(aso.throttle.__file__).read_text())

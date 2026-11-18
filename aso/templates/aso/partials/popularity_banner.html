@@ -16,9 +16,9 @@ in priority order:
    affected: last-synced values keep serving but stop refreshing.
 2. Amber non-dismissible while the APPLE source is selected, credentials
    saved, but verification has not passed yet (one actionable step left).
-3. (No banner.) The recommendation to connect Apple Ads is a step of the
-   Keywords page's setup checklist (aso/setup_checklist.py) since
-   docs/development/APP_SHELL_PLAN.md.
+3. (No banner.) The recommendation to connect Apple Ads is the Apple Ads
+   tile of the Apps page's Get set up strip (aso/setup_checklist.py,
+   docs/development/DAILY_USE_PLAN.md step 3.7a).
 4. Soft AMBER, DISMISSIBLE notice when the internal source is selected but
    previously working credentials got rejected: no score is affected (only
    the secondary Apple values stop refreshing), so dismissal is allowed BY
@@ -34,7 +34,7 @@ Context flags come from aso.context_processors.popularity_source.
     <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Reconnect Apple Ads once to keep Apple's popularity current.</span>
-            It takes about 5 minutes; until then your scores keep the last Apple values.
+            Until then your scores keep the last Apple values.
         </p>
         <a href="{% url 'aso:settings_popularity' %}"
            class="text-xs font-medium text-red-100 bg-red-600/40 hover:bg-red-600/60 border border-red-500/30 rounded-lg px-2.5 py-1 transition-colors whitespace-nowrap">

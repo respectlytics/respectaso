@@ -1,0 +1,57 @@
+{% load aso_tags %}{% comment %}One app on the Apps page (aso/apps_home.py). With a Pro license: three numbers, then its
+To do lines or "Nothing to do.". Without one, today's row: the app and its keyword count (D12).
+No inline script: the page swaps this in place, and every listener is on document.{% endcomment %}
+<li class="card p-4" data-app-id="{{ row.app.pk }}">
+    <div class="grid grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))_4.75rem] items-center gap-4">
+        <div class="flex min-w-0 items-center gap-3">
+            {% if row.app.icon_url %}<img src="{{ row.app.icon_url }}" alt="" class="h-10 w-10 shrink-0 rounded-xl" loading="lazy">{% else %}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-sm font-semibold text-white" aria-hidden="true">{{ row.app.name|slice:":1"|upper }}</span>{% endif %}
+            <a href="{% url 'aso:dashboard' %}?app={{ row.app.pk }}" class="item-title link truncate" title="Open its keywords" data-app-name>{{ row.app.name }}</a>
+        </div>
+        {% if row.store and row.store.ready %}
+        <div><a href="{{ row.store.url }}" class="link text-2xs">Downloads</a><p class="text-base font-semibold text-white">{{ row.store.downloads|floatformat:"0g" }}{% include "aso/partials/apps_change.html" with change=row.store.downloads_change %}</p></div>
+        <div><a href="{{ row.store.url }}" class="link text-2xs">Proceeds</a><p class="text-base font-semibold text-white">{{ row.store.proceeds_text }}{% include "aso/partials/apps_change.html" with change=row.store.proceeds_change %}</p></div>
+        <div><a href="{% url 'aso:dashboard' %}?app={{ row.app.pk }}" class="link text-2xs">In the top 10</a><p class="text-base font-semibold text-white">{{ row.brief.top10 }} <span class="text-sm font-normal text-slate-400">of {{ row.keywords }}</span></p></div>
+        {% elif row.brief %}
+        <div><a href="{% url 'aso:dashboard' %}?app={{ row.app.pk }}" class="link text-2xs">Keywords</a><p class="text-base font-semibold text-white">{{ row.keywords }}</p></div>
+        <div><span class="text-2xs text-slate-400">In the top 10</span><p class="text-base font-semibold text-white">{% if row.app.track_id %}{{ row.brief.top10 }}{% else %}<span class="text-slate-500">—</span>{% endif %}</p></div>
+        <div><span class="text-2xs text-slate-400">Moved</span><p class="text-base font-semibold">{% if row.brief.up or row.brief.down %}<span class="{% if row.brief.up %}text-green-400{% else %}text-slate-500{% endif %}">▲ {{ row.brief.up }}</span> <span class="ml-2 {% if row.brief.down %}text-red-400{% else %}text-slate-500{% endif %}">▼ {{ row.brief.down }}</span>{% else %}<span class="text-slate-500">—</span>{% endif %}</p></div>
+        {% else %}{# no Pro license: the row of today's list (D12) #}
+        <div class="col-span-3">{% if row.keywords %}<a href="{% url 'aso:dashboard' %}?app={{ row.app.pk }}" class="link text-2xs">Keywords</a><p class="text-base font-semibold text-white">{{ row.keywords }}</p>{% else %}<a href="{% url 'aso:dashboard' %}?app={{ row.app.pk }}" class="btn-quiet -ml-2">Track keywords</a>{% endif %}</div>
+        {% endif %}
+        <div class="flex items-center justify-end gap-1">{# a fixed column: rows without a refresh button line up with the rest #}
+            {% if row.app.track_id %}
+            <form method="post" action="{% url 'aso:app_refresh' row.app.id %}" class="app-refresh-form">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-slate-400 hover:text-purple-400 transition-colors p-2 rounded-lg hover:bg-purple-900/20"
+                        title="Refresh title &amp; icon from the App Store" aria-label="Refresh title and icon from the App Store">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </button>
+            </form>
+            {% endif %}
+            <form method="post" action="{% url 'aso:app_delete' row.app.id %}" class="app-delete-form" data-app-name="{{ row.app.name }}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="text-slate-400 hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-red-900/20"
+                        title="Delete app" aria-label="Delete app">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+    {% if row.store and not row.store.ready %}<p class="mt-3 flex items-center gap-2 text-sm text-slate-400" data-reading><span class="h-4 w-4 animate-spin rounded-full border-b-2 border-purple-500" aria-hidden="true"></span>Reading its numbers from Apple.</p>{% endif %}
+    {% for line in row.lines %}{% include "aso/partials/todo_line.html" %}{% endfor %}
+    {% if row.more %}
+    <details class="mt-2" id="apps-more-{{ row.app.pk }}" data-keep-open>
+        <summary class="disclosure text-xs">{{ row.more|length }} more</summary>
+        {% for line in row.more %}{% include "aso/partials/todo_line.html" %}{% endfor %}
+    </details>
+    {% endif %}
+    {% if row.brief and not row.lines and not row.more %}
+    <p class="mt-3 flex items-center gap-2 text-sm text-slate-400" data-calm><svg class="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>Nothing to do.</p>
+    {% endif %}
+</li>

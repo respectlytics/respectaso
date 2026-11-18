@@ -38,7 +38,7 @@ def png_size(path: Path) -> tuple[int, int]:
 
 class ImagesTest(SimpleTestCase):
     def test_the_templates_draw_the_two_logos(self):
-        self.assertEqual(pictures(), [("respectaso-logo", 32), ("respectlytics-mark", 16)])
+        self.assertEqual(pictures(), [("respectaso-logo", 32), ("respectlytics-mark", 32)])
 
     def test_every_variant_exists_at_its_slot_size_within_the_budget(self):
         for name, size in pictures():
@@ -57,8 +57,8 @@ class ImagesTest(SimpleTestCase):
         self.assertEqual(found, [])
 
     def test_picture_offers_avif_then_webp_then_png_at_1x_and_2x(self):
-        html = Template('{% load aso_tags %}{% picture "respectlytics-mark" 16 classes="h-4 w-4" %}').render(Context())
+        html = Template('{% load aso_tags %}{% picture "respectlytics-mark" 32 classes="h-8 w-8" %}').render(Context())
         self.assertEqual(re.findall(r'type="(image/\w+)"', html), ["image/avif", "image/webp"])
-        self.assertIn("respectlytics-mark-16.avif 1x, /static/images/respectlytics-mark-32.avif 2x", html)
-        self.assertIn('src="/static/images/respectlytics-mark-16.png"', html)
-        self.assertIn('width="16" height="16" alt="" class="h-4 w-4"', html)
+        self.assertIn("respectlytics-mark-32.avif 1x, /static/images/respectlytics-mark-64.avif 2x", html)
+        self.assertIn('src="/static/images/respectlytics-mark-32.png"', html)
+        self.assertIn('width="32" height="32" alt="" class="h-8 w-8"', html)

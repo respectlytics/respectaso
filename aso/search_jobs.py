@@ -63,7 +63,6 @@ MAX_COOLDOWNS = 3           # consecutive cool-downs before the job pauses and a
 STATUS_POLL_SLICE = 5       # seconds between status checks during a cool-down
 FAILED_ITEMS_CAP = 200      # failed keywords kept on the row (the retry uses them)
 LIST_DISPLAY_CAP = 30       # names spelled out in a warning before "and N more"
-ETA_MIN_PAIRS = 3           # pairs done in this run before an ETA is shown
 
 FREE_BUSY_MESSAGE = (
     "Your current search is still running. Wait for it to finish, or get Pro "
@@ -176,13 +175,14 @@ def finished_job():
 # Creating and describing jobs
 # ---------------------------------------------------------------------------
 
-def create_job(app, countries, keywords, *, run_now=False) -> KeywordSearchJob:
+def create_job(app, countries, keywords, *, run_now=False, not_before=None) -> KeywordSearchJob:
     """Create a queued job and kick the lane. With ``run_now`` the job goes
     first, pausing a running keyword search if there is one (Top Search
-    Terms tracks one keyword this way)."""
+    Terms tracks one keyword this way). With ``not_before`` ("Run tonight")
+    it waits for that moment."""
     job = KeywordSearchJob.objects.create(
         app=app, countries=list(countries), keywords=list(keywords),
-        status="queued", progress_message="Waiting to start...",
+        status="queued", progress_message="Waiting to start...", not_before=not_before,
     )
     if run_now:
         run_queue.run_now(FEATURE_KEY, job.pk)
@@ -267,8 +267,6 @@ def job_payload(job, *, include_results=False) -> dict:
     can_run_now = False
     if job.status == "queued":
         waiting_for, can_run_now = _waiting_for(job)
-    remaining_pairs = max(job.total_pairs - job.next_index, 0)
-    eta = (remaining_pairs * job.seconds_per_pair) if (job.seconds_per_pair and job.status == "running") else None
     data = {
         "id": job.pk,
         "status": job.status,
@@ -284,11 +282,11 @@ def job_payload(job, *, include_results=False) -> dict:
         "current_pair": job.current_pair or "",
         "throttle_state": job.throttle_state,
         "auto_resume": job.auto_resume,
-        "eta_seconds": int(eta) if eta is not None else None,
         "countries": list(job.countries),
         "country_names": country_names(job.countries),
         "countries_text": countries_text(job.countries),
         "queue_position": run_queue.queue_position(job) if job.status == "queued" else None,
+        "tonight": run_queue.waits_for_tonight(job),
         "waiting_for": waiting_for,
         "can_run_now": can_run_now,
         "yielded_for": job.yielded_for_label if job.auto_resume else None,
@@ -492,6 +490,10 @@ def execute_job(pk) -> None:
 
 
 def _execute(pk) -> None:
+    _execute_pairs(pk)
+
+
+def _execute_pairs(pk) -> None:
     job = KeywordSearchJob.objects.select_related("app").get(pk=pk)
     countries = list(job.countries)
     keywords = list(job.keywords)
@@ -519,7 +521,6 @@ def _execute(pk) -> None:
     cooldowns = 0
     run_started = time.monotonic()
     elapsed_before = job.elapsed_seconds or 0.0
-    seconds_per_pair = job.seconds_per_pair
     # Waits on the limiter before real App Store reads only; a keyword read
     # today anywhere in the app is written from that read (aso/day_reads.py).
     pacer = day_reads.Pacer(wait=lambda: limiter.wait())
@@ -535,8 +536,7 @@ def _execute(pk) -> None:
         if len(failed_items) < FAILED_ITEMS_CAP:
             failed_items.append({"keyword": keyword, "country": country, "error": error[:200]})
 
-    # pairs_this_run counts the pairs this run has finished, this one included.
-    for pairs_this_run, index in enumerate(range(start_index, total), start=1):
+    for index in range(start_index, total):
         status, current_app_id = _status_and_app(pk)
         if status != "running":     # Pause, Discard, Run now, or removed
             return
@@ -573,8 +573,6 @@ def _execute(pk) -> None:
                 record_failure(keyword, country, "Unexpected error")
 
         active_seconds = time.monotonic() - run_started
-        if pairs_this_run >= ETA_MIN_PAIRS:
-            seconds_per_pair = active_seconds / pairs_this_run
         state = classify_throttle_state(limiter, attempted=attempted, failed=failed)
         next_pair = _pair_text(*job.pair(index + 1)) if index + 1 < total else ""
         # The cursor and the counters are guarded by the cursor, not the
@@ -584,7 +582,7 @@ def _execute(pk) -> None:
         KeywordSearchJob.objects.filter(pk=pk, next_index=index).update(
             next_index=index + 1, done_count=done, skipped_count=skipped,
             failed_count=failed_total, skipped_items=skipped_items, failed_items=failed_items,
-            seconds_per_pair=seconds_per_pair, elapsed_seconds=elapsed_before + active_seconds,
+            elapsed_seconds=elapsed_before + active_seconds,
         )
         KeywordSearchJob.objects.filter(pk=pk, status="running").update(
             current_pair=next_pair, throttle_state=STATUS_NAME_FOR_THROTTLE.get(state, state),
@@ -622,6 +620,6 @@ def _finish(pk) -> None:
 
 run_queue.register(run_queue.Feature(
     key=FEATURE_KEY, label=FEATURE_LABEL, model=KeywordSearchJob, filter_kwargs={},
-    execute=execute_job, describe=describe, progress=job_payload, open_url="/",
+    execute=execute_job, describe=describe, progress=job_payload, open_url="/keywords/",
     interrupted=requeue_interrupted, on_remove=remove_from_queue, can_yield=True,
 ))

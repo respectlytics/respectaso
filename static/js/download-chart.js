@@ -67,8 +67,8 @@
         <rect x="${zoneX3}" y="${PAD_T}" width="${zoneX4 - zoneX3}" height="${chartH}" fill="rgba(100,116,139,0.03)" rx="4"/>`;
     const zoneLabels = `
         <text x="${(zoneX1 + zoneX2) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(167,139,250,0.6)" text-anchor="middle" font-weight="600">TOP 5</text>
-        <text x="${(zoneX2 + zoneX3) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(96,165,250,0.5)" text-anchor="middle" font-weight="600">TOP 6\u201310</text>
-        <text x="${(zoneX3 + zoneX4) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(148,163,184,0.4)" text-anchor="middle" font-weight="600">TOP 11\u201320</text>`;
+        <text x="${(zoneX2 + zoneX3) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(96,165,250,0.5)" text-anchor="middle" font-weight="600">TOP 6-10</text>
+        <text x="${(zoneX3 + zoneX4) / 2}" y="${PAD_T + 11}" font-size="9" fill="rgba(148,163,184,0.4)" text-anchor="middle" font-weight="600">TOP 11-20</text>`;
 
     let bars = '';
     positions.forEach((p, i) => {
@@ -96,7 +96,7 @@
         // Download value label above bar for key positions
         if (p.downloads_high > 0 && (p.pos <= 5 || p.pos === 10 || p.pos === 15 || p.pos === 20 || isAppPos)) {
             const labelY = yHigh - (isAppPos ? 16 : 5);
-            bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}\u2013${fmt(p.downloads_high)}</text>`;
+            bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}-${fmt(p.downloads_high)}</text>`;
         }
 
         // "YOU" marker for your app position
@@ -116,7 +116,7 @@
     // Per-position tier cards (not averages — show what each position actually gets)
     function posRow(pos, p, isBold) {
         const cls = isBold ? 'font-semibold' : 'opacity-80';
-        return '<div style="display:flex;justify-content:space-between;font-size:0.75rem;"><span style="color:#94a3b8;">#' + pos + '</span><span class="' + cls + '">' + fmt(p.downloads_low) + '\u2013' + fmt(p.downloads_high) + '/day</span></div>';
+        return '<div style="display:flex;justify-content:space-between;font-size:0.75rem;"><span style="color:#94a3b8;">#' + pos + '</span><span class="' + cls + '">' + fmt(p.downloads_low) + '-' + fmt(p.downloads_high) + '/day</span></div>';
     }
     const p1 = positions[0], p3 = positions[2], p5 = positions[4];
     const p6 = positions[5], p8 = positions[7], p10 = positions[9];
@@ -133,7 +133,7 @@
                 </div>
             </div>
             <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
-                <p class="text-2xs text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6\u201310, per position</p>
+                <p class="text-2xs text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6-10, per position</p>
                 <div class="space-y-1 text-blue-300">
                     ${posRow(6, p6, true)}
                     ${posRow(8, p8, false)}
@@ -141,7 +141,7 @@
                 </div>
             </div>
             <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
-                <p class="text-2xs text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11\u201320, per position</p>
+                <p class="text-2xs text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11-20, per position</p>
                 <div class="space-y-1 text-slate-300">
                     ${posRow(11, p11, true)}
                     ${posRow(15, p15, false)}

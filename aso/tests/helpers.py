@@ -20,6 +20,12 @@ class _SyncThread:
         if self._target:
             self._target(*self._args, **self._kwargs)
 
+    def join(self, timeout=None):
+        """The target already ran in start()."""
+
+    def is_alive(self):
+        return False
+
 
 def ranked_search(apps, extra_ids=(), source="itunes"):
     """A RankedSearch for tests: ``apps`` in Apple's order (the first 25 are

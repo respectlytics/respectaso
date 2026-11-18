@@ -1,0 +1,21 @@
+{% comment %}What the Apps page shows for each app with Pro, as one sample row (invented numbers): the
+real layout, marked Sample. Nothing in it is a live control: the page's one Pro button is on the
+Pro license tile of the Get set up strip (step 3.7a).{% endcomment %}
+<section class="card mt-4 border-dashed p-4" id="apps-pro-sample" data-pro-preview>
+    <div class="mb-3 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="card-title">{{ pro_sample.headline }}</h2>
+            <p class="card-lead">A sample. Pro reads these from App Store Connect for your own apps.</p>
+        </div>
+    </div>
+    <div class="pointer-events-none select-none rounded-xl border border-white/10 bg-slate-900/40 p-4" aria-hidden="true">
+        <div class="grid grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] items-center gap-4">
+            <div class="flex min-w-0 items-center gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-sm font-semibold text-white">H</span><span class="item-title truncate">Habito: Habit Tracker</span><span class="chip shrink-0 border-amber-500/30 text-amber-200">Sample</span></div>
+            <div><span class="text-2xs text-slate-400">Downloads</span><p class="text-base font-semibold text-white">612<span class="ml-1.5 text-xs font-semibold text-red-300">-31%</span></p></div>
+            <div><span class="text-2xs text-slate-400">Proceeds</span><p class="text-base font-semibold text-white">USD 288.00<span class="ml-1.5 text-xs font-semibold text-red-300">-12%</span></p></div>
+            <div><span class="text-2xs text-slate-400">In the top 10</span><p class="text-base font-semibold text-white">14 <span class="text-sm font-normal text-slate-400">of 42</span></p></div>
+        </div>
+        <div class="notice notice-line notice-warning">{% include "aso/partials/notice_icon.html" with tone="warning" %}<p class="min-w-0 flex-1">Fewer people see your app: 9,410 in the last 7 days, 13,600 in the 7 before.</p><span class="notice-action">Open Get found</span></div>
+        <div class="notice notice-line notice-info">{% include "aso/partials/notice_icon.html" with tone="info" %}<p class="min-w-0 flex-1">4 reviews of 1 to 3 stars wait for a reply.</p><span class="notice-action">Open Reviews</span></div>
+    </div>
+</section>

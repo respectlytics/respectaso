@@ -132,12 +132,57 @@
        and organized"). */
     .detail-card { @apply rounded-lg border border-white/10 bg-slate-800/60 p-3; }
     .takeaway { @apply rounded-lg border-l-2 border-purple-400 bg-purple-500/10 px-3 py-2 text-sm text-slate-100; }
+    /* A notice: what just happened, or where something stands, with what to
+       do next (owner, 2026-11-17: one look for one kind of thing, the
+       app-added banner's green). Tinted by tone, an icon first, an X last
+       that closes it (aso/partials/notice_icon.html, notice_close.html,
+       static/js/notice.js). Every success, status, warning and error banner
+       in the app is one of these, never a plain card.
+         notice-success  done: added, saved, applied, created, live
+         notice-info     waiting on someone else: with Apple for review
+         notice-warning  needs a look: nothing applied, a figure missing
+         notice-error    failed or refused
+       A notice about something that happened has the X; one that is the
+       state of what the screen shows (Apple Ads connected, a license
+       ending) has none, since it goes away when the state does.
+       Guarded by aso/tests/test_notices.py. */
+    .notice { @apply flex items-start gap-3 rounded-xl border px-4 py-3 text-sm; }
+    .notice-success { @apply border-green-500/30 bg-green-900/30 text-green-200; }
+    .notice-info { @apply border-sky-500/30 bg-sky-900/30 text-sky-200; }
+    .notice-warning { @apply border-amber-500/30 bg-amber-900/30 text-amber-200; }
+    .notice-error { @apply border-red-500/30 bg-red-900/30 text-red-200; }
+    .notice-icon { @apply mt-0.5 h-4 w-4 shrink-0; }
+    .notice-title { @apply font-semibold text-white; }
+    .notice-step { @apply font-semibold text-white; }
+    .notice-close { @apply -mr-1.5 -mt-1 ml-auto shrink-0 cursor-pointer rounded-md p-1 opacity-70 transition hover:bg-white/10 hover:opacity-100; }
+    /* A notice that is one line inside a card (a To do line on Apps, aso/partials/todo_line.html):
+       the same tones, thinner, with a small action in the notice's own colour (owner, 2026-11-18). */
+    .notice-line { @apply mt-1.5 items-center gap-2.5 rounded-lg px-3 py-1; }
+    .notice-line .notice-icon { @apply mt-0 h-3.5 w-3.5; }
+    .notice-line .notice-close { @apply -my-0.5 -mr-1 mt-0 p-0.5; }
+    .notice-action { @apply inline-flex shrink-0 items-center rounded-md bg-white/10 px-2 py-0.5 text-xs font-medium text-current transition-colors hover:bg-white/20; }
+    /* A short warning inside a card, about that card (no version open, a
+       language the AI writes less well): amber, no border, no X. */
+    .hint-warning { @apply flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200; }
+    /* The same for guidance that warns of nothing (how to fill a field). */
+    .hint-info { @apply flex items-start gap-2 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-200; }
     .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed; }
     .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white; }
     .btn-quiet { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-sky-400 transition-colors hover:bg-sky-400/10 hover:text-sky-300; }
+    /* An on/off switch (a submit button with role="switch"): the track, its
+       knob and the label after it; aria-checked draws the state. */
+    .switch { @apply -m-1 flex w-fit cursor-pointer items-center gap-3 rounded-lg p-1 text-sm font-medium text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400; }
+    .switch-track { @apply relative inline-flex h-5 w-9 shrink-0 rounded-full bg-slate-600 transition-colors; }
+    .switch:hover .switch-track { @apply bg-slate-500; }
+    .switch-knob { @apply absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform; }
+    .switch[aria-checked="true"] .switch-track { @apply bg-purple-600; }
+    .switch[aria-checked="true"] .switch-knob { @apply translate-x-4; }
     .chip { @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium; }
     .section-tab { @apply rounded-lg border border-transparent px-2.5 py-1 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white; }
     .section-tab-active { @apply rounded-lg border border-purple-500/30 bg-purple-600/20 px-2.5 py-1 text-sm font-medium text-purple-200; }
+    /* A table column's header that sorts the table (aso/partials/sort_button.html and
+       static/js/table-sort.js): its words and an up and down arrow, lit when it sorts. */
+    .sort-button { @apply inline-flex cursor-pointer items-center gap-1 rounded font-medium transition-colors hover:text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400; }
     .menu { @apply absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-white/10 bg-[#1e293b] p-1.5 shadow-2xl shadow-black/40; }
     .menu-item { @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-white/5 hover:text-white; }
     /* A menu row's icon ({% menu_icon %}): one outline set, muted, lit with
@@ -149,12 +194,11 @@
     .menu-item.text-red-300:hover .menu-icon { color: currentColor; }
     .menu-icon-external { @apply ml-auto h-3.5 w-3.5 shrink-0 text-slate-500; }
     /* Respectlytics, the analytics product of the same studio, in the Help
-       menu: its own mark and its indigo to purple, so it reads as a sister
-       product rather than one more help link. */
-    .menu-item-respectlytics { @apply hover:bg-indigo-500/10; }
-    .menu-item-respectlytics .menu-label { @apply bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text font-medium text-transparent; }
-    .menu-item-respectlytics:hover .menu-label { @apply from-indigo-200 to-purple-200; }
-    .menu-item-respectlytics .menu-icon-external { @apply text-purple-400/70; }
+       menu: its logo as its app icon shows it (the mark on white), its name
+       and one line on what it does, on a ground of its own, so it reads as a
+       sister product rather than one more help link. */
+    .menu-item-respectlytics { @apply mt-1 gap-3 border border-indigo-400/20 bg-indigo-500/[0.07] py-2.5 hover:border-indigo-400/30 hover:bg-indigo-500/[0.12]; }
+    .menu-item-respectlytics .menu-icon-external { @apply text-indigo-300/70; }
 
     /* Clickable text (docs/development/PRO_AND_CLICKABLE_TEXT_PLAN.md): every
        text link, text button (.btn-quiet) and section that opens on a click

@@ -61,9 +61,11 @@ class TheRefreshBacksOffWhileAppleIsBusyTest(TestCase):
         self.assertEqual(len(apple.calls), 2 * 5)
         self.assertIn("stopped: Apple's App Store keeps turning reads away", log)
         self.assertIn(f"0 of {PAIRS} pairs refreshed; {PAIRS} wait for the next check", log)
-        # Every wait honours Apple's Retry-After, above the normal pace.
+        # Every wait honours Apple's Retry-After, above the normal pace. The
+        # shared gate counts it from Apple's answer, so a wait is Retry-After
+        # less the moment the refresh took to note the answer.
         self.assertTrue(waits)
-        self.assertGreaterEqual(min(waits), RETRY_AFTER)
+        self.assertGreaterEqual(min(waits), RETRY_AFTER - 0.5)
         status = scheduler.get_status()
         self.assertFalse(status["running"])
         self.assertIsNone(status["last_completed_at"])
@@ -76,8 +78,11 @@ class TheRefreshBacksOffWhileAppleIsBusyTest(TestCase):
         self.assertEqual(refreshed, PAIRS - 1)
         self.assertIn(f"{PAIRS - 1} of {PAIRS} pairs refreshed, 0 skipped (App Store unavailable), "
                       "1 busy, 0 failed", log)
-        # The pause before the next keyword is Apple's Retry-After, not two seconds.
-        self.assertEqual(waits[:2], [RETRY_AFTER, RETRY_AFTER])
+        # The pause before the next keyword is Apple's Retry-After, not two
+        # seconds: the search's own pause, then the gate's, counted from
+        # Apple's answer (aso/throttle.py AppleGate).
+        self.assertEqual(waits[0], RETRY_AFTER)
+        self.assertAlmostEqual(waits[1], RETRY_AFTER, delta=0.5)
         # The keyword Apple turned away is the one left for the next check.
         self.assertEqual(scheduler._get_pairs_to_refresh(), [self.pairs[0]])
 
@@ -85,7 +90,13 @@ class TheRefreshBacksOffWhileAppleIsBusyTest(TestCase):
         apple = AppleSearch(_apps())
         refreshed, waits, _log = self._refresh(apple)
         self.assertEqual(refreshed, PAIRS)
-        self.assertEqual(waits, [scheduler.REFRESH_PACE_SECONDS] * (PAIRS - 1))
+        # Its pace between reads, counted from the start of the previous read
+        # at the shared gate (aso/throttle.py AppleGate), so a wait is the
+        # pace less the time that read took; the first read waits for nobody.
+        self.assertEqual(len(waits), PAIRS - 1)
+        for wait in waits:
+            self.assertLessEqual(wait, scheduler.REFRESH_PACE_SECONDS)
+            self.assertAlmostEqual(wait, scheduler.REFRESH_PACE_SECONDS, delta=0.5)
 
     def test_the_next_check_carries_on_with_the_pairs_left(self):
         self._refresh(AppleSearch(429, retry_after=str(RETRY_AFTER)))

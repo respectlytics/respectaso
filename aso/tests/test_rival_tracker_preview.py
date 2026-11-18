@@ -21,7 +21,7 @@ class SampleDataTest(TestCase):
             self.assertEqual(len(ctx["rows"]), len(preview.SAMPLE_ROWS))
             for row in ctx["rows"]:
                 self.assertEqual(len(row["cells"]), len(preview.SAMPLE_APPS))
-            for key in ("eyebrow", "headline", "body", "primary_label", "primary_url", "table_line"):
+            for key in ("headline", "body", "primary_label", "primary_url", "table_line"):
                 self.assertTrue(ctx["cta"][key], f"{state}: empty {key}")
             self.assertEqual(bool(ctx["cta"]["secondary_label"]), bool(ctx["cta"]["secondary_url"]))
 

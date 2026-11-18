@@ -26,17 +26,6 @@
         return n === 1 ? one : (many || one + 's');
     }
 
-    // A wait in words, from the one copy every page loads first
-    // (static/js/country-picker.js).
-    function durationText(seconds) {
-        return window.CountryPicker.durationText(seconds);
-    }
-
-    function etaText(seconds) {
-        var text = durationText(seconds);
-        return text ? text + ' left' : '';
-    }
-
     function byId(id) { return document.getElementById(id); }
 
     function setText(id, text) {
@@ -119,8 +108,6 @@
         esc: esc,
         fmt: fmt,
         plural: plural,
-        durationText: durationText,
-        etaText: etaText,
         byId: byId,
         setText: setText,
         setHtml: setHtml,

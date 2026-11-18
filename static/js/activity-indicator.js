@@ -16,7 +16,7 @@
  * top bar that then flies into the pill (docs/development/ACTIVITY_CENTER_PLAN.md):
  *
  *   ActivityIndicator.announce({queued: true, label: '12 keywords in the United States',
- *                               current: 'the current search', eta: 180})
+ *                               current: 'the current search'})
  *
  * The daily update of tracked keywords reports here too: the pill polls
  * aso:auto_refresh_status (data-daily-url on #activity-root).
@@ -87,7 +87,7 @@
     function render() {
         var pill = byId('activity-pill');
         if (!pill) return;
-        var running = null, waiting = 0;
+        var running = null, waiting = 0, tonight = 0;
         Object.keys(sources).forEach(function (key) {
             var state = sources[key];
             if (key !== 'announce' && state && (state.running || state.waiting)) sources.announce = null;
@@ -97,8 +97,29 @@
             if (!state) return;
             if (state.running && !running) running = state.running;
             waiting += state.waiting || 0;
+            tonight += state.tonight || 0;
             if (state.running || state.waiting) activeSources[key] = true;
         });
+
+        // Only runs that wait for the night ("Run tonight"): a quiet pill that
+        // opens the panel listing them, no spinner, and no "done" signal
+        // when one is taken out of the queue.
+        if (!running && !waiting && tonight && !signal) {
+            wasActive = false;
+            activeSources = {};
+            stopSignal();
+            pill.classList.remove('hidden');
+            setIcons(false, false, false);
+            byId('activity-name').textContent = 'Tonight at 02:00';
+            // Below 1440 px the pill hides the name: the hour alone says it.
+            var wide = window.matchMedia('(min-width: 1440px)').matches;
+            byId('activity-pct').textContent = wide ? '' : '02:00';
+            byId('activity-pct').classList.toggle('hidden', wide);
+            pill.setAttribute('aria-label', tonight === 1 ? '1 run tonight at 02:00' : tonight + ' runs tonight at 02:00');
+            byId('activity-waiting-count').textContent = '';
+            byId('activity-waiting').classList.add('hidden');
+            return;
+        }
 
         if (!running && !waiting) {
             if (wasActive) {          // the work just ended here: signal it once
@@ -122,6 +143,7 @@
         stopSignal();
         wasActive = true;
         pill.classList.remove('hidden');
+        byId('activity-pct').classList.remove('hidden');
         setIcons(true, false, false);
         // From 1440 px the pill names the task; below, it stays small so the bar fits.
         var name = running ? running.label : 'Starting next';
@@ -168,27 +190,22 @@
     var NOTE_MS = 6000, FLY_MS = 400, ANNOUNCE_MS = 8000;
     var FOOTNOTE = 'One task at a time, so every result is fresh and complete.';
 
-    // A wait in words, from the one copy every page loads (country-picker.js).
-    function timeText(seconds) {
-        return (window.CountryPicker && seconds) ? CountryPicker.durationText(seconds) : '';
+    // Never how long a run will take (owner, 2026-11-18): what the person
+    // can do meanwhile, and what it waits for.
+    function startedLine() {
+        return 'You can keep working while it runs.';
     }
 
-    function startedLine(etaSeconds) {
-        var time = timeText(etaSeconds);
-        if (!time) return 'You can keep working.';
-        time = time.indexOf('about ') === 0 ? 'About ' + time.slice(6) : 'About ' + time;
-        return time + '. You can keep working.';
-    }
-
-    function queuedLine(current, etaSeconds) {
-        var time = timeText(etaSeconds);
-        return 'Starts after ' + (current || 'the current task') + (time ? ', in ' + time : '') + '.';
+    function queuedLine(current) {
+        return 'Starts after ' + (current || 'the current task') + '.';
     }
 
     var announceTimer = null;
 
     function announce(note) {
         note = note || {};
+        // A run started with "Run tonight" waits for 02:00 (aso/run_queue.py).
+        if (note.tonight) note.queued = true;
         var old = byId('activity-note');
         if (old) old.remove();
         var box = document.createElement('div');
@@ -205,9 +222,10 @@
             '<p class="mt-0.5 text-xs text-slate-300"></p>' +
             '<p class="mt-2 text-2xs text-slate-500"></p>';
         var lines = box.querySelectorAll('p');
-        lines[0].lastChild.textContent = note.queued ? 'Queued' : 'Started';
+        lines[0].lastChild.textContent = note.tonight ? 'Tonight' : (note.queued ? 'Queued' : 'Started');
         lines[1].textContent = note.label || '';
-        lines[2].textContent = note.queued ? queuedLine(note.current, note.eta) : startedLine(note.eta);
+        lines[2].textContent = note.tonight ? 'Starts at 02:00 your time.'
+            : (note.queued ? queuedLine(note.current) : startedLine());
         lines[3].textContent = FOOTNOTE;
         document.body.appendChild(box);
 

@@ -11,9 +11,11 @@ control: what looks clickable in the sample is a span.
 {% block title %}{{ page_title }} · RespectASO{% endblock %}
 
 {% block content %}
-<div class="w-full">
+<div class="w-full{% if feature == "simulator" %} max-w-5xl mx-auto{% endif %}">
     {% include "aso/partials/back_link.html" %}
-    {% if feature != "simulator" %}{% include "aso/partials/section_tabs.html" with section="discover" %}{% endif %}
+    {% if feature == "simulator" %}
+    {% if preview_store_tabs %}{% include "aso/partials/store_preview_tabs.html" with tabs=preview_store_tabs %}{% else %}{% include "aso/partials/section_tabs.html" with section="store" %}{% endif %}
+    {% else %}{% include "aso/partials/section_tabs.html" with section="discover" %}{% endif %}
 
     <div class="mb-4">
         <h1 class="page-title">{{ page_title }}</h1>

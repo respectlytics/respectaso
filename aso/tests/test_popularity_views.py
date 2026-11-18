@@ -45,14 +45,19 @@ class PopularityViewTestBase(TestCase):
 class BannerMatrixTest(PopularityViewTestBase):
     """The six-state signal matrix v2 (apple-ads.instructions.md)."""
 
-    def test_fresh_install_recommends_apple_in_the_checklist_not_a_banner(self):
+    def test_fresh_install_recommends_apple_on_the_apps_strip_not_a_banner(self):
+        """The recommendation is the Apple Ads tile of Get set up on Apps
+        (DAILY_USE_PLAN.md step 3.7a), with "Stay on the estimate"."""
         from aso.models import App
 
-        App.objects.create(name="Moonpond")   # with nothing at all, the first run card shows instead
+        App.objects.create(name="Moonpond")
         response = self.client.get(reverse("aso:dashboard"))
         self.assertNotContains(response, "apple-recommend-banner")
-        self.assertContains(response, 'data-setup-step="apple"')
-        self.assertContains(response, "Use Apple&#x27;s own popularity numbers")
+        self.assertNotContains(response, "data-setup-tile")
+        response = self.client.get(reverse("aso:apps"))
+        self.assertNotContains(response, "apple-recommend-banner")
+        self.assertContains(response, 'data-setup-tile="apple" data-state="open"')
+        self.assertContains(response, "Stay on the estimate")
 
     def test_recommend_banner_hidden_after_opt_out(self):
         storage.save_apple_settings(apple_ads={"estimate_opt_out": True})
