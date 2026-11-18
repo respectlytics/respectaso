@@ -45,9 +45,9 @@ RespectASO is designed as a **local-only tool** running on the user's machine (n
 
 - **No remote access**: binds to localhost only
 - **No authentication**: single-user tool, no auth needed
-- **No credentials stored**: all data comes from the public iTunes Search API, no API keys needed
-- **No data exfiltration**: all API calls go directly from the user's machine to Apple/iTunes
-- **No telemetry**: no data is sent to Respectlytics or any third party
+- **Your keys stay on your machine**: an Apple Ads key you add is kept only in RespectASO's data folder
+- **Direct requests**: every request goes straight from your machine to the service it is for (Apple, respectaso.com), with no server of ours in between
+- **Your research stays yours**: nothing you research is sent to us
 
 ## Supported Versions
 

@@ -23,7 +23,7 @@ Most ASO tools need accounts and API keys, and send your keyword research to the
 
 - **No API keys or credentials needed**: works out of the box with the public iTunes Search API; connecting Apple Ads for official popularity data is optional
 - **Runs on your Mac**: App Store data comes from Apple straight to your computer, never through a server of ours
-- **No telemetry, no analytics, no tracking**: the app reports nothing about you or your research to us or anyone else
+- **Your research stays on your Mac**: no RespectASO account, and nothing you research is sent to us
 - **Open source**: AGPL-3.0 licensed
 - **Native Mac app**: download the `.dmg`, drag to Applications, done
 
@@ -196,7 +196,7 @@ RespectASO is designed with privacy as a core principle:
 
 - **A native Mac app**: it runs on your machine and keeps your research there
 - **No accounts**: no registration, no login, no user tracking
-- **No telemetry**: no analytics and no usage data. The app's only calls go to Apple, for App Store data, and to respectaso.com, to see whether a new version is out. Once a day the app asks respectaso.com for the newest version; it sends its version, edition and macOS version, nothing else.
+- **Where your data goes**: the app's calls go to Apple, for App Store data and, with your own key, Apple Ads; and to respectaso.com, to see whether a new version is out. Once a day the app asks respectaso.com for the newest version; it sends its version, edition and macOS version, nothing else.
 - **No API keys required**: the public iTunes Search API needs no credentials; the optional Apple Ads connection uses your own key, which stays on your Mac
 - **No middleman**: App Store data comes straight from Apple to your machine, never through a RespectASO server
 - **Your data stays yours**: keyword research, competitor analysis and search history are stored on your Mac, not on any server of ours
