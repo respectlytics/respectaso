@@ -33,7 +33,7 @@
     <script src="{% static 'js/popularity-banner.js' %}"></script>
 
 
-    <main class="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-4">
+    <main class="frame flex-1 py-4">
         <!-- Update Banner (populated by JS, shown on all pages) -->
         <div id="update-banner" class="hidden animate-fade-in mb-4">
             <div class="bg-purple-900/30 border border-purple-500/30 rounded-xl px-4 py-3">
@@ -61,7 +61,7 @@
                         </a>
                         <a id="update-instructions-btn" href="{{ setup_guide_url }}#updating"
                            class="hidden text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap">
-                            Update instructions →
+                            Update instructions
                         </a>
                     </div>
                 </div>
@@ -69,7 +69,7 @@
                 <div id="update-notes" class="hidden mt-3 pt-3 border-t border-purple-500/20">
                     <div id="update-notes-content" class="text-xs text-slate-400 leading-relaxed max-h-48 overflow-y-auto [&_h2]:text-slate-300 [&_h2]:font-semibold [&_h2]:text-sm [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2:first-child]:mt-0 [&_h3]:text-slate-300 [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3:first-child]:mt-0 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_strong]:text-slate-300 [&_p]:mb-1.5 [&_code]:bg-slate-700/50 [&_code]:px-1 [&_code]:rounded [&_code]:text-slate-300"></div>
                     <a id="update-release-link" href="#" target="_blank" rel="noopener" class="link inline-block mt-2 text-xs">
-                        View full release on GitHub →
+                        View full release on GitHub
                     </a>
                 </div>
             </div>
@@ -281,6 +281,7 @@
     of carrying a list of their own. See aso/country_picker.py.{% endcomment %}
     {{ country_catalog|json_script:"country-catalog-data" }}
     {{ classification_legend|json_script:"classification-legend-data" }}
+    {{ product_icons|json_script:"product-icons-data" }}
     {{ difficulty_factors|json_script:"difficulty-factors-data" }}
     {% comment %}What the app remembers for a visitor between pages (aso/ui_memory.py).{% endcomment %}
     <script src="{% static 'js/ui-memory.js' %}" data-url="{% url 'aso:ui_memory' %}" data-csrf="{{ csrf_token }}"></script>
@@ -308,6 +309,7 @@
             } catch (e) { /* no Intl: the machine's zone stays in use */ }
         })();
     </script>
+    <script src="{% static 'js/icons.js' %}"></script>
     <script src="{% static 'js/classification-badge.js' %}"></script>
     <script src="{% static 'js/difficulty-factors.js' %}"></script>
 

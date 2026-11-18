@@ -4,8 +4,8 @@
 The owner found no hierarchy on any page (2026-10-02): a card's title, the
 names of the things in it and its conclusion were all the same white bold,
 and card headings came in five sizes. Now a heading is a page-title, a
-card-title (serif, one step below the page), a section-label (small
-capitals in grey) or an item-title (Inter semibold), each defined once in
+card-title (one step below the page), a section-label (small, grey,
+in sentence case) or an item-title (medium), each defined once in
 static/css/tailwind.source.css, so no template sets a heading's size,
 weight or colour by hand. The one exception is a notice's heading, red or
 amber by its state, and the preview's benefit line, which is set large on
@@ -87,7 +87,8 @@ class EveryHeadingTakesARoleTest(SimpleTestCase):
         self.assertTrue({"text-lg", "font-semibold", "text-white"} <= _css_rule("run-title"))
         self.assertTrue({"text-base", "font-semibold", "text-white"} <= card)
         self.assertTrue({"text-sm", "font-medium"} <= item)
-        self.assertTrue({"text-2xs", "uppercase", "text-slate-400"} <= label)
+        self.assertTrue({"text-xs", "font-semibold", "text-slate-400"} <= label)
+        self.assertNotIn("uppercase", label)   # no capitals letter-spaced (aso/tests/test_no_uppercase_labels.py)
         self.assertTrue(_css_rule("takeaway"))
 
     def test_nothing_on_a_page_is_set_larger_than_its_title(self):

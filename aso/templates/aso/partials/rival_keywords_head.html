@@ -21,7 +21,7 @@ those columns, off the card's centre, with no room above the icons (the
 owner, 2026-10-02).
 {% endcomment %}
 <thead>
-    <tr class="border-b border-white/5 text-left text-2xs uppercase tracking-wide text-slate-400">
+    <tr class="border-b border-white/5 text-left text-xs font-medium text-slate-400">
         <th class="px-4 py-2 align-bottom{% if not locked %} cursor-pointer select-none hover:text-slate-200{% endif %}"{% if not locked %} data-sort="keyword" tabindex="0" aria-sort="none"{% endif %}>
             <span class="inline-flex items-center gap-1">Keyword {% if not locked %}{% column_info "keyword" %}<span class="sort-indicator"></span>{% endif %}</span>
         </th>
@@ -29,7 +29,7 @@ owner, 2026-10-02).
             <span class="inline-flex items-center gap-1">Popularity {% if not locked %}{% column_info "popularity" %}<span class="sort-indicator">▼</span>{% endif %}</span>
         </th>
         {% for column in columns %}
-        <th class="px-3 pb-2 pt-3 text-center align-bottom font-medium normal-case tracking-normal{% if not locked %} cursor-pointer select-none hover:text-white{% endif %}"{% if not locked %} data-sort="app-{{ forloop.counter0 }}" tabindex="0" aria-sort="none" title="{{ column.name|default:column.short_name }}: sort by its rank"{% endif %}>
+        <th class="px-3 pb-2 pt-3 text-center align-bottom font-medium{% if not locked %} cursor-pointer select-none hover:text-white{% endif %}"{% if not locked %} data-sort="app-{{ forloop.counter0 }}" tabindex="0" aria-sort="none" title="{{ column.name|default:column.short_name }}: sort by its rank"{% endif %}>
             <span class="inline-flex flex-col items-center gap-1">
                 {% if column.icon_url %}<img src="{{ column.icon_url }}" alt="" class="w-5 h-5 rounded">{% else %}<span class="w-5 h-5 rounded bg-slate-700" aria-hidden="true"></span>{% endif %}
                 <span class="inline-flex max-w-[7rem] items-center gap-1"><span class="text-2xs truncate {% if column.is_tracked_app %}text-purple-300{% else %}text-slate-300{% endif %}{% if locked %} preview-term blur-sm select-none{% endif %}">{{ column.short_name }}</span>{% if not locked %}<span class="sort-indicator text-2xs text-slate-400"></span>{% endif %}</span>

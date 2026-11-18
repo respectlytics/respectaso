@@ -1,4 +1,4 @@
-{% comment %}
+{% load aso_tags %}{% comment %}
 What we found (01_DESIGN.md 7.1, docs/development/AI_DECISION_FIRST_PLAN.md
 section 1): the first card of an AI Researcher or AI Competitor result, and of
 their Pro previews. How many keywords to target now, to climb and to skip, the
@@ -33,31 +33,31 @@ with data-switch-tab opens that tab of the results page
             {% for row in verdict.best %}
             <tr class="border-b border-white/5 last:border-0">
                 <td class="py-2 pr-6 text-sm font-medium text-white{% if locked %} blur-sm select-none{% endif %}">{{ row.keyword }}</td>
-                <td class="py-2 pr-6">{% for chip in chips %}{% if chip.label == row.classification %}<span class="{{ chip.css }} border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap inline-flex items-center gap-0.5 cursor-help" data-tip="{{ row.tip|default:chip.description }}">{{ chip.icon }} {{ chip.label }}</span>{% endif %}{% endfor %}</td>
-                <td class="py-2 pr-6 text-sm text-slate-300 whitespace-nowrap tabular-nums">Opportunity {{ row.opportunity }}</td>
+                <td class="py-2 pr-6">{% for chip in chips %}{% if chip.label == row.classification %}<span class="{{ chip.css }} border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-help" data-tip="{{ row.tip|default:chip.description }}">{% icon chip.icon %}{{ chip.label }}</span>{% endif %}{% endfor %}</td>
+                <td class="py-2 pr-6 text-sm text-slate-300 whitespace-nowrap">Opportunity {{ row.opportunity }}</td>
                 <td class="py-2 text-sm text-slate-400">{{ row.at_top }} at #1{% if row.competitor_rank %} · they rank #{{ row.competitor_rank }}{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    {% if not locked %}<button type="button" class="btn-quiet mt-2 -ml-2" data-switch-tab="keywords">See all {{ verdict.total }} keywords →</button>{% endif %}
+    {% if not locked %}<button type="button" class="btn-quiet mt-2 -ml-2" data-switch-tab="keywords">See all {{ verdict.total }} keywords</button>{% endif %}
 
     {% if listing.title %}
     <h3 class="section-label mt-4">Suggested listing</h3>
     <dl class="mt-2 grid grid-cols-[auto_auto_auto] justify-start items-baseline gap-x-6 gap-y-1.5">
         <dt class="text-xs text-slate-400">Title</dt>
         <dd class="text-sm text-white">{{ listing.title }}</dd>
-        <dd class="text-xs text-slate-400 tabular-nums">{{ listing.title|length }}/30</dd>
+        <dd class="text-xs text-slate-400">{{ listing.title|length }}/30</dd>
         {% if listing.subtitle %}
         <dt class="text-xs text-slate-400">Subtitle</dt>
         <dd class="text-sm text-white">{{ listing.subtitle }}</dd>
-        <dd class="text-xs text-slate-400 tabular-nums">{{ listing.subtitle|length }}/30</dd>
+        <dd class="text-xs text-slate-400">{{ listing.subtitle|length }}/30</dd>
         {% endif %}
     </dl>
     {% if not locked %}
     <div class="mt-4 flex flex-wrap items-center gap-2">
         {% if simulate_url %}<a href="{{ simulate_url }}" class="btn-secondary">Simulate this metadata</a>{% endif %}
-        <button type="button" class="btn-quiet" data-switch-tab="metadata">See all suggestions →</button>
+        <button type="button" class="btn-quiet" data-switch-tab="metadata">See all suggestions</button>
     </div>
     {% endif %}
     {% endif %}

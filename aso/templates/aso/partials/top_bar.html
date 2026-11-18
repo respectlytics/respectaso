@@ -11,7 +11,7 @@ the Pro lock and say on hover what they do for the reader. The section and every
 aso.context_processors.nav and pro_button; nothing here compares url names.
 {% endcomment %}
 <nav class="sticky top-0 z-40 border-b border-white/10 bg-slate-800/80 backdrop-blur-sm" aria-label="Main">
-    <div class="mx-auto flex h-12 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <div class="frame flex h-12 items-center justify-between gap-4">
         <div class="flex h-full items-center gap-8">
             <a href="{% url 'aso:apps' %}" class="flex shrink-0 items-center gap-2 text-white transition-colors hover:text-purple-300">
                 {% picture "respectaso-logo" 32 classes="h-8 w-8 rounded" %}

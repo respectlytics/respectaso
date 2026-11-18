@@ -359,15 +359,17 @@ def difficulty_factors(request):
 
 
 def classification_legend(request):
-    """The seven keyword classifications, for any screen that shows one.
+    """The keyword classifications, for any screen that shows one, and the
+    icons they and a keyword's notes are drawn with (aso/icons.py), by name.
 
     Published once per page like the country catalog, because the icons, the
     colours and the wording used to be copied into every renderer that drew a
     badge and each copy drifted from the classifier at its own pace.
     """
+    from .icons import catalog
     from .scoring import classification_legend as legend
 
     try:
-        return {"classification_legend": legend()}
+        return {"classification_legend": legend(), "product_icons": catalog()}
     except Exception:  # noqa: BLE001 (the legend must never break a page)
-        return {"classification_legend": []}
+        return {"classification_legend": [], "product_icons": {}}

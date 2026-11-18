@@ -3,7 +3,7 @@
 {% block title %}Install and update · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div>
     {% include "aso/partials/back_link.html" %}
 
     <!-- Header -->
@@ -14,6 +14,7 @@
         </p>
     </div>
 
+    <div class="card-columns">
     {% if IS_NATIVE_APP %}
     <!-- ============================================ -->
     <!-- NATIVE MAC APP SECTIONS                      -->
@@ -83,7 +84,7 @@
     <!-- ============================================ -->
 
     <!-- Native App Recommendation -->
-    <section class="notice notice-warning mb-4">
+    <section class="notice notice-warning mb-4 xl:col-span-2">
         {% include "aso/partials/notice_icon.html" with tone="warning" %}
         <div class="min-w-0 flex-1">
         <h2 class="notice-title mb-3">
@@ -101,7 +102,7 @@
                 </a>
                 <a href="#migrating-from-docker"
                    class="link text-xs">
-                    Migration guide ↓
+                    Migration guide
                 </a>
             </div>
         </div>
@@ -252,6 +253,7 @@
         </div>
     </section>
     {% endif %}
+    </div>
 
     <!-- The same way back at the end of a long page -->
     <div class="mb-5 text-center">{% include "aso/partials/back_link.html" with back_class="" %}</div>

@@ -38,7 +38,26 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.2.0',
+RELEASES = [{'version': '3.2.1',
+  'date': '2026-11-18',
+  'title': 'Numbers read as you expect',
+  'kind': 'patch',
+  'sections': [
+      {'heading': 'Easier to read',
+       'items': [
+           'Numbers such as 1.5 and 1,234 read as you expect, everywhere in the app.',
+           'Every page uses the full width of the window, with the same edges from tab to tab.',
+           'Keyword tags, notes and buttons carry clear icons.',
+           'The tools on each keyword row are always in sight.',
+           'Download ranges in the keyword mix read in words, such as 36 to 355 more a day.',
+       ]},
+      {'heading': 'Smoother',
+       'items': [
+           'In Countries, every row of a finished scan opens and tracks as you expect.',
+           'Adding an app and long tables fit narrow windows.',
+       ]},
+  ]},
+ {'version': '3.2.0',
   'date': '2026-11-18',
   'title': 'Apps, your new home page, and Store for your own apps',
   'kind': 'feature',

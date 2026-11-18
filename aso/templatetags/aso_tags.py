@@ -6,7 +6,7 @@ from django.templatetags.static import static
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 
-from aso import countries
+from aso import countries, icons as product_icons
 from aso.services import compound_form
 from aso.words import word_spans
 
@@ -47,15 +47,6 @@ def ago(value):
     return f"{timesince(value)} ago"
 
 
-@register.filter
-def abs_val(value):
-    """Return the absolute value.  Usage: {{ delta|abs_val }}"""
-    try:
-        return abs(value)
-    except (TypeError, ValueError):
-        return value
-
-
 @register.filter(is_safe=True)
 def trend_arrow(delta, metric="higher_better"):
     """Render a coloured ↑/↓ arrow for a delta value.
@@ -85,20 +76,6 @@ def trend_arrow(delta, metric="higher_better"):
     return mark_safe(
         f'<span class="{color} ml-1.5" title="Change since the check before">({arrow}{abs(delta)})</span>'
     )
-
-@register.filter
-def country_display(code):
-    """
-    Return flag emoji + country name from 2-letter ISO code.
-
-    Usage: {{ result.country|country_display }}
-    """
-    if not code:
-        return mark_safe("—")
-    flag = countries.flag(code)
-    name = countries.name(code)
-    return mark_safe(f'{flag} <span class="ml-0.5">{name}</span>')
-
 
 @register.filter
 def country_flag(code):
@@ -216,6 +193,13 @@ def menu_icon(name):
 
 
 @register.simple_tag
+def icon(name):
+    """A keyword tag's or note's icon by its name (aso/icons.py), in the colour
+    of the text beside it; nothing for a name it does not know."""
+    return mark_safe(product_icons.svg(name))   # markup built from constants in aso/icons.py
+
+
+@register.simple_tag
 def picture(name, size, classes="", alt=""):
     """An image drawn `size` CSS px wide: AVIF, then WebP, then the PNG, each
     at 1x and 2x, from static/images/<name>-<px>.<ext> as scripts/build_images.py
@@ -231,7 +215,7 @@ def picture(name, size, classes="", alt=""):
         srcset("avif"), srcset("webp"), static(f"images/{name}-{size}.png"), srcset("png"), size, size, alt, classes)
 
 
-OPPORTUNITY_SUBLINE_CLASS ="opp-subline block text-2xs font-normal normal-case text-slate-400 text-balance"
+OPPORTUNITY_SUBLINE_CLASS = "opp-subline block text-2xs font-normal text-slate-400 text-balance"
 
 
 @register.simple_tag
@@ -274,14 +258,14 @@ def download_cell(estimates, idx=0, total=0):
         # "group" would also respond to the parent <tr class="... group">, making
         # the tooltip appear on row-hover instead of cell-hover.
         '<div class="group/dl relative inline-block">'
-        '<span class="text-sm tabular-nums text-slate-300 cursor-help border-b border-dotted border-slate-600">'
+        '<span class="text-sm text-slate-300 cursor-help border-b border-dotted border-slate-600">'
         f'{p1_lo}-{p1_hi}<span class="text-slate-400">/day</span></span>'
         f'<div class="hidden group-hover/dl:block absolute z-20 {pos_class} left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">'
-        '<p class="text-2xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>'
+        '<p class="text-xs text-slate-400 mb-2 font-medium">Est. daily downloads</p>'
         '<div class="space-y-1.5">'
-        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">{p1_lo}-{p1_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">{p5_lo}-{p5_hi}</span></div>'
-        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">{p10_lo}-{p10_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300">{p1_lo}-{p1_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300">{p5_lo}-{p5_hi}</span></div>'
+        f'<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300">{p10_lo}-{p10_hi}</span></div>'
         '</div>'
         f'{_derived_market_note(estimates)}'
         '</div></div>'
@@ -358,7 +342,7 @@ def _badge_popover(badge_cls, label, heading, paragraphs, note="",
         else ""
     )
     trigger = trigger_html or (
-        '<span class="text-2xs font-semibold uppercase tracking-wide rounded '
+        '<span class="text-2xs font-semibold rounded '
         f'px-0.5 py-px {badge_cls} cursor-help">{label}</span>'
     )
     return (
@@ -366,10 +350,10 @@ def _badge_popover(badge_cls, label, heading, paragraphs, note="",
         f'{trigger}'
         f'<div class="hidden group-hover/pop:block absolute z-20 {pos} '
         'left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 '
-        'rounded-lg p-3 shadow-xl text-left normal-case font-normal '
-        'tracking-normal whitespace-normal">'
-        '<p class="text-2xs text-slate-400 mb-1.5 font-medium uppercase '
-        f'tracking-wider">{escape(heading)}</p>'
+        'rounded-lg p-3 shadow-xl text-left font-normal '
+        'whitespace-normal">'
+        '<p class="text-xs text-slate-400 mb-1.5 font-medium">'
+        f'{escape(heading)}</p>'
         f"{paras}{note_html}"
         "</div></span>"
     )
@@ -536,22 +520,6 @@ def download_sort_value(estimates):
         return float(positions[0].get("downloads_high", -1))
     except (TypeError, ValueError):
         return -1
-
-
-@register.filter
-def dl_interval(value):
-    """Render a [low, high] dict/tuple as '~120-180' (no '/day' suffix).
-
-    Accepts dicts with 'low'/'high' keys, tuples, or lists. Returns '—' for
-    empty intervals. Used by the App Summary panel.
-    """
-    from aso.dashboard_summary import format_interval
-
-    if isinstance(value, dict):
-        return format_interval(value.get("low", 0), value.get("high", 0))
-    if isinstance(value, (list, tuple)) and len(value) >= 2:
-        return format_interval(value[0], value[1])
-    return "—"
 
 
 @register.filter

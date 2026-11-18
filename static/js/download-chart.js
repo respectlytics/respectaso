@@ -99,10 +99,10 @@
             bars += `<text x="${x + barW/2}" y="${labelY}" font-size="7.5" fill="rgba(255,255,255,0.5)" text-anchor="middle">${fmt(p.downloads_low)}-${fmt(p.downloads_high)}</text>`;
         }
 
-        // "YOU" marker for your app position
+        // "You" marker for your app position
         if (isAppPos) {
             bars += `<rect x="${x - 2}" y="${yHigh - 2}" width="${barW + 4}" height="${hHigh + 4}" rx="3" fill="none" stroke="rgb(250,204,21)" stroke-width="1.5" stroke-dasharray="3,2"/>`;
-            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="600" fill="rgb(250,204,21)" text-anchor="middle">YOU</text>`;
+            bars += `<text x="${x + barW/2}" y="${yHigh - 6}" font-size="9" font-weight="600" fill="rgb(250,204,21)" text-anchor="middle">You</text>`;
         }
 
         // Position number on x-axis
@@ -125,7 +125,7 @@
     const tierCards = `
         <div class="grid grid-cols-3 gap-3 mt-3">
             <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2.5">
-                <p class="text-2xs text-purple-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 5, per position</p>
+                <p class="text-xs text-purple-400 font-semibold text-center mb-1.5">Top 5, per position</p>
                 <div class="space-y-1 text-purple-300">
                     ${posRow(1, p1, true)}
                     ${posRow(3, p3, false)}
@@ -133,7 +133,7 @@
                 </div>
             </div>
             <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5">
-                <p class="text-2xs text-blue-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 6-10, per position</p>
+                <p class="text-xs text-blue-400 font-semibold text-center mb-1.5">Top 6-10, per position</p>
                 <div class="space-y-1 text-blue-300">
                     ${posRow(6, p6, true)}
                     ${posRow(8, p8, false)}
@@ -141,7 +141,7 @@
                 </div>
             </div>
             <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-2.5">
-                <p class="text-2xs text-slate-400 uppercase tracking-wide font-semibold text-center mb-1.5">Top 11-20, per position</p>
+                <p class="text-xs text-slate-400 font-semibold text-center mb-1.5">Top 11-20, per position</p>
                 <div class="space-y-1 text-slate-300">
                     ${posRow(11, p11, true)}
                     ${posRow(15, p15, false)}

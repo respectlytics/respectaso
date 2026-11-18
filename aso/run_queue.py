@@ -57,7 +57,6 @@ YIELDED_MESSAGE = "Paused while another run goes first"
 # own time zone (aso/local_day.py), and the answers a start accepts.
 TONIGHT_HOUR = 2
 WHEN_CHOICES = ("now", "tonight")
-TONIGHT_LABEL = "Starts tonight at 02:00"
 READY_TITLE = "Your report is ready"
 # How a run that worked ends; any other end (failed, cancelled) says nothing.
 FINISHED_STATUSES = ("completed", "ready", "done", "waiting_for_confirm")

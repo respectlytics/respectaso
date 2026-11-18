@@ -251,7 +251,7 @@
                 : 'Starting…';
         }
         if (job.auto_resume) {
-            return (job.yielded_for ? '"' + job.yielded_for + '"' : 'Another run') + ' goes first. This search carries on right after.';
+            return (job.yielded_for ? '\u201c' + job.yielded_for + '\u201d' : 'Another run') + ' goes first. This search carries on right after.';
         }
         if (job.status === 'failed' || job.error_message) {
             return job.error_message || 'Something went wrong. Press Resume to carry on.';

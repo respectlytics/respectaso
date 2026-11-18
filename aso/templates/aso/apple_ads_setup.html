@@ -4,7 +4,7 @@
 {% block title %}Apple Ads Setup · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div>
     {% include "aso/partials/back_link.html" %}
 
     <div class="mb-4">
@@ -14,6 +14,7 @@
         </p>
     </div>
 
+    <div class="card-columns">
     <!-- Step 1 -->
     <section class="card p-4 mb-4">
         <h2 class="card-title mb-2 flex items-center gap-2">
@@ -115,7 +116,7 @@
             <li class="flex gap-2"><span class="text-sky-400">•</span><span>
                 <span class="text-white font-medium">Top terms only:</span> Apple reports each category's top 500
                 most-searched terms (roughly 500+ weekly searches). Keywords outside them show the
-                <span class="text-slate-300 font-mono text-xs">EST*</span> badge and score from the calibrated estimate,
+                <span class="text-slate-300 text-xs">EST*</span> badge and score from the calibrated estimate,
                 capped just below their category's reported range, a bound on their popularity, not an error.
                 Hovering the badge explains the exact cap for that keyword.
             </span></li>
@@ -176,6 +177,7 @@
             </table>
         </div>
     </section>
+    </div>
 
     <a href="{% url 'aso:settings_popularity' %}"
        class="inline-block text-sm font-medium text-white bg-sky-600 hover:bg-sky-500 rounded-lg px-4 py-2 transition-colors">

@@ -67,7 +67,7 @@
         box.className = 'fixed z-50 w-64 rounded-lg border border-white/10 bg-slate-800 p-2 shadow-xl';
         box.setAttribute('role', 'menu');
         box.innerHTML =
-            '<p class="px-1.5 pb-1.5 pt-0.5 text-2xs font-medium uppercase tracking-wider text-slate-400">Track for</p>' +
+            '<p class="px-1.5 pb-1.5 pt-0.5 text-xs font-medium text-slate-400">Track for</p>' +
             list.map(function (app) {
                 return '<button type="button" role="menuitem" data-app-id="' + esc(app.id) + '" data-app-name="' + esc(app.name) + '"' +
                     ' class="track-target flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-xs text-slate-200 hover:bg-white/5">' +

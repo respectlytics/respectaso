@@ -99,13 +99,26 @@
     .ai-prose tbody tr { @apply border-b border-white/5; }
     .ai-prose tbody tr:last-child { @apply border-b-0; }
     .ai-prose th { @apply text-left py-2 px-3 text-slate-400 font-medium; }
-    .ai-prose td { @apply text-left py-2 px-3 align-top tabular-nums; }
+    .ai-prose td { @apply text-left py-2 px-3 align-top; }
 }
 
 /* The named components, defined once (docs/development/APP_SHELL_PLAN.md,
    UI_REDESIGN_PLAN.md 12.3). Built only from Tailwind utilities; a new
    shared component is added here or not at all. */
 @layer components {
+    /* The frame: the one content width of the app, set here and nowhere
+       else (the loheden-design skill, Use the width; owner, 2026-11-18).
+       The top bar, the notices under it and every page's content share its
+       edges, so nothing jumps between sections; a page never narrows itself.
+       Running text keeps a readable line by sitting beside something (two
+       columns, text beside its controls) or by a measure on the text block
+       alone (max-w-prose), left-aligned with the frame. Guarded by
+       aso/tests/test_one_frame.py. */
+    .frame { @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8; }
+    /* A page of independent cards (Settings, a setup guide): one column in a
+       small window, two from 1280 px, so each card keeps a readable width
+       inside the frame instead of a narrow column centred in empty space. */
+    .card-columns { @apply grid items-start gap-x-4 xl:grid-cols-2; }
     .page-title { @apply text-xl font-semibold tracking-tight text-white; }
     .page-lead { @apply text-sm text-slate-400 mt-0.5; }
     .card { @apply bg-[#1e293b] border border-white/10 rounded-xl; }
@@ -116,7 +129,7 @@
          run-title      16 semibold, white       the run a results page shows (a research, a simulation)
          card-title     14 semibold, white       a card, a dialog
          item-title     13 medium, slate 100     a thing in a list
-         section-label  11 capitals, slate 400   a part of a card
+         section-label  12 semibold, slate 400   a part of a card, in sentence case
          body           13, slate 300            what is said about it (text-sm text-slate-300)
          card-lead      13, slate 400            the line that explains a card; counts and dates too
          takeaway       the answer a card arrives at, set apart by the brand purple
@@ -124,7 +137,7 @@
     .run-title { @apply text-lg font-semibold text-white; }
     .card-title { @apply text-base font-semibold text-white; }
     .card-lead { @apply text-sm text-slate-400 mt-0.5; }
-    .section-label { @apply text-2xs font-semibold uppercase tracking-wider text-slate-400; }
+    .section-label { @apply text-xs font-semibold text-slate-400; }
     .item-title { @apply text-sm font-medium text-slate-100; }
     /* A part of an opened detail (a keyword's row, a country's row): its own
        card, raised on the detail's darker panel, its section-label inside
@@ -166,9 +179,10 @@
     .hint-warning { @apply flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200; }
     /* The same for guidance that warns of nothing (how to fill a field). */
     .hint-info { @apply flex items-start gap-2 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-200; }
-    .btn-primary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed; }
-    .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white; }
-    .btn-quiet { @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-sky-400 transition-colors hover:bg-sky-400/10 hover:text-sky-300; }
+    /* A button never wraps its label (owner, 2026-11-18): the row it sits in wraps as a whole. */
+    .btn-primary { @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed; }
+    .btn-secondary { @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-700 hover:text-white; }
+    .btn-quiet { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-sm text-sky-400 transition-colors hover:bg-sky-400/10 hover:text-sky-300; }
     /* An on/off switch (a submit button with role="switch"): the track, its
        knob and the label after it; aria-checked draws the state. */
     .switch { @apply -m-1 flex w-fit cursor-pointer items-center gap-3 rounded-lg p-1 text-sm font-medium text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400; }
@@ -251,5 +265,5 @@
        in the Pro green, with the lock, so it stands apart from the grey
        buttons and says what it leads to. With Pro it is a btn-primary. */
     .btn-locked { @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition-colors hover:border-emerald-300/60 hover:bg-emerald-400/20 hover:text-white; }
-    .chip-pro { @apply inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-2xs font-semibold tracking-wide text-emerald-200; }
+    .chip-pro { @apply inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-2xs font-semibold text-emerald-200; }
 }

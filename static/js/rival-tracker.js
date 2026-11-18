@@ -232,7 +232,7 @@
                 return '<div class="flex items-center gap-2 py-0.5 text-xs">' +
                     '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + s.color + '"></span>' + appIcon(s) +
                     '<span class="min-w-0 flex-1 truncate ' + (s.is_tracked_app ? 'text-purple-200 font-medium' : 'text-slate-300') + '">' + esc(s.short_name) + '</span>' +
-                    '<span class="tabular-nums ' + (rank == null ? 'text-slate-500' : 'text-white') + '">' + (rank == null ? '—' : '#' + rank) + '</span></div>';
+                    '<span class="' + (rank == null ? 'text-slate-500' : 'text-white') + '">' + (rank == null ? '—' : '#' + rank) + '</span></div>';
             }).join('');
             tip.classList.remove('hidden');
         }

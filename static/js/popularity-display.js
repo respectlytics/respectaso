@@ -154,12 +154,12 @@
         var showBelow = total > 0 && idx < total / 2;
         var pos = showBelow ? 'top-full mt-2' : 'bottom-full mb-2';
         return '<span class="group/pop relative inline-flex">'
-            + (triggerHtml || ('<span class="text-2xs font-semibold uppercase tracking-wide rounded px-0.5 py-px '
+            + (triggerHtml || ('<span class="text-2xs font-semibold rounded px-0.5 py-px '
                 + tip.badge.cls + ' cursor-help">' + tip.badge.label + '</span>'))
             + '<div class="hidden group-hover/pop:block absolute z-20 ' + pos
             + ' left-1/2 -translate-x-1/2 w-64 bg-slate-800 border border-white/10 rounded-lg p-3 '
-            + 'shadow-xl text-left normal-case font-normal tracking-normal whitespace-normal">'
-            + '<p class="text-2xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">'
+            + 'shadow-xl text-left font-normal whitespace-normal">'
+            + '<p class="text-xs text-slate-400 mb-1.5 font-medium">'
             + tip.heading + '</p>'
             + tip.paragraphs.map(function (p, i) {
                 return '<p class="text-2xs leading-relaxed text-slate-300'
@@ -273,7 +273,7 @@
         if (source !== 'apple' && source !== 'internal') return '';
         var badge = source === 'apple' ? BADGES.asa : BADGES.est;
         var label = source === 'apple' ? 'Apple Ads popularity' : 'RespectASO estimate';
-        return '<span class="text-2xs font-semibold uppercase tracking-wide rounded px-0.5 py-px '
+        return '<span class="text-2xs font-semibold rounded px-0.5 py-px '
             + badge.cls + ' cursor-help" title="Popularity source used in this analysis: '
             + label + '">' + badge.label + '</span>';
     }

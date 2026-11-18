@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from . import rank_change
 from .models import SearchResult
-from .scoring import estimate_range, sentence_app_name
+from .scoring import estimate_range, quoted_keyword, sentence_app_name
 
 
 def _safe_estimates(result):
@@ -248,9 +248,9 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
         top3_high = sum(_current_dl_interval(r)[1] for r in by_dl[:3])
         share_pct = round(top3_high / total_high * 100)
         if share_pct >= 60:  # only flag when concentration is meaningful
-            names = ", ".join(f"`{r.keyword.keyword}`" for r in by_dl[:3])
+            names = ", ".join(quoted_keyword(r.keyword.keyword) for r in by_dl[:3])
             callouts.append(
-                f"Your top 3 keywords drive ~{share_pct}% of estimated downloads: {names}."
+                f"Your top 3 keywords drive about {share_pct}% of estimated downloads: {names}."
             )
 
     # 2) Largest single rank gap — quantified, no bucket label
@@ -270,9 +270,9 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
         )
         gap_n = _format_dl_number(biggest_gap_overall["headroom_high"])
         callouts.append(
-            f"`{biggest_gap_overall['keyword']}` has the largest rank gap "
+            f"{quoted_keyword(biggest_gap_overall['keyword'])} has the largest rank gap "
             f"({rank_part}, popularity {biggest_gap_overall['popularity']}). "
-            f"Closing it could add up to ~{gap_n}/day."
+            f"Closing it could add up to {gap_n} downloads a day."
         )
 
     # 3) Single-country prompt, descriptive, not prescriptive. From 20
@@ -288,7 +288,7 @@ def _build_callouts(country_rows, total_keywords, total_countries, bucket_dist, 
     )
     if zero_dl_count >= 5 and len(callouts) < 3:
         callouts.append(
-            f"{zero_dl_count} tracked keywords contribute ~0 downloads "
+            f"{zero_dl_count} tracked keywords bring next to no downloads "
             f"(not ranking). Consider pruning them, or run AI Researcher to find replacements."
         )
 
@@ -371,16 +371,12 @@ def _format_dl_number(value):
 
 
 def format_interval(low, high):
-    """Render a (low, high) interval as e.g. '~120-180' (no '/day' suffix)."""
-    if (low is None or low <= 0) and (high is None or high <= 0):
-        return "—"
-    lo = _format_dl_number(low)
-    hi = _format_dl_number(high)
-    if lo == hi:
-        return f"~{hi}"
-    # A low end that rounds to nothing is written as 0, never as a lone high
-    # figure, which would read like a precise one.
-    return f"~{'0' if lo == '0.0' else lo}-{hi}"
+    """A (low, high) downloads range as the App Summary's cells print it,
+    in the words of the glance tiles (_range_figures): "36 to 355", "up to
+    0.3", "under 0.1". It used to print "~36-355", which the Growth columns
+    put a plus sign before ("+~36-355"), so a range read like arithmetic
+    (2026-11-18). The empty figure stays the lone long dash."""
+    return _range_figures(low, high) or "\u2014"
 
 
 def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
@@ -505,19 +501,29 @@ def compute_app_summary(selected_app, selected_app_name, last_refresh=None):
     }
 
 
-def _range_words(low, high, more=False):
-    """A downloads range as the glance tiles say it: "0.7 to 7 a day", or
-    "0.7 to 7 more a day"; never "~" or an en dash."""
-    tail = " more a day" if more else " a day"
+def _range_figures(low, high):
+    """A downloads range in words without its unit: "0.7 to 7", "up to 7",
+    "under 0.1"; None when there is nothing. Never "~", a sign or a dash, and
+    a low end that rounds to nothing never stands as a precise figure."""
     if (low is None or low <= 0) and (high is None or high <= 0):
-        return "Nothing yet"
+        return None
     lo = _format_dl_number(low)
     hi = _format_dl_number(high)
     if hi in ("0", "0.0"):
-        return f"Under 0.1{tail}"
+        return "under 0.1"
     if lo in ("0", "0.0") or lo == hi:
-        return f"Up to {hi}{tail}"
-    return f"{lo} to {hi}{tail}"
+        return f"up to {hi}"
+    return f"{lo} to {hi}"
+
+
+def _range_words(low, high, more=False):
+    """A downloads range as the glance tiles say it: "0.7 to 7 a day", or
+    "0.7 to 7 more a day"; never "~" or an en dash."""
+    figures = _range_figures(low, high)
+    if figures is None:
+        return "Nothing yet"
+    tail = " more a day" if more else " a day"
+    return f"{figures[:1].upper()}{figures[1:]}{tail}"
 
 
 def _glance(country_rows, is_multi_country):

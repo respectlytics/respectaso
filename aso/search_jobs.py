@@ -11,7 +11,7 @@ and after a container restart - ``requeue_interrupted`` puts it back at the
 front of the queue on the next start.
 
 Limits: 1,000 keywords per search and the queue with a Pro license, 3 per
-search and one search at a time without (``keyword_limit``). The limit is
+search and one search at a time without (``limit_context``). The limit is
 an error with a number, never a silent cut.
 
 Ships in the free-tier ``aso`` app: no ``aso_pro`` or ``licensing`` imports
@@ -79,10 +79,6 @@ def fmt(n) -> str:
 # ---------------------------------------------------------------------------
 # Limits and parsing
 # ---------------------------------------------------------------------------
-
-def keyword_limit() -> int:
-    return PRO_KEYWORD_LIMIT if has_pro_license() else FREE_KEYWORD_LIMIT
-
 
 def parse_keywords(raw: str) -> list[str]:
     """Split on commas and newlines, strip, drop empties, and dedupe

@@ -213,6 +213,8 @@ We built RespectASO because we believe developers should be able to research key
 
 [AGPL-3.0](LICENSE): free to use, modify, and distribute. If you modify and deploy RespectASO as a service, you must share your changes under the same license.
 
+The interface icons are from [Heroicons](https://github.com/tailwindlabs/heroicons) (MIT License, Copyright (c) Tailwind Labs, Inc.); the licence text is in [aso/icons.py](aso/icons.py).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

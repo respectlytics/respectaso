@@ -41,13 +41,6 @@
     }
 
 
-    function oppBg(score) {
-        if (score >= 50) return 'bg-green-900/30';
-        if (score >= 35) return 'bg-emerald-900/20';
-        if (score >= 20) return 'bg-yellow-900/20';
-        return '';
-    }
-
     // renderDownloadChart lives in static/js/download-chart.js
 
 
@@ -112,7 +105,7 @@
         if (!cards) return '';
         return `
             <div class="mb-4">
-                <h4 class="section-label mb-2">How Hard Is It to Rank?</h4>
+                <h4 class="section-label mb-2">How hard is it to rank?</h4>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">${cards}</div>
             </div>`;
     }
@@ -286,7 +279,7 @@
     // by the high end, like the other tables.
     function atFirstCell(r) {
         var range = r.downloads_at_first || [0, 0];
-        return '<td class="px-3 py-2 text-center text-slate-300 whitespace-nowrap tabular-nums" data-sort-value="' +
+        return '<td class="px-3 py-2 text-center text-slate-300 whitespace-nowrap" data-sort-value="' +
             range[1] + '">' + fmt(range[0]) + '-' + fmt(range[1]) +
             '<span class="text-slate-400">/day</span></td>';
     }
@@ -297,7 +290,7 @@
         if (!r) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
         box.innerHTML =
-            '<p class="text-2xs uppercase tracking-wide text-green-400/70 mb-1">Best opportunity</p>' +
+            '<p class="text-xs font-medium text-green-400/70 mb-1">Best opportunity</p>' +
             '<p class="text-lg font-semibold text-white">' + (r.country_flag || '') + ' ' +
             JP.esc(r.country_name) + '</p>' +
             '<p class="text-sm text-slate-300 mt-1">Opportunity <span class="' +
@@ -425,7 +418,7 @@
 
         const compTableHtml = competitors.length ? `
             <div class="overflow-x-auto">
-                <h4 class="section-label mb-2">Top ${competitors.length} Competitors</h4>
+                <h4 class="section-label mb-2">Top ${competitors.length} competitors</h4>
                 <table class="w-full text-sm text-left">
                     <thead>
                         <tr class="border-b border-white/10">
@@ -449,7 +442,7 @@
         if (insights.length) {
             insightsHtml = '<div class="space-y-1.5 mb-4">' + insights.map(ins =>
                 `<div class="flex items-start gap-2 text-xs ${ins.type === 'barrier' ? 'text-red-400' : ins.type === 'opportunity' ? 'text-green-400' : 'text-slate-400'}">
-                    <span class="flex-shrink-0">${ins.icon}</span><span>${ins.text}</span>
+                    <span class="flex-shrink-0 pt-0.5">${window.ProductIcon(ins.icon)}</span><span>${ins.text}</span>
                 </div>`
             ).join('') + '</div>';
         }
@@ -462,7 +455,7 @@
                 <p class="text-xs font-medium text-green-400 mb-2">Opportunity Signals</p>
                 <div class="space-y-2">${oppSignals.map(sig =>
                     `<div class="flex items-start gap-2 text-xs">
-                        <span class="flex-shrink-0">${sig.icon}</span>
+                        <span class="flex-shrink-0 pt-0.5 text-green-400">${window.ProductIcon(sig.icon)}</span>
                         <div><span class="text-green-300 font-medium">${sig.signal}</span>
                         <span class="text-slate-400 ml-1">(${sig.strength})</span>
                         <p class="text-slate-400 mt-0.5">${sig.detail}</p></div>
@@ -475,18 +468,18 @@
             <div class="flex flex-col lg:flex-row gap-4">
                 <div class="lg:w-1/3 space-y-2">
                     <div class="bg-slate-800 rounded-lg p-2.5">
-                        <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Popularity</p>
+                        <p class="text-xs text-slate-400 mb-0.5">Popularity</p>
                         <span class="text-lg font-semibold text-purple-400">${r.popularity ?? 'N/A'}</span>
                         ${r.popularity ? '<span class="text-slate-400 text-xs ml-1">/ 100</span> ' + formatPopularityBadge(r) : ''}
                     </div>
                     <div class="bg-slate-800 rounded-lg p-2.5">
-                        <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Overall Difficulty</p>
+                        <p class="text-xs text-slate-400 mb-0.5">Overall difficulty</p>
                         <span class="text-lg font-semibold ${r.difficulty_color}">${r.difficulty}</span>
                         <span class="text-slate-400 text-xs ml-1">/ 100</span>
                         <p class="${r.difficulty_color} text-xs mt-0.5 font-medium">${r.difficulty_label}</p>
                     </div>
                     ${r.app_rank ? `<div class="bg-yellow-900/20 border border-yellow-500/20 rounded-lg p-2.5">
-                        <p class="text-xs text-slate-400 mb-0.5 uppercase tracking-wide">Your App Rank</p>
+                        <p class="text-xs text-slate-400 mb-0.5">Your app rank</p>
                         <span class="text-lg font-semibold text-yellow-400">#${r.app_rank}</span>
                     </div>` : ''}
                     ${adviceHtml}
@@ -589,7 +582,9 @@
     function apply(data) {
         var scan = data.scan || data.finished || null;
         state = scan;
-        cfg.scanId = scan ? scan.id : null;
+        // After Done the poll answers with no scan, but its results stay on
+        // screen: their rows still open and still track, so keep their scan.
+        if (scan) { cfg.scanId = scan.id; }
         renderPanel(scan);
         if (scan) { renderResults(scan); }
         var startBtn = JP.byId('opp-btn');

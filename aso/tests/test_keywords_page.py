@@ -105,6 +105,35 @@ class GlanceTest(TestCase):
         self.assertNotIn("~", card)
         self.assertNotIn("+~", card)
 
+    def test_the_folded_part_says_ranges_in_words(self):
+        """By country, rank spread and keyword mix: its cells and callouts read
+        "36 to 355 more a day" like the tiles, and name a keyword in quotes.
+        It printed "+~36-355", "+~2.8-28/day" and "`rain noise`" (2026-11-18)."""
+        app = App.objects.create(name="Moonpond: Sleep Sounds")
+        for i, keyword in enumerate(("rain noise", "sleep sounds", "white noise", "brown noise")):
+            row = _row(app, keyword, country="us", rank=i + 2)
+            row.popularity_score = 80
+            row.save()
+            _row(app, keyword, country="gb", rank=i + 9)
+        for keyword in ("fan sound", "ocean waves", "thunder", "lullaby", "pink noise"):
+            _row(app, keyword, rank=None)
+        html = self.client.get(reverse("aso:dashboard"), {"app": app.pk}).content.decode()
+        start = html.rindex("<div", 0, html.index("data-summary-body class="))
+        depth, pos = 0, start
+        for tag in re.finditer(r"<(/?)div\b", html[start:]):
+            depth += -1 if tag.group(1) else 1
+            if depth == 0:
+                pos = start + tag.end()
+                break
+        body = html[start:pos]
+        text = re.sub(r"<[^>]+>", " ", body)
+        self.assertIn("more a day at #1", text)
+        self.assertRegex(text, r"\d to \d[\d.,K]* more a day")
+        self.assertIn("“rain noise”", body)      # quoted, never in backticks
+        for wrong in ("~", "`", "+", "/day", "extra/day"):
+            with self.subTest(wrong=wrong):
+                self.assertNotIn(wrong, text)
+
 
 class FirstRunTest(TestCase):
     def test_nothing_yet_asks_which_app(self):

@@ -74,9 +74,7 @@ FAST_SLEEPER = _fast_sleep
 
 # Weekly datasets are generated Mondays at 07:00 UTC for the preceding
 # Sunday-Saturday week, retained rolling 65 weeks.
-PUBLICATION_WEEKDAY = 0        # Monday
 PUBLICATION_HOUR_UTC = 7
-WEEKS_RETAINED_BY_APPLE = 65
 
 POPULARITY_FIELDS = [
     "rankInGenre",
@@ -441,12 +439,6 @@ def list_acls(credentials, sleeper=time.sleep) -> list[dict]:
             "roles": [str(r) for r in (item.get("roles") or [])],
         })
     return entries
-
-
-def get_org(credentials, org_id, sleeper=time.sleep) -> dict:
-    payload = _request("GET", f"/orgs/{org_id}", credentials, sleeper=sleeper)
-    result = payload.get("result") or payload.get("data") or {}
-    return result if isinstance(result, dict) else {}
 
 
 # --------------------------------------------------------------------------- #

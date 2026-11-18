@@ -197,10 +197,10 @@
             var rows = catalog.countries.filter(function (c) { return c.region === region; });
             if (!rows.length) { return; }
             html += '<div class="cp-group" data-region="' + esc(region) + '">' +
-                '<p class="cp-region sticky top-0 z-10 bg-slate-800 px-3 py-1 text-2xs uppercase tracking-wider text-slate-400 flex items-center justify-between">' +
+                '<p class="cp-region sticky top-0 z-10 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-400 flex items-center justify-between">' +
                 '<span>' + esc(region) + '</span>' +
                 (showRegionAll
-                    ? '<button type="button" class="link cp-region-all normal-case tracking-normal">Select all</button>'
+                    ? '<button type="button" class="link cp-region-all">Select all</button>'
                     : '') +
                 '</p>';
             rows.forEach(function (c) { html += self.rowHtml(c); });

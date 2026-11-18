@@ -13,6 +13,9 @@
 (function () {
     'use strict';
 
+    // W follows the chart's width on screen (draw sets it), so the chart
+    // fills the frame at any window size while its text stays 11 px and its
+    // height 240 px, instead of a fixed drawing scaled up with its letters.
     var W = 900, H = 240, L = 56, R = 16, T = 24, B = 28;
     var DOT_Y = 10;           // the marker dots sit above the plot, on top of their lines
     var SNAP_PX = 10;         // a pointer this close (screen pixels) to a marked line reads that day
@@ -59,6 +62,8 @@
 
     function draw(root, data, metric) {
         var svg = root.querySelector('[data-chart-svg]');
+        W = Math.round(svg.getBoundingClientRect().width) || 900;
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
         var values = data.series[metric] || [];
         var n = values.length;
         var known = values.filter(function (v) { return v !== null; });
@@ -200,7 +205,9 @@
         if (!source) return;
         var data = JSON.parse(source.textContent);
         var buttons = root.querySelectorAll('[data-chart-metric]');
+        var current = root.dataset.chartDefault || 'downloads', resizing = null;
         function pick(metric) {
+            current = metric;
             buttons.forEach(function (b) {
                 var on = b.dataset.chartMetric === metric;
                 b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -210,7 +217,12 @@
             draw(root, data, metric);
         }
         buttons.forEach(function (b) { b.addEventListener('click', function () { pick(b.dataset.chartMetric); }); });
-        pick(root.dataset.chartDefault || 'downloads');
+        pick(current);
+        // A new window width draws the chart again at that width.
+        window.addEventListener('resize', function () {
+            clearTimeout(resizing);
+            resizing = setTimeout(function () { draw(root, data, current); }, 150);
+        });
     }
 
     document.querySelectorAll('[data-store-chart]').forEach(start);

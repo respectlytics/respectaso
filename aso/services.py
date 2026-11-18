@@ -1366,31 +1366,6 @@ class DownloadEstimator:
     estimate (RANGE_LOW_SHARE below).
     """
 
-    # Popularity → estimated daily searches: the canonical curve lives
-    # in aso.scoring.POP_TO_SEARCHES (threshold-anchored to Apple's
-    # official dataset; see the derivation comment there). Both
-    # popularity sources speak the same calibrated 1-100 scale since
-    # estimate v2, so one curve serves everything - no source switching.
-
-    def _daily_searches(self, popularity: int) -> float:
-        """Interpolate daily search volume from popularity score."""
-        from .scoring import POP_TO_SEARCHES
-
-        if popularity is None or popularity <= 0:
-            return 0
-        pts = POP_TO_SEARCHES
-        if popularity <= pts[0][0]:
-            return pts[0][1] * (popularity / pts[0][0])
-        if popularity >= pts[-1][0]:
-            return pts[-1][1]
-        for i in range(1, len(pts)):
-            p0, s0 = pts[i - 1]
-            p1, s1 = pts[i]
-            if popularity <= p1:
-                ratio = (popularity - p0) / (p1 - p0)
-                return s0 + ratio * (s1 - s0)
-        return pts[-1][1]
-
     # Position → tap-through rate (fraction of searchers who tap).
     #
     # App Store search shows 2–3 full app cards per screen (icon,
@@ -1926,7 +1901,6 @@ class DifficultyCalculator:
         # Compute counts for insight text (no longer used for scoring,
         # but still useful for human-readable explanations).
         top_half = rating_counts[: max(n // 2, 1)]
-        serious_count = sum(1 for r in rating_counts if r > 10_000)
         mega_count = sum(1 for r in top_half if r > 100_000)
         ultra_count = sum(1 for r in top_half if r > 1_000_000)
 
@@ -1994,7 +1968,6 @@ class DifficultyCalculator:
             rating_counts,
             median_ratings,
             avg_ratings,
-            serious_count,
             mega_count,
             ultra_count,
             title_match_count,
@@ -2008,7 +1981,7 @@ class DifficultyCalculator:
             insights.insert(
                 0,
                 {
-                    "icon": "🏷️",
+                    "icon": "tag",
                     "type": "info",
                     "text": (
                         f"Brand keyword: '{kw_lower}' matches publisher "
@@ -2080,7 +2053,7 @@ class DifficultyCalculator:
             insights.insert(
                 0,
                 {
-                    "icon": "📍",
+                    "icon": "info",
                     "type": "opportunity",
                     "text": override_text,
                 },
@@ -2444,7 +2417,6 @@ class DifficultyCalculator:
         rating_counts: list,
         median: float,
         avg: float,
-        serious: int,
         mega: int,
         ultra: int,
         title_matches: int,
@@ -2458,7 +2430,7 @@ class DifficultyCalculator:
         if ultra > 0:
             insights.append(
                 {
-                    "icon": "🏢",
+                    "icon": "building",
                     "type": "barrier",
                     "text": (
                         f"{ultra} app{'s' if ultra > 1 else ''} with 1M+ "
@@ -2469,7 +2441,7 @@ class DifficultyCalculator:
         elif mega > 0:
             insights.append(
                 {
-                    "icon": "⚠️",
+                    "icon": "building",
                     "type": "barrier",
                     "text": (
                         f"{mega} app{'s' if mega > 1 else ''} with 100K+ "
@@ -2482,7 +2454,7 @@ class DifficultyCalculator:
         if avg > 0 and median > 0 and avg > median * 3:
             insights.append(
                 {
-                    "icon": "📊",
+                    "icon": "chart_bar",
                     "type": "info",
                     "text": (
                         f"Rating distribution is skewed: the median "
@@ -2496,7 +2468,7 @@ class DifficultyCalculator:
         if title_matches == 0 and n > 0:
             insights.append(
                 {
-                    "icon": "🎯",
+                    "icon": "title",
                     "type": "opportunity",
                     "text": (
                         "No competitors have this exact keyword in their "
@@ -2507,7 +2479,7 @@ class DifficultyCalculator:
         elif title_matches <= 2:
             insights.append(
                 {
-                    "icon": "🎯",
+                    "icon": "title",
                     "type": "opportunity",
                     "text": (
                         f"Only {title_matches} of {n} competitors use this "
@@ -2518,7 +2490,7 @@ class DifficultyCalculator:
         else:
             insights.append(
                 {
-                    "icon": "🔒",
+                    "icon": "lock",
                     "type": "barrier",
                     "text": (
                         f"{title_matches} of {n} competitors already have "
@@ -2531,7 +2503,7 @@ class DifficultyCalculator:
         if avg_quality >= 4.5:
             insights.append(
                 {
-                    "icon": "⭐",
+                    "icon": "star",
                     "type": "barrier",
                     "text": (
                         f"High quality bar: the average rating is "
@@ -2545,7 +2517,7 @@ class DifficultyCalculator:
         if weak_count >= 3:
             insights.append(
                 {
-                    "icon": "💡",
+                    "icon": "trending_down",
                     "type": "opportunity",
                     "text": (
                         f"{weak_count} of {n} competitors have <1,000 "
@@ -2572,7 +2544,7 @@ class DifficultyCalculator:
             signals.append(
                 {
                     "signal": "Title Gap",
-                    "icon": "🎯",
+                    "icon": "title",
                     "strength": "Strong",
                     "detail": (
                         "No top app has this keyword in its title. "
@@ -2585,7 +2557,7 @@ class DifficultyCalculator:
             signals.append(
                 {
                     "signal": "Title Gap",
-                    "icon": "🎯",
+                    "icon": "title",
                     "strength": "Moderate",
                     "detail": (
                         f"Only {title_matches} of {n} competitors have "
@@ -2606,7 +2578,7 @@ class DifficultyCalculator:
             signals.append(
                 {
                     "signal": "Weak Competitors",
-                    "icon": "📉",
+                    "icon": "trending_down",
                     "strength": (
                         "Strong" if len(weak_apps) >= 3 else "Moderate"
                     ),
@@ -2639,7 +2611,7 @@ class DifficultyCalculator:
             signals.append(
                 {
                     "signal": "Active Market",
-                    "icon": "🆕",
+                    "icon": "sparkles",
                     "strength": "Moderate",
                     "detail": (
                         f"{len(fresh_apps)} "
@@ -2662,7 +2634,7 @@ class DifficultyCalculator:
             signals.append(
                 {
                     "signal": "Cross-Genre",
-                    "icon": "🔀",
+                    "icon": "mixed",
                     "strength": "Moderate",
                     "detail": (
                         f"Results span {len(genres)} genres "

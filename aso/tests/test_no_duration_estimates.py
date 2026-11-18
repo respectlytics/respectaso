@@ -70,7 +70,7 @@ def _newest_release_texts():
     yield newest["title"]
     for section in newest["sections"]:
         yield section["heading"]
-        yield from section["intro"]
+        yield from section.get("intro", [])
         yield from section["items"]
 
 

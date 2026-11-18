@@ -4,7 +4,7 @@
 {% block title %}Apple Ads popularity · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div>
 
     {% include "aso/partials/settings_tabs.html" %}
 
@@ -16,6 +16,7 @@
 
     {% include "aso/partials/settings_message.html" %}
 
+    <div class="card-columns">
     {% comment %}First card: the connection (UI_REDESIGN_PLAN.md 10.2). Not
     connected, the three numbered steps and Generate my key pair; connected,
     the status, the weekly data and Sync now.{% endcomment %}
@@ -179,7 +180,7 @@
                     <span class="flex-1 min-w-0">
                         <span class="flex items-center gap-2">
                             <span class="text-sm font-semibold text-white">RespectASO Estimate</span>
-                            <span class="text-2xs font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
+                            <span class="text-2xs font-semibold rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
                         </span>
                         <span class="block text-xs text-slate-400 mt-1">
                             Built-in, works for every keyword in all {% storefront_count %} storefronts. Open methodology.
@@ -211,8 +212,8 @@
                     <span class="flex-1 min-w-0">
                         <span class="flex items-center gap-2 flex-wrap">
                             <span class="text-sm font-semibold text-white">Apple Ads Popularity</span>
-                            <span class="text-2xs font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
-                            <span class="text-2xs font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 bg-emerald-900/40 text-emerald-300 border border-emerald-500/30">Recommended</span>
+                            <span class="text-2xs font-semibold rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
+                            <span class="text-2xs font-semibold rounded px-1.5 py-0.5 bg-emerald-900/40 text-emerald-300 border border-emerald-500/30">Recommended</span>
                         </span>
                         <span class="block text-xs text-slate-400 mt-1">
                             Apple's official search popularity, from your Apple Ads account.
@@ -254,7 +255,7 @@
                     <div class="grid md:grid-cols-2 gap-4">
                         <div>
                             <p class="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-                                <span class="text-2xs font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
+                                <span class="text-2xs font-semibold rounded px-1.5 py-0.5 bg-slate-700/40 text-slate-300 border border-white/10">EST</span>
                                 RespectASO Estimate
                             </p>
                             <ul class="text-xs text-slate-400 space-y-1.5">
@@ -263,11 +264,11 @@
                                 <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-emerald-400">+</span><span>No account or setup needed</span></li>
                                 <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>An estimate, not Apple's own measurement: on busy keywords it can differ from Apple's numbers</span></li>
                             </ul>
-                            <a href="{% url 'aso:methodology' %}" class="link inline-block mt-2 text-xs">How the estimate works →</a>
+                            <a href="{% url 'aso:methodology' %}" class="link inline-block mt-2 text-xs">How the estimate works</a>
                         </div>
                         <div>
                             <p class="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
-                                <span class="text-2xs font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
+                                <span class="text-2xs font-semibold rounded px-1.5 py-0.5 bg-sky-900/40 text-sky-300 border border-sky-500/30">ASA</span>
                                 Apple Ads Popularity
                             </p>
                             <ul class="text-xs text-slate-400 space-y-1.5">
@@ -278,7 +279,7 @@
                                 <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>Weekly snapshots, not real-time (Apple publishes each completed week on Mondays)</span></li>
                                 <li class="flex gap-2"><span class="w-2 shrink-0 text-center text-red-400">-</span><span>No data for storefronts where Apple Ads does not operate (for example Russia), which use the estimate</span></li>
                             </ul>
-                            <a href="{% url 'aso:apple_ads_setup' %}" class="link inline-block mt-2 text-xs">Step-by-step setup guide →</a>
+                            <a href="{% url 'aso:apple_ads_setup' %}" class="link inline-block mt-2 text-xs">Step-by-step setup guide</a>
                         </div>
                     </div>
                 </div>
@@ -325,6 +326,7 @@
         {% endif %}
 
     </section>
+    </div>
 
 </div>
 

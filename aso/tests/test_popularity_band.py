@@ -22,7 +22,6 @@ from aso.popularity import (
     annotate_effective_popularity,
     effective_from_pair,
 )
-from aso.services import DownloadEstimator
 from aso.tests.test_apple_ads_storage import StorageTestBase
 
 WEEK = dt.date(2026, 8, 9)
@@ -154,38 +153,6 @@ class SearchResultCapParityTest(StorageTestBase):
         self._result(90, 47)
         row = annotate_effective_popularity(SearchResult.objects.all()).get()
         self.assertEqual(row.effective_pop, 90)
-
-
-class DownloadCurveTest(StorageTestBase):
-    databases = "__all__"
-
-    def test_single_curve_serves_both_sources(self):
-        """One threshold-anchored curve (aso.scoring.POP_TO_SEARCHES) -
-        both sources speak the calibrated 1-100 scale since estimate v2."""
-        from aso.scoring import POP_TO_SEARCHES, _pop_to_searches
-
-        est = DownloadEstimator()
-        for source in ("internal", "apple"):
-            storage.save_apple_settings(popularity_source=source)
-            for value in (1, 25, 40, 79, 100):
-                self.assertEqual(
-                    est._daily_searches(value), _pop_to_searches(value),
-                    f"curve mismatch at {value} under {source}",
-                )
-        self.assertEqual(POP_TO_SEARCHES[0], (1, 1))
-
-    def test_threshold_anchor(self):
-        """Covered values (40+) sit at/above the ~70/day anchor; the
-        below-top-terms region stays under it."""
-        est = DownloadEstimator()
-        self.assertEqual(est._daily_searches(40), 70)
-        for below in (1, 20, 39):
-            self.assertLess(est._daily_searches(below), 70)
-
-    def test_curve_monotonic(self):
-        est = DownloadEstimator()
-        values = [est._daily_searches(v) for v in range(1, 101)]
-        self.assertEqual(values, sorted(values))
 
 
 class EstimatorV2Test(TestCase):

@@ -51,9 +51,10 @@
         return catalog()[label] || null;
     }
 
+    /** The tag's icon as markup (static/js/icons.js), or ''. */
     function icon(label) {
         var item = get(label);
-        return item ? item.icon : '';
+        return item ? window.ProductIcon(item.icon) : '';
     }
 
     /** {badge, ring} for the progress ticker's arc and chip. */
@@ -76,8 +77,8 @@
         if (!targeting || !targeting.label) return '';
         return `
             <div class="${esc(targeting.css)} border rounded-lg p-2.5">
-                <p class="text-2xs uppercase tracking-wide text-slate-400 mb-1">ASO Targeting</p>
-                <p class="text-xs font-medium">${esc(targeting.icon)} ${esc(targeting.label)}</p>
+                <p class="text-xs font-medium text-slate-400 mb-1">ASO targeting</p>
+                <p class="flex items-center gap-1 text-xs font-medium">${window.ProductIcon(targeting.icon)}${esc(targeting.label)}</p>
                 <p class="text-2xs text-slate-400 mt-0.5 leading-relaxed">${esc(targeting.description)}</p>
             </div>`;
     }
@@ -102,8 +103,8 @@
         var item = get(label);
         if (!item) return '';
         return '<span class="' + esc(item.css) + ' border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap '
-            + 'inline-flex items-center gap-0.5 cursor-help" data-tip="' + esc(tip || item.description) + '">'
-            + esc(item.icon) + ' ' + esc(item.label) + '</span>';
+            + 'inline-flex items-center gap-1 cursor-help" data-tip="' + esc(tip || item.description) + '">'
+            + window.ProductIcon(item.icon) + esc(item.label) + '</span>';
     }
 
     window.ClassificationBadge = {

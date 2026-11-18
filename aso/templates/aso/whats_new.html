@@ -3,7 +3,7 @@
 {% block title %}What's New · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div>
     {% include "aso/partials/back_link.html" %}
 
     <!-- Header -->
@@ -17,6 +17,8 @@
     </div>
 
 
+    {% comment %}Every release spans the frame, so the versions and dates line
+    up; the notes inside keep a readable line (max-w-prose), left-aligned.{% endcomment %}
     {% for release in releases %}
         {% if forloop.first %}
         <!-- Current version: fully expanded -->
@@ -24,13 +26,13 @@
             <div class="flex items-baseline justify-between gap-3 flex-wrap mb-1">
                 <h2 class="card-title">
                     v{{ release.version }}
-                    <span class="ml-2 align-middle text-2xs font-semibold uppercase tracking-wider text-purple-300 bg-purple-500/15 border border-purple-500/30 rounded px-1.5 py-0.5">Current</span>
+                    <span class="ml-2 align-middle text-2xs font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 rounded px-1.5 py-0.5">Current</span>
                 </h2>
                 <span class="text-xs text-slate-400">{{ release.date }}</span>
             </div>
             <p class="text-sm text-purple-300/90 mb-4">{{ release.title }}</p>
             {% for section in release.sections %}
-            <div class="{% if not forloop.first %}mt-5{% endif %}">
+            <div class="max-w-prose{% if not forloop.first %} mt-5{% endif %}">
                 {% if section.heading %}<h3 class="section-label mb-2">{{ section.heading|safe }}</h3>{% endif %}
                 {% for para in section.intro %}
                 <p class="text-sm text-slate-400 leading-relaxed mb-2">{{ para|safe }}</p>
@@ -50,7 +52,7 @@
         </section>
 
         {% if releases|length > 1 %}
-        <h2 class="section-label mb-3 mt-5">Earlier releases</h2>
+        <h2 class="card-title mb-3 mt-5">Earlier releases</h2>
         {% endif %}
 
         {% elif release.kind == "feature" %}
@@ -68,7 +70,7 @@
             </summary>
             <div class="px-4 pb-4 pt-1 border-t border-white/5">
                 {% for section in release.sections %}
-                <div class="{% if not forloop.first %}mt-4{% else %}mt-2{% endif %}">
+                <div class="max-w-prose {% if not forloop.first %}mt-4{% else %}mt-2{% endif %}">
                     {% if section.heading %}<h3 class="section-label mb-2">{{ section.heading|safe }}</h3>{% endif %}
                     {% for para in section.intro %}
                     <p class="text-sm text-slate-400 leading-relaxed mb-2">{{ para|safe }}</p>
@@ -103,7 +105,7 @@
             </summary>
             <div class="px-4 pb-4 pt-1 border-t border-white/5">
                 {% for section in release.sections %}
-                <div class="{% if not forloop.first %}mt-3{% else %}mt-2{% endif %}">
+                <div class="max-w-prose {% if not forloop.first %}mt-3{% else %}mt-2{% endif %}">
                     {% if section.heading %}<h3 class="section-label mb-1.5">{{ section.heading|safe }}</h3>{% endif %}
                     {% for para in section.intro %}
                     <p class="text-xs text-slate-400 leading-relaxed mb-1.5">{{ para|safe }}</p>

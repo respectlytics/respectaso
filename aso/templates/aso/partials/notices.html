@@ -9,8 +9,8 @@ at the top of the page content, as before.
     {% include "aso/partials/popularity_banner.html" %}
 </div>
 {% if license_expiring_soon %}
-<div class="border-b border-amber-500/30 bg-amber-900/30 px-4 py-2.5" data-license-notice="expiring">
-    <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
+<div class="border-b border-amber-500/30 bg-amber-900/30 py-2.5" data-license-notice="expiring">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-sm text-amber-100">
             <span class="font-semibold">Your Pro license ends in {{ license_days_left }} day{{ license_days_left|pluralize }}.</span>
             Renew with the same email and the new period starts when this one ends.
@@ -19,8 +19,8 @@ at the top of the page content, as before.
     </div>
 </div>
 {% elif is_pro_expired %}
-<div class="border-b border-amber-500/30 bg-amber-900/30 px-4 py-2.5" data-license-notice="expired">
-    <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
+<div class="border-b border-amber-500/30 bg-amber-900/30 py-2.5" data-license-notice="expired">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-sm text-amber-100">
             <span class="font-semibold">Your Pro license has ended.</span>
             Premium features stop working until you renew.

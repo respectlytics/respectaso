@@ -47,7 +47,7 @@
                 {% if keyword_limit_context.is_pro %}<div class="flex items-center self-stretch">{% include "aso/partials/run_tonight_button.html" %}</div>{% endif %}
             </div>
             {# The keyword count, and for the free edition how many fit a search (static/js/keyword-search-job.js) #}
-            <p id="keyword-counter" class="mt-1.5 text-sm text-slate-300 tabular-nums empty:hidden"></p>
+            <p id="keyword-counter" class="mt-1.5 text-sm text-slate-300 empty:hidden"></p>
             <p id="new-app-hint" class="hidden mt-1.5 text-sm text-slate-300">Type the words people would search for.</p>
             {% include "aso/partials/notice_live.html" with id="search-error" extra="mt-3" %}
         </form>
@@ -149,7 +149,7 @@
                 <div class="flex items-end gap-3">
                     <!-- Insight multi-select dropdown -->
                     <div class="relative" id="insight-dropdown-wrap">
-                        <label class="block text-2xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Insight</label>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Insight</label>
                         <button type="button" id="insight-dropdown-btn" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[160px] justify-between">
                             <span id="insight-dropdown-text" class="truncate">{% if selected_insights %}{{ selected_insights|length }} selected{% else %}Any{% endif %}</span>
                             <svg class="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -157,7 +157,7 @@
                         <div id="insight-dropdown-panel" data-keep-open class="hidden absolute top-full left-0 mt-1 bg-slate-800 border border-white/10 rounded-lg py-1 z-50 shadow-xl min-w-[200px] max-h-64 overflow-y-auto">
                             {% for item in classification_legend %}
                             <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer text-xs text-white">
-                                <input type="checkbox" value="{{ item.label }}" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if item.label in selected_insights %}checked{% endif %}> {{ item.icon }} {{ item.label }}
+                                <input type="checkbox" value="{{ item.label }}" class="insight-cb rounded border-white/20 bg-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0" {% if item.label in selected_insights %}checked{% endif %}> <span class="inline-flex items-center gap-1">{% icon item.icon %}{{ item.label }}</span>
                             </label>
                             {% endfor %}
                         </div>
@@ -166,7 +166,7 @@
                     Always here, so the feature can be found: until a label exists, it says
                     how to add one.{% endcomment %}
                     <div class="relative" id="label-dropdown-wrap">
-                        <label class="block text-2xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Labels</label>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Labels</label>
                         <button type="button" id="label-dropdown-btn" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center gap-1.5 min-w-[160px] justify-between">
                             <span id="label-dropdown-text" class="truncate">{% if selected_labels %}{{ selected_labels|length }} selected{% else %}Any{% endif %}</span>
                             <svg class="w-3 h-3 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -183,7 +183,7 @@
                     </div>
                     <!-- Popularity dropdown -->
                     <div>
-                        <label for="filter-pop-min" class="block text-2xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Popularity ≥</label>
+                        <label for="filter-pop-min" class="block text-xs font-medium text-slate-400 mb-1.5">Popularity ≥</label>
                         <select id="filter-pop-min" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                             <option value="">Any</option>
                             <option value="5" {% if selected_pop_min == 5 %}selected{% endif %}>5</option><option value="10" {% if selected_pop_min == 10 %}selected{% endif %}>10</option><option value="15" {% if selected_pop_min == 15 %}selected{% endif %}>15</option><option value="20" {% if selected_pop_min == 20 %}selected{% endif %}>20</option><option value="25" {% if selected_pop_min == 25 %}selected{% endif %}>25</option>
@@ -194,7 +194,7 @@
                     </div>
                     <!-- Difficulty dropdown -->
                     <div>
-                        <label for="filter-diff-max" class="block text-2xs font-medium text-slate-400 uppercase tracking-wide mb-1.5">Difficulty ≤</label>
+                        <label for="filter-diff-max" class="block text-xs font-medium text-slate-400 mb-1.5">Difficulty ≤</label>
                         <select id="filter-diff-max" class="bg-slate-700 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500">
                             <option value="">Any</option>
                             <option value="5" {% if selected_diff_max == 5 %}selected{% endif %}>5</option><option value="10" {% if selected_diff_max == 10 %}selected{% endif %}>10</option><option value="15" {% if selected_diff_max == 15 %}selected{% endif %}>15</option><option value="20" {% if selected_diff_max == 20 %}selected{% endif %}>20</option><option value="25" {% if selected_diff_max == 25 %}selected{% endif %}>25</option>
@@ -253,7 +253,7 @@
                             </th>
                             <th class="min-w-32 text-left text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('keyword')">Keyword <span class="sort-indicator text-slate-400">{% if current_sort == 'keyword' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>
                             {% if show_rank %}<th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('rank')">Rank <span class="sort-indicator text-slate-400">{% if current_sort == 'rank' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span></th>{% endif %}
-                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')"><span class="inline-flex items-center gap-1">Popularity {% column_info "popularity" %}</span> <span class="sort-indicator text-slate-400">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span><span class="block text-2xs font-normal normal-case text-slate-400 text-balance">{% if popularity_source == 'apple' %}Apple Ads{% else %}RespectASO estimate{% endif %}</span></th>
+                            <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('popularity')"><span class="inline-flex items-center gap-1">Popularity {% column_info "popularity" %}</span> <span class="sort-indicator text-slate-400">{% if current_sort == 'popularity' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span><span class="block text-2xs font-normal text-slate-400 text-balance">{% if popularity_source == 'apple' %}Apple Ads{% else %}RespectASO estimate{% endif %}</span></th>
                             <th class="text-center text-xs font-medium text-slate-400 px-3 py-2 cursor-pointer hover:text-slate-200 select-none" onclick="sortHistory('difficulty')">
                                 <span class="inline-flex items-center gap-1">Difficulty {% column_info "difficulty" %}</span>
                                 <span class="sort-indicator text-slate-400">{% if current_sort == 'difficulty' %}{% if current_dir == 'asc' %}▲{% else %}▼{% endif %}{% endif %}</span>
@@ -283,7 +283,7 @@
                             </td>
                             <td class="px-3 py-2">
                                 {# The copy button floats beside the keyword, out of the line, so it never drops to a line of its own and lifts the keyword in a narrow window. #}
-                                <span class="relative inline-block text-white text-sm font-medium">{{ result.keyword.keyword }}<button class="kw-copy-btn absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center opacity-0 group-hover:opacity-100 focus:opacity-100" data-kw="{{ result.keyword.keyword }}" title="Copy keyword" aria-label="Copy keyword"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></span>
+                                <span class="relative inline-block text-white text-sm font-medium">{{ result.keyword.keyword }}<button class="kw-copy-btn absolute left-full top-1/2 -translate-y-1/2 ml-1.5 text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center" data-kw="{{ result.keyword.keyword }}" title="Copy keyword" aria-label="Copy keyword"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button></span>
                                 {% if result.keyword.app %}
                                 {% if not selected_app %}<span class="text-slate-400 text-2xs block">{{ result.keyword.app.name }}</span>{% endif %}
                                 {% else %}
@@ -292,7 +292,7 @@
                                 {% if result.label_names %}
                                 <span class="flex flex-wrap gap-1 mt-1">
                                     {% for name in result.label_names %}
-                                    <span class="inline-flex items-center text-2xs leading-4 pl-1.5 rounded bg-purple-500/10 border border-purple-500/25 text-purple-200">{{ name }}<button type="button" class="kw-label-remove px-1 text-purple-300/60 hover:text-white transition-colors" data-keyword-id="{{ result.keyword.id }}" data-label="{{ name }}" title="Remove the label {{ name }} from this keyword" aria-label="Remove the label {{ name }} from this keyword">&times;</button></span>
+                                    <span class="inline-flex items-center text-2xs leading-4 pl-1.5 rounded bg-purple-500/10 border border-purple-500/25 text-purple-200">{{ name }}<button type="button" class="kw-label-remove inline-flex items-center self-stretch px-1 text-purple-300/60 hover:text-white transition-colors" data-keyword-id="{{ result.keyword.id }}" data-label="{{ name }}" title="Remove the label {{ name }} from this keyword" aria-label="Remove the label {{ name }} from this keyword">{% icon "x_mark" %}</button></span>
                                     {% endfor %}
                                 </span>
                                 {% endif %}
@@ -331,12 +331,12 @@
                             </td>
                             <td class="px-3 py-2">
                                 {% with advice=result.targeting_advice %}
-                                <span class="{{ advice.2 }} border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap inline-flex items-center gap-0.5 cursor-help" data-tip="{{ advice.3 }}">{{ advice.0 }} {{ advice.1 }}</span>
+                                <span class="{{ advice.2 }} border rounded px-1.5 py-0.5 text-2xs whitespace-nowrap inline-flex items-center gap-1 cursor-help" data-tip="{{ advice.3 }}">{% icon advice.0 %}{{ advice.1 }}</span>
                                 {% endwith %}
                             </td>
                             {% if show_country_column %}<td class="px-3 py-2 text-slate-300 text-xs whitespace-nowrap">{{ result.country|country_flag }} {{ result.country|upper }}</td>{% endif %}
                             <td class="px-3 py-2 text-right" data-no-detail>
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center justify-end gap-1">
                                     <button onclick="refreshKeyword({{ result.keyword.id }}, '{{ result.country }}', this)" title="Update this row now. Rows also update on their own once a day."
                                             class="text-slate-400 hover:text-purple-400 transition-colors p-1 rounded hover:bg-white/5">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -358,7 +358,7 @@
                             <td colspan="{{ history_colspan }}" class="border-l-2 border-purple-400/60 bg-slate-900/70 px-4 py-4">
                                 {% with advice=result.targeting_advice %}
                                 <div class="max-w-4xl">
-                                    <span class="{{ advice.2 }} border rounded px-2 py-1 text-sm inline-flex items-center gap-1">{{ advice.0 }} {{ advice.1 }}</span>
+                                    <span class="{{ advice.2 }} border rounded px-2 py-1 text-sm inline-flex items-center gap-1.5">{% icon advice.0 %}{{ advice.1 }}</span>
                                     <p class="mt-2 text-sm text-slate-200">{{ advice.3 }}</p>
                                     <p class="mt-1.5 text-xs text-slate-400">Popularity {{ result.effective_popularity|default:"N/A" }} · Difficulty {{ result.difficulty_score }}, {{ result.difficulty_label }} · Opportunity {{ result.opportunity_score }} · Checked <time datetime="{{ result.searched_at|date:'c' }}" data-read-at><span data-read-date>{{ result.searched_at|date:"M d, Y" }}</span> at <span data-read-time>{{ result.searched_at|date:"H:i" }}</span></time></p>
                                 </div>
@@ -507,7 +507,7 @@
                 {% if has_prev %}
                 <a data-in-place="page" href="?{% if history_query %}{{ history_query }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"-1" }}"
                    class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
-                    ← Prev
+                    Previous
                 </a>
                 {% endif %}
                 {% if total_pages > 1 %}
@@ -516,7 +516,7 @@
                 {% if has_next %}
                 <a data-in-place="page" href="?{% if history_query %}{{ history_query }}&{% endif %}per_page={{ per_page }}&sort={{ current_sort }}&dir={{ current_dir }}&page={{ page|add:"1" }}"
                    class="text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">
-                    Next →
+                    Next
                 </a>
                 {% endif %}
             </div>
@@ -651,7 +651,6 @@ function exportHistoryCSV(includeApps) {
 // Countries come from the shared picker (static/js/country-picker.js), which
 // reads the catalog base.html emits. Three hand kept lists used to live here.
 function countryFlag(code) { return CountryPicker.flag(code); }
-function countryDisplayText(code) { return CountryPicker.label(code); }
 
 // --- History sorting (server-side, across the full dataset) ---
 // Numeric/score columns default to DESC on first click (highest first), text columns default to ASC.

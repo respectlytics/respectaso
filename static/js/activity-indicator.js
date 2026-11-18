@@ -211,11 +211,11 @@
         var box = document.createElement('div');
         box.id = 'activity-note';
         box.setAttribute('role', 'status');
-        // A clear order (the owner, 2026-10-02): the state in small coloured
-        // capitals, the task as the one strong line, what happens next a step
+        // A clear order (the owner, 2026-10-02): the state small and
+        // coloured, the task as the one strong line, what happens next a step
         // quieter, the footnote quietest. Whole class strings, for Tailwind.
         box.className = 'fixed right-6 top-14 z-50 w-72 rounded-xl border border-white/10 bg-[#1e293b] px-3.5 py-3 shadow-xl shadow-black/40 cursor-pointer transition-all duration-[400ms] ease-in';
-        box.innerHTML = '<p class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider ' +
+        box.innerHTML = '<p class="flex items-center gap-1.5 text-xs font-semibold ' +
                 (note.queued ? 'text-purple-300' : 'text-emerald-300') + '">' +
                 '<span class="h-1.5 w-1.5 rounded-full ' + (note.queued ? 'bg-purple-300' : 'bg-emerald-400') + '"></span><span></span></p>' +
             '<p class="mt-1 truncate text-sm font-semibold text-white"></p>' +

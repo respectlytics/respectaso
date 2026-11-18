@@ -44,6 +44,10 @@ class PopToSearchesTest(TestCase):
     def test_above_last_point(self):
         self.assertEqual(_pop_to_searches(110), 300_000)
 
+    def test_curve_rises_with_popularity(self):
+        values = [_pop_to_searches(v) for v in range(1, 101)]
+        self.assertEqual(values, sorted(values))
+
 
 class CalcOpportunityTest(TestCase):
     """Test the new opportunity formula."""
@@ -684,9 +688,11 @@ class OneDownloadRangeTest(TestCase):
     def test_the_app_summary_never_prints_a_lone_high_figure(self):
         from aso.dashboard_summary import format_interval
 
-        self.assertEqual(format_interval(0.8, 8), "~0.8-8")
-        self.assertEqual(format_interval(0.03, 0.3), "~0-0.3")
-        self.assertEqual(format_interval(0, 0.3), "~0-0.3")
+        self.assertEqual(format_interval(0.8, 8), "0.8 to 8")
+        self.assertEqual(format_interval(36, 355), "36 to 355")
+        self.assertEqual(format_interval(0.03, 0.3), "up to 0.3")
+        self.assertEqual(format_interval(0, 0.3), "up to 0.3")
+        self.assertEqual(format_interval(-2.8, 28), "up to 28")     # never a sign inside a range
         self.assertEqual(format_interval(0, 0), "—")
 
 

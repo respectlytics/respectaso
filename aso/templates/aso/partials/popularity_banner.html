@@ -30,8 +30,8 @@ in priority order:
 Context flags come from aso.context_processors.popularity_source.
 {% endcomment %}
 {% if apple_source_broken == "upgrade_reconnect" %}
-<div id="apple-upgrade-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+<div id="apple-upgrade-banner" class="bg-red-900/30 border-b border-red-500/30 py-2.5">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Reconnect Apple Ads once to keep Apple's popularity current.</span>
             Until then your scores keep the last Apple values.
@@ -43,8 +43,8 @@ Context flags come from aso.context_processors.popularity_source.
     </div>
 </div>
 {% elif apple_source_broken == "not_connected" %}
-<div id="apple-notconnected-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+<div id="apple-notconnected-banner" class="bg-red-900/30 border-b border-red-500/30 py-2.5">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple Ads is disconnected but still your popularity source.</span>
             New keywords use the estimate meanwhile. Connect again, or switch to the RespectASO estimate in Settings.
@@ -56,8 +56,8 @@ Context flags come from aso.context_processors.popularity_source.
     </div>
 </div>
 {% elif apple_source_broken == "credential_rejected" %}
-<div id="apple-rejected-banner" class="bg-red-900/30 border-b border-red-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+<div id="apple-rejected-banner" class="bg-red-900/30 border-b border-red-500/30 py-2.5">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-xs text-red-200/90">
             <span class="font-semibold">Apple no longer accepts your Apple Ads key.</span>
             Apple popularity has stopped updating. Re-verify the connection in Settings.
@@ -69,8 +69,8 @@ Context flags come from aso.context_processors.popularity_source.
     </div>
 </div>
 {% elif apple_source_broken == "needs_verify" %}
-<div id="apple-needsverify-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+<div id="apple-needsverify-banner" class="bg-amber-900/30 border-b border-amber-500/30 py-2.5">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
             <span class="font-semibold">Apple Ads is almost connected: one step left.</span>
             Verify the connection in Settings to start getting Apple's popularity.
@@ -82,8 +82,8 @@ Context flags come from aso.context_processors.popularity_source.
     </div>
 </div>
 {% elif apple_secondary_stale %}
-<div id="apple-stale-banner" class="bg-amber-900/30 border-b border-amber-500/30 px-4 py-2.5">
-    <div class="max-w-[1600px] mx-auto flex items-center justify-between gap-3">
+<div id="apple-stale-banner" class="bg-amber-900/30 border-b border-amber-500/30 py-2.5">
+    <div class="frame flex items-center justify-between gap-3">
         <p class="text-xs text-amber-200/90">
             <span class="font-semibold">Apple no longer accepts your Apple Ads key.</span>
             The Apple values shown beside your scores are no longer refreshing.

@@ -31,6 +31,13 @@
         return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;')
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    // An app's icon, or a plain tile of the same size when it has none or it
+    // fails to load, so a missing App Store image never draws as a broken one.
+    function appIcon(url, size) {
+        var tile = '<span class="' + size + ' bg-slate-700 shrink-0" aria-hidden="true"></span>';
+        if (!url) return tile;
+        return '<img src="' + esc(url) + '" alt="" class="' + size + ' shrink-0" onerror="this.outerHTML=this.dataset.tile" data-tile="' + esc(tile) + '">';
+    }
     function countryName(code) { return window.CountryPicker ? CountryPicker.name(code) : code.toUpperCase(); }
     function storeName(code) { return CountryPicker.storeName(code); }
     function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
@@ -167,10 +174,10 @@
     // ---- keywords -------------------------------------------------------------
 
     function chip(k, index) {
-        var mark = k.origin === 'suggested' ? '<span class="text-purple-300" aria-hidden="true">✦</span>' : '';
+        var mark = k.origin === 'suggested' ? '<span class="text-purple-300">' + window.ProductIcon('sparkles') + '</span>' : '';
         return '<span class="inline-flex items-center gap-1.5 text-xs bg-slate-800 border border-white/10 rounded-full pl-3 pr-1 py-1 text-slate-200"' +
             (k.reason ? ' data-tip="' + esc(k.reason) + '"' : '') + '>' + mark + esc(k.text) +
-            '<button type="button" class="kw-remove w-5 h-5 rounded-full text-slate-400 hover:text-white hover:bg-white/10" data-index="' + index + '" aria-label="Remove ' + esc(k.text) + '">×</button></span>';
+            '<button type="button" class="kw-remove inline-flex w-5 h-5 items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10" data-index="' + index + '" aria-label="Remove ' + esc(k.text) + '">' + window.ProductIcon('x_mark') + '</button></span>';
     }
 
     function renderKeywords() {
@@ -522,8 +529,8 @@
     function renderRivals() {
         el('rival-chips').innerHTML = state.rivals.length ? state.rivals.map(function (r, i) {
             return '<span class="inline-flex items-center gap-2 text-sm bg-slate-900 border border-white/10 rounded-full pl-1.5 pr-1 py-1 text-slate-200">' +
-                (r.icon_url ? '<img src="' + esc(r.icon_url) + '" alt="" class="w-6 h-6 rounded-md">' : '<span class="w-6 h-6 rounded-md bg-slate-700"></span>') +
-                esc(r.name) + '<button type="button" class="rival-remove w-6 h-6 rounded-full text-slate-400 hover:text-white hover:bg-white/10" data-index="' + i + '" aria-label="Remove ' + esc(r.name) + '">×</button></span>';
+                appIcon(r.icon_url, 'w-6 h-6 rounded-md') +
+                esc(r.name) + '<button type="button" class="rival-remove inline-flex w-6 h-6 items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10" data-index="' + i + '" aria-label="Remove ' + esc(r.name) + '">' + window.ProductIcon('x_mark') + '</button></span>';
         }).join('') : '<span class="text-sm text-slate-400">No rival yet.</span>';
         el('rival-search').disabled = state.rivals.length >= MAX_RIVALS;
         el('rival-search').placeholder = state.rivals.length >= MAX_RIVALS
@@ -545,9 +552,9 @@
     function renderIdeas(ideas) {
         var have = state.rivals.map(function (r) { return r.track_id; });
         ideas = ideas.filter(function (i) { return have.indexOf(i.track_id) === -1; });
-        el('rival-ideas').innerHTML = ideas.length ? '<p class="text-xs uppercase tracking-wide text-slate-400 mb-2">Ideas</p><ul class="space-y-1.5">' + ideas.map(function (i) {
+        el('rival-ideas').innerHTML = ideas.length ? '<p class="text-xs font-semibold text-slate-400 mb-2">Ideas</p><ul class="space-y-1.5">' + ideas.map(function (i) {
             return '<li class="flex items-center justify-between gap-3 text-sm"><span class="flex items-center gap-2 min-w-0 text-slate-200">' +
-                (i.icon_url ? '<img src="' + esc(i.icon_url) + '" alt="" class="w-6 h-6 rounded-md shrink-0">' : '<span class="w-6 h-6 rounded-md bg-slate-700 shrink-0"></span>') +
+                appIcon(i.icon_url, 'w-6 h-6 rounded-md') +
                 '<span class="truncate">' + esc(i.name) + '</span> <span class="text-xs text-slate-400 truncate">' + esc(i.reason) + '</span></span>' +
                 '<button type="button" class="idea-add shrink-0 text-xs text-sky-200 border border-sky-500/30 bg-sky-900/20 hover:bg-sky-900/40 rounded-lg px-2.5 py-1" data-idea="' + esc(JSON.stringify(i)) + '">Add</button></li>';
         }).join('') + '</ul>' : '';
@@ -578,7 +585,7 @@
                     var own = a.trackId === state.app_track_id;
                     return '<button type="button" class="search-pick w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-white/5 disabled:opacity-50" ' + (own ? 'disabled ' : '') +
                         'data-app="' + esc(JSON.stringify({track_id: a.trackId, name: a.trackName, icon_url: a.artworkUrl100, seller_name: a.sellerName, source: 'manual'})) + '">' +
-                        '<img src="' + esc(a.artworkUrl100) + '" alt="" class="w-8 h-8 rounded-lg"><span class="min-w-0"><span class="block text-slate-100 truncate">' + esc(a.trackName) + '</span>' +
+                        appIcon(a.artworkUrl100, 'w-8 h-8 rounded-lg') + '<span class="min-w-0"><span class="block text-slate-100 truncate">' + esc(a.trackName) + '</span>' +
                         '<span class="block text-xs text-slate-400 truncate">' + esc(a.sellerName) + (own ? ' · the app this tracker follows' : '') + '</span></span></button>';
                 }).join('') : '<p class="px-3 py-2 text-sm text-slate-400">' + esc(data.error || 'No App Store app matches that.') + '</p>';
                 box.classList.remove('hidden');

@@ -8,21 +8,19 @@ shows no bar when it has one tab (the free edition in Docker).
 {% endcomment %}
 {% if section == "discover" %}
 <nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="discover" aria-label="Discover">
-    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Discover</span>
     {% for tab in discover_tabs %}
     <a href="{{ tab.url }}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %} inline-flex items-center{% if tab.locked %} pro-lock{% endif %}"{% if tab.benefit %} data-tip="{{ tab.benefit }}"{% endif %}{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}
 </nav>
 {% elif section == "store" and store_tabs %}
 <nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="store" aria-label="Store">
-    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Store</span>
     {% for tab in store_tabs %}
     <a href="{{ tab.url }}{% if app %}?{% if tab.key == 'simulator' %}app_id{% else %}app{% endif %}={{ app.pk }}{% endif %}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}
 </nav>
 {% elif section == "settings" and settings_tabs|length > 1 %}
 <nav class="mb-4 flex flex-wrap items-center gap-2" data-section-tabs="settings" aria-label="Settings">
-    <span class="mr-1 text-xs font-medium uppercase tracking-wide text-slate-400">Settings</span>
+    <span class="mr-1 text-sm text-slate-400">Settings</span>
     {% for tab in settings_tabs %}
     <a href="{{ tab.url }}" class="{% if tab.active %}section-tab-active{% else %}section-tab{% endif %}"{% if tab.active %} aria-current="page"{% endif %}>{{ tab.label }}</a>
     {% endfor %}

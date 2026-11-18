@@ -215,14 +215,6 @@ def title_carries(app, keyword) -> bool:
     return bool(evidence["exact_phrase"] or evidence["all_words"])
 
 
-def effective_difficulty(difficulty, app=None) -> float:
-    """Difficulty as this app experiences it: what is left after its own
-    strength above a brand new app's. Equal to the difficulty for a new app,
-    never above it."""
-    lift = max(0.0, app_strength(app) - _new_app_strength())
-    return max(0.0, min(max(difficulty or 0, 0), 100) - lift)
-
-
 def rank_from_gap(gap: float) -> float:
     """The effective rank at a gap of difficulty minus strength: the measured
     table, log-linear between its points, flat below the first, and past the
@@ -1067,18 +1059,24 @@ def scoring_guide() -> dict:
     # classify_keyword uses, so the guide and the tags cannot drift apart.
     starts = {SWEET_SPOT_SCORE: "Sweet Spot", GOOD_TARGET_SCORE: "Good Target",
               SUPPORTING_SCORE: "Supporting"}
+    # Each point reads as the estimate the score stands for, as the tags and
+    # the Methodology prose do ("50 is about one download a day"; Sweet Spot
+    # is 10 or more). It used to print the estimate's range, from a tenth of
+    # it up, so the 70+ row read "1 to 10 downloads a day" beside a Sweet
+    # Spot tag saying 10 or more (2026-11-18).
     opportunity = []
     for score in (SWEET_SPOT_SCORE, GOOD_TARGET_SCORE, SUPPORTING_SCORE, 10):
         per_day = OPPORTUNITY_MIDPOINT_DOWNLOADS * 10 ** ((score - 50) / per_decade)
+        meaning = _capitalized(downloads_phrase(per_day))
         opportunity.append({
             "range": f"{score}+" if score == SWEET_SPOT_SCORE else str(score),
-            "meaning": _capitalized(estimate_range_phrase(per_day)),
+            "meaning": f"{meaning} or more" if score == SWEET_SPOT_SCORE else meaning,
             "tag": starts.get(score, ""),
         })
     floor = OPPORTUNITY_MIDPOINT_DOWNLOADS * 10 ** (-50 / per_decade)
     opportunity.append({
         "range": "0",
-        "meaning": _capitalized(estimate_range_phrase(floor)),
+        "meaning": _capitalized(downloads_phrase(floor)) + ", or fewer",
     })
 
     difficulty = []
@@ -1120,19 +1118,20 @@ def scoring_guide() -> dict:
 
 
 # ── Targeting advice tuples ── (icon, label, css_classes, description)
+# The icon is a name from aso/icons.py, which draws it; never an emoji.
 
 _TARGETING = {
-    "Sweet Spot": ("🎯", "Sweet Spot", "bg-green-900/20 text-green-300 border-green-500/20",
+    "Sweet Spot": ("target", "Sweet Spot", "bg-green-900/20 text-green-300 border-green-500/20",
                    "Target now. Ten or more downloads a day at the rank you can expect."),
-    "Good Target": ("✅", "Good Target", "bg-green-900/20 text-green-300 border-green-500/20",
+    "Good Target": ("check_circle", "Good Target", "bg-green-900/20 text-green-300 border-green-500/20",
                     "Target now. One to ten downloads a day at the rank you can expect."),
-    "Supporting": ("👍", "Supporting", "bg-blue-900/20 text-blue-300 border-blue-500/20",
+    "Supporting": ("thumb_up", "Supporting", "bg-blue-900/20 text-blue-300 border-blue-500/20",
                    ("Target now, as a supporting keyword. Between one download every ten days "
                     "and one a day at the rank you can expect.")),
-    "Worth Climbing": ("🌱", "Worth Climbing", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
+    "Worth Climbing": ("trending_up", "Worth Climbing", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
                        ("Worth targeting. #1 brings a download a day or more, but today's rank "
                         "brings little. It pays more as the app climbs.")),
-    "Low Volume": ("🔍", "Low Volume", "bg-slate-800 text-slate-300 border-white/10",
+    "Low Volume": ("minus_circle", "Low Volume", "bg-slate-800 text-slate-300 border-white/10",
                    "Skip. Even #1 brings under one download a day here."),
 }
 
@@ -1212,14 +1211,14 @@ def targeting_description(label, popularity, difficulty, country=None, app=None,
 
 # Difficulty-only fallbacks (when popularity is unknown)
 _DIFF_ONLY_TARGETING = {
-    25: ("🟢", "Easy to Rank", "bg-green-900/20 text-green-300 border-green-500/20",
+    25: ("dot", "Easy to Rank", "bg-green-900/20 text-green-300 border-green-500/20",
          "Low competition: a well-optimized app can rank quickly."),
-    50: ("🟡", "Moderate", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
+    50: ("dot", "Moderate", "bg-yellow-900/20 text-yellow-300 border-yellow-500/20",
          "Achievable with strong ASO."),
-    75: ("🟠", "Competitive", "bg-orange-900/20 text-orange-300 border-orange-500/20",
+    75: ("dot", "Competitive", "bg-orange-900/20 text-orange-300 border-orange-500/20",
          "Consider long-tail variants."),
 }
-_DIFF_ONLY_DEFAULT = ("🔴", "Very Competitive", "bg-red-900/20 text-red-300 border-red-500/20",
+_DIFF_ONLY_DEFAULT = ("dot", "Very Competitive", "bg-red-900/20 text-red-300 border-red-500/20",
                       "Dominated by established apps. Target easier keywords first.")
 
 

@@ -478,9 +478,6 @@ class KeywordSearchJob(models.Model):
     progress_message = models.CharField(max_length=200, blank=True, default="")
     error_message = models.TextField(blank=True, default="")
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
-    # No longer written or read: the app never estimates how long a run will
-    # take (owner, 2026-11-18). Kept so no migration is needed for it.
-    seconds_per_pair = models.FloatField(null=True, blank=True)
     elapsed_seconds = models.FloatField(default=0)                # active time across resumes
     acknowledged = models.BooleanField(default=False)             # "Close" pressed on a finished job
     restart_resumes = models.PositiveIntegerField(default=0)      # continued after the app was closed mid-run
@@ -527,10 +524,6 @@ class KeywordSearchJob(models.Model):
     def progress_percent(self) -> int:
         total = self.total_pairs
         return int(self.next_index * 100 / total) if total else 0
-
-    @property
-    def is_active(self) -> bool:
-        return self.status in self.ACTIVE_STATUSES
 
     @property
     def is_terminal(self) -> bool:
@@ -664,16 +657,6 @@ class AppleTopTerm(models.Model):
 
     def __str__(self):
         return f"{self.term} ({self.country}, {self.week}): {self.popularity}"
-
-    @classmethod
-    def latest_ingested_week(cls, country):
-        """Newest week with rows for this country, or None."""
-        return (
-            cls.objects.filter(country=country)
-            .order_by("-week")
-            .values_list("week", flat=True)
-            .first()
-        )
 
     @classmethod
     def values_for_week(cls, terms, country, week):
@@ -917,14 +900,7 @@ class OpportunityScan(models.Model):
     progress_message = models.CharField(max_length=200, blank=True, default="")
     error_message = models.TextField(blank=True, default="")
     throttle_state = models.CharField(max_length=16, choices=THROTTLE_CHOICES, default="normal")
-    # No longer written or read: the app never estimates how long a run will
-    # take (owner, 2026-11-18). Kept so no migration is needed for it.
-    seconds_per_country = models.FloatField(null=True, blank=True)
     elapsed_seconds = models.FloatField(default=0)
-    # No longer read or written (run_owner replaced it on 2026-10-07). Kept so
-    # an app from before then keeps working on a database the MCP server has
-    # brought up to date, which a removed column would break.
-    heartbeat_at = models.DateTimeField(null=True, blank=True)
     acknowledged = models.BooleanField(default=False)
     restart_resumes = models.PositiveIntegerField(default=0)
     saved_count = models.PositiveIntegerField(default=0)   # rows sent to Search History
@@ -959,10 +935,6 @@ class OpportunityScan(models.Model):
         if not total:
             return 0
         return min(100, round(self.next_index / total * 100))
-
-    @property
-    def is_active(self) -> bool:
-        return self.status in self.ACTIVE_STATUSES
 
     @property
     def is_terminal(self) -> bool:

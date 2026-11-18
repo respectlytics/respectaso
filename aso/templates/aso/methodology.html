@@ -1,9 +1,10 @@
 {% extends "aso/base.html" %}
+{% load aso_tags %}
 
 {% block title %}Our Methodology · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
+<div>
     {% include "aso/partials/back_link.html" %}
 
     <!-- Header -->
@@ -14,6 +15,9 @@
         </p>
     </div>
 
+    {% comment %}The sections flow in two columns from 1280 px, read down and
+    across like a page, so each keeps a readable line inside the frame.{% endcomment %}
+    <div class="gap-4 xl:columns-2 [&>section]:break-inside-avoid">
     <!-- Philosophy -->
     <section class="card p-4 mb-4">
         <h2 class="card-title mb-3 flex items-center gap-2">
@@ -112,7 +116,7 @@
                 information: Apple is indicating it ranks below every reported term of its category. Under the Apple
                 source such keywords score from the RespectASO estimate,
                 <span class="text-white">capped just below the least-reported value of their own category</span>, marked
-                with a visible <span class="text-slate-300 font-mono text-xs">EST*</span> indicator, so a keyword outside
+                with a visible <span class="text-slate-300 text-xs">EST*</span> indicator, so a keyword outside
                 Apple's list can never outrank its category's reported terms while long-tail keywords still rank
                 sensibly against each other. Hovering the indicator shows the exact numbers: the raw estimate, the cap,
                 and the category floor it came from.
@@ -434,7 +438,7 @@
             <p>
                 Every keyword gets one tag, and each tag is one range of one number on its row, so a tag can never
                 disagree with the numbers beside it. Demand comes first, and it is a fact about the keyword, not the app:
-                when even #1 brings under one download a day, at the low end of the Downloads at #1 column, the tag is
+                when even #1 brings under one download a day, the top of the Downloads at #1 range, the tag is
                 <strong class="text-white">Low Volume</strong>, for every app and at every difficulty. Otherwise the
                 Opportunity score decides, on round bars: <strong class="text-white">Sweet Spot</strong> from 10 downloads
                 a day, <strong class="text-white">Good Target</strong> from 1, <strong class="text-white">Supporting</strong>
@@ -455,7 +459,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {% for item in group.list %}
                 <div class="{{ item.css }} border rounded-lg p-3">
-                    <p class="text-xs font-medium">{{ item.icon }} {{ item.label }}</p>
+                    <p class="flex items-center gap-1 text-xs font-medium">{% icon item.icon %}{{ item.label }}</p>
                     <p class="text-xs text-slate-400 mt-1">{{ item.description }}</p>
                 </div>
                 {% endfor %}
@@ -506,7 +510,7 @@
             {% with o=scoring_guide.opportunity %}
             <div class="bg-slate-800/80 rounded-lg p-4 space-y-1.5 text-xs">
                 {% for row in o %}
-                <div class="grid grid-cols-[3.5rem_1fr] gap-3"><span class="text-cyan-300 font-mono">{{ row.range }}</span><span class="text-slate-300">{{ row.meaning }}</span></div>
+                <div class="grid grid-cols-[3.5rem_1fr] gap-3"><span class="text-cyan-300">{{ row.range }}</span><span class="text-slate-300">{{ row.meaning }}</span></div>
                 {% endfor %}
             </div>
             {% endwith %}
@@ -665,7 +669,7 @@
     </section>
 
     <!-- Data Source -->
-    <section class="card p-4 mb-5">
+    <section class="card p-4 mb-4">
         <h2 class="card-title mb-3 flex items-center gap-2">
             Data Sources
         </h2>
@@ -697,7 +701,9 @@
             </p>
         </div>
     </section>
+    </div>
 
+    <div class="grid items-start gap-x-4 xl:grid-cols-2">
     <!-- The Creator Behind -->
     <section class="border-l-2 border-red-500/40 bg-slate-800/60 rounded-r-xl pl-5 pr-5 py-4 mb-5">
         <div class="flex items-center gap-3">
@@ -730,6 +736,7 @@
             </div>
         </div>
     </section>
+    </div>
 
     <!-- The same way back at the end of a long page -->
     <div class="mb-5 text-center">{% include "aso/partials/back_link.html" with back_class="" %}</div>

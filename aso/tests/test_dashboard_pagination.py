@@ -109,10 +109,6 @@ class DashboardPaginationTest(TestCase):
         rows = resp.context["history_results"]
         self.assertEqual(len(rows), 1)
         row = rows[0]
-        self.assertTrue(row.has_history)
-        self.assertEqual(row.prev_popularity, 40)
-        self.assertEqual(row.prev_difficulty, 50)
-        self.assertEqual(row.prev_rank, 20)
         self.assertEqual(row.popularity_delta, 15)
         self.assertEqual(row.difficulty_delta, -5)
         self.assertEqual(row.rank_delta, 8)  # rank improved 20 -> 12
@@ -121,6 +117,5 @@ class DashboardPaginationTest(TestCase):
         create_results(1)
         resp = self.get_dashboard()
         row = resp.context["history_results"][0]
-        self.assertFalse(row.has_history)
         self.assertIsNone(row.popularity_delta)
         self.assertIsNone(row.rank_delta)

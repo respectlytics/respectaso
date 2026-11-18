@@ -418,12 +418,8 @@ def dashboard_view(request):
             (row for row in pair_rows if row["searched_at"] < result.searched_at),
             None,
         )
-        result.has_history = len(pair_rows) > 1
         if prev:
             prev_effective = _row_effective(prev)
-            result.prev_popularity = prev_effective
-            result.prev_difficulty = prev["difficulty_score"]
-            result.prev_rank = prev["app_rank"]
             # Deltas compare the EFFECTIVE popularity across snapshots
             if result.effective_popularity is not None and prev_effective is not None:
                 result.popularity_delta = result.effective_popularity - prev_effective
@@ -438,9 +434,6 @@ def dashboard_view(request):
             else:
                 result.rank_delta = None
         else:
-            result.prev_popularity = None
-            result.prev_difficulty = None
-            result.prev_rank = None
             result.popularity_delta = None
             result.difficulty_delta = None
             result.rank_delta = None

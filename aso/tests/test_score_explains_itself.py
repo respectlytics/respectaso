@@ -212,10 +212,25 @@ class ScoringGuideComesFromTheCodeTest(SimpleTestCase):
 
     def test_the_opportunity_scale_reads_as_downloads(self):
         rows = {row["range"]: row["meaning"] for row in scoring_guide()["opportunity"]}
-        # A range from a tenth of the estimate to the estimate, like every
-        # download figure (DownloadEstimator.RANGE_LOW_SHARE).
-        self.assertEqual(rows["50"], "0.1 to 1 downloads a day")
-        self.assertEqual(rows["30"], "At most one download every 10 days")
+        # The estimate each point stands for, as the Methodology prose says
+        # it ("50 is about one download a day").
+        self.assertEqual(rows["50"], "About one download a day")
+        self.assertEqual(rows["30"], "About one download every 10 days")
+        self.assertEqual(rows["0"], "About one download every 11 months, or fewer")
+
+    def test_each_band_says_what_its_tag_says(self):
+        """The How to read row where a tag starts says the tag's own figure:
+        it read "70+ 1 to 10 downloads a day · Sweet Spot from here" beside a
+        Sweet Spot tag saying 10 or more (2026-11-18)."""
+        from aso.scoring import CLASSIFICATION_SUMMARY
+
+        rows = {row["tag"]: row["meaning"] for row in scoring_guide()["opportunity"] if row.get("tag")}
+        self.assertEqual(rows["Sweet Spot"], "About 10 downloads a day or more")
+        self.assertIn("10 or more", CLASSIFICATION_SUMMARY["Sweet Spot"])
+        self.assertEqual(rows["Good Target"], "About one download a day")
+        self.assertTrue(CLASSIFICATION_SUMMARY["Good Target"].startswith("1 to "))
+        self.assertEqual(rows["Supporting"], "About one download every 10 days")
+        self.assertTrue(CLASSIFICATION_SUMMARY["Supporting"].startswith("One every 10 days"))
 
 
 class DashboardShowsTheWorkingTest(TestCase):

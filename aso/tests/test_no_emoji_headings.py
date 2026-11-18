@@ -1,6 +1,6 @@
 """No emoji in page titles, card titles or section headings
 (docs/development/UI_FOUNDATIONS_PLAN.md, UI_REDESIGN_PLAN.md 12.4). The
-Insight tags keep theirs: they are data glyphs, not headings."""
+Insight tags draw their icons from aso/icons.py (test_no_emoji.py)."""
 
 import re
 from pathlib import Path

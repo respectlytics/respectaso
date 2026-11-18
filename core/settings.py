@@ -9,7 +9,7 @@ from core.database import SQLITE_OPTIONS
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Current version — update on each release
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 
 # Native macOS app vs Docker detection
 IS_NATIVE_APP = os.environ.get("RESPECTASO_NATIVE") == "1" or getattr(sys, "frozen", False)

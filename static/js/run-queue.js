@@ -23,7 +23,7 @@
 
     var POLL_MS = 2000;
 
-    // A run started with "Run tonight" (aso/run_queue.py TONIGHT_LABEL).
+    // A run started with "Run tonight" (aso/run_queue.py TONIGHT_HOUR).
     var TONIGHT_LABEL = 'Starts tonight at 02:00';
 
     var FEATURE_BADGE_LABELS = {
@@ -203,7 +203,7 @@
         return '' +
             '<div class="rounded-lg border border-white/5 bg-slate-800/30 px-3 py-2"' + data + '>' +
                 '<div class="flex items-center gap-2.5">' +
-                    '<span class="w-3 shrink-0 text-2xs tabular-nums text-slate-500">' + item.position + '</span>' +
+                    '<span class="w-3 shrink-0 text-2xs text-slate-500">' + item.position + '</span>' +
                     '<div class="min-w-0 flex-1">' +
                         '<div class="flex min-w-0 items-center gap-1.5">' +
                             badgeHtml(item) +
@@ -231,7 +231,7 @@
         // Notice: a run finished while the user was busy elsewhere.
         toggle('queue-notice', !!noticeRun);
         if (noticeRun) {
-            var name = noticeRun.label ? '"' + noticeRun.label + '"' : 'your run';
+            var name = noticeRun.label ? '\u201c' + noticeRun.label + '\u201d' : 'your run';
             setText('queue-notice-text',
                 (noticeRun.status === 'completed' ? 'Finished: ' : 'Failed: ') + name);
             setText('queue-notice-action',

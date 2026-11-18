@@ -183,7 +183,11 @@
 
         // Icon + keyword + classification badge
         var iconEl = document.getElementById('ticker-icon');
-        if (iconEl) iconEl.textContent = icon;
+        if (iconEl) {
+            // Markup from the server's icon catalogue, in the tag's own colour.
+            iconEl.innerHTML = icon;
+            iconEl.className = 'inline-flex text-base ' + ((style.badge || '').match(/\btext-[a-z]+-\d+/) || [''])[0];
+        }
 
         var kwEl = document.getElementById('ticker-keyword');
         if (kwEl) kwEl.textContent = data.keyword;
@@ -316,9 +320,9 @@
                 ? window.formatPopularityCompact(row) : esc(Math.round(row.popularity || 0));
             return '<tr class="border-b border-white/5 last:border-0">' +
                 '<td class="py-1.5 px-2 text-white truncate max-w-xs">' + esc(row.keyword) + '</td>' +
-                '<td class="py-1.5 px-2 text-center text-purple-300 tabular-nums">' + pop + '</td>' +
-                '<td class="py-1.5 px-2 text-center text-orange-300 tabular-nums">' + esc(Math.round(row.difficulty || 0)) + '</td>' +
-                '<td class="py-1.5 px-2 text-center text-sky-300 font-semibold tabular-nums">' + esc(Math.round(row.opportunity || 0)) + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-purple-300">' + pop + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-orange-300">' + esc(Math.round(row.difficulty || 0)) + '</td>' +
+                '<td class="py-1.5 px-2 text-center text-sky-300 font-semibold">' + esc(Math.round(row.opportunity || 0)) + '</td>' +
                 '<td class="py-1.5 px-2"><span class="text-2xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap border ' + style.badge + '">' + esc(row.classification) + '</span></td>' +
                 '</tr>';
         }).join('');

@@ -178,14 +178,14 @@
         // Named group ("group/dl") so the tooltip only shows on cell hover, not
         // when hovering anywhere on a parent row that also carries a "group" class.
         return '<div class="group/dl relative inline-block">' +
-            '<span class="text-sm tabular-nums text-slate-300 cursor-help border-b border-dotted border-slate-600">' +
+            '<span class="text-sm text-slate-300 cursor-help border-b border-dotted border-slate-600">' +
             fmt(p1.downloads_low) + '-' + fmt(p1.downloads_high) + '<span class="text-slate-400">/day</span></span>' +
             '<div class="hidden group-hover/dl:block absolute z-20 ' + posClass + ' left-1/2 -translate-x-1/2 w-48 bg-slate-800 border border-white/10 rounded-lg p-3 shadow-xl text-left">' +
-            '<p class="text-2xs text-slate-400 mb-2 font-medium uppercase tracking-wider">Est. daily downloads</p>' +
+            '<p class="text-xs text-slate-400 mb-2 font-medium">Est. daily downloads</p>' +
             '<div class="space-y-1.5">' +
-            '<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300 tabular-nums">' + fmt(p1.downloads_low) + '-' + fmt(p1.downloads_high) + '</span></div>' +
-            '<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300 tabular-nums">' + fmt(p5.downloads_low) + '-' + fmt(p5.downloads_high) + '</span></div>' +
-            '<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300 tabular-nums">' + fmt(p10.downloads_low) + '-' + fmt(p10.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-emerald-400">Rank #1</span><span class="text-slate-300">' + fmt(p1.downloads_low) + '-' + fmt(p1.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-amber-400">Rank #5</span><span class="text-slate-300">' + fmt(p5.downloads_low) + '-' + fmt(p5.downloads_high) + '</span></div>' +
+            '<div class="flex justify-between text-xs"><span class="text-slate-400">Rank #10</span><span class="text-slate-300">' + fmt(p10.downloads_low) + '-' + fmt(p10.downloads_high) + '</span></div>' +
             '</div>' +
             derivedMarketNote(dl) +
             '</div></div>';
@@ -708,11 +708,11 @@
             '<span class="min-w-0 flex-1">' +
                 '<span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">' +
                     '<span class="text-sm font-medium text-white">' + escapeHtml(text) + '</span>' +
-                    (recommended ? '<span class="text-2xs font-semibold uppercase tracking-wide text-emerald-300">Recommended</span>' : '') +
+                    (recommended ? '<span class="text-2xs font-semibold text-emerald-300">Recommended</span>' : '') +
                 '</span>' +
                 (chips ? '<span class="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">' + chips + '</span>' : '') +
             '</span>' +
-            '<span class="shrink-0 pt-0.5 text-xs tabular-nums ' + (over ? 'font-medium text-red-400' : 'text-slate-400') + '">' +
+            '<span class="shrink-0 pt-0.5 text-xs ' + (over ? 'font-medium text-red-400' : 'text-slate-400') + '">' +
                 text.length + '/30' + (over ? ', too long' : '') + '</span>' +
             '<button type="button" data-copy-variant class="-m-1 shrink-0 rounded p-1 text-slate-400 transition-colors hover:text-white" ' +
                 'title="Copy" aria-label="Copy">' + (opts.copyIcon || '') + '</button>';
@@ -832,7 +832,7 @@
             var length = root.querySelector('[data-pick-length="' + kind + '"]');
             if (length) {
                 length.textContent = text.length + '/30';
-                length.className = 'text-xs tabular-nums ' + (text.length > 30 ? 'font-medium text-red-400' : 'text-slate-400');
+                length.className = 'text-xs ' + (text.length > 30 ? 'font-medium text-red-400' : 'text-slate-400');
             }
             var copy = root.querySelector('[data-pick-copy="' + kind + '"]');
             if (copy) copy.onclick = function () { opts.copy(text, copy); };

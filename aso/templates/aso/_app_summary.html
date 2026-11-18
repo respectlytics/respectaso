@@ -37,12 +37,12 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
     <div class="grid grid-cols-3 gap-3 px-4 pt-4{% if summary.stale_state == 'stale_7d' %} opacity-60{% endif %}">
         <div class="rounded-lg border border-white/5 bg-slate-900/40 p-3">
             <p class="text-xs text-slate-400">From search today</p>
-            <p class="mt-1 text-base font-semibold text-white tabular-nums">{{ g.now }}</p>
+            <p class="mt-1 text-base font-semibold text-white">{{ g.now }}</p>
             {% if g.country %}<p class="mt-0.5 text-xs text-slate-400">in {{ g.country|country_name }}</p>{% endif %}
         </div>
         <div class="rounded-lg border border-white/5 bg-slate-900/40 p-3">
             <p class="text-xs text-slate-400">With every keyword at #1</p>
-            <p class="mt-1 text-base font-semibold text-purple-300 tabular-nums">{{ g.more }}</p>
+            <p class="mt-1 text-base font-semibold text-purple-300">{{ g.more }}</p>
             {% if g.country %}<p class="mt-0.5 text-xs text-slate-400">in {{ g.country|country_name }}</p>{% endif %}
         </div>
         <div class="rounded-lg border border-white/5 bg-slate-900/40 p-3">
@@ -104,7 +104,7 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
         <div class="overflow-x-auto -mx-1">
             <table class="w-full text-xs" id="app-summary-country-table">
                 <thead>
-                    <tr class="text-left text-2xs font-semibold text-slate-400 uppercase tracking-wider border-b border-white/5">
+                    <tr class="text-left text-xs font-medium text-slate-400 border-b border-white/5">
                         <th class="px-2 py-2">Country</th>
                         <th class="px-2 py-2 cursor-help" data-tip="Downloads a day this app likely gets from these keywords at today's ranks, as a rough range.">
                             <span class="inline-flex items-center gap-1">Daily downloads now
@@ -140,36 +140,36 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
                             <div class="text-white font-medium">{{ row.country|country_flag }} {{ row.country|country_name }}</div>
                             {% if summary.is_multi_country %}
-                            <div class="text-2xs text-slate-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">click to filter ↓</div>
+                            <div class="text-2xs text-slate-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">click to filter</div>
                             {% endif %}
                         </td>
 
                         {# Daily downloads now — current state #}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
-                            <div class="tabular-nums text-white font-semibold cursor-help" data-tip="{% if row.ranking_keywords == 0 %}No keyword ranks here yet, so about 0 downloads a day.{% else %}From the {{ row.ranking_keywords }} of {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} that rank here, at today's ranks.{% endif %}">
-                                {{ row.downloads_low|dl_interval_from:row.downloads_high }}
+                            <div class="text-white font-semibold cursor-help" data-tip="{% if row.ranking_keywords == 0 %}No keyword ranks here yet, so about 0 downloads a day.{% else %}From the {{ row.ranking_keywords }} of {{ row.total_keywords }} keyword{{ row.total_keywords|pluralize }} that rank here, at today's ranks.{% endif %}">
+                                {{ row.downloads_low|dl_interval_from:row.downloads_high|capfirst }}
                             </div>
-                            <div class="text-2xs text-slate-400">downloads/day</div>
+                            <div class="text-2xs text-slate-400">downloads a day</div>
                         </td>
 
                         {# Growth potential — the ceiling minus current #}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
-                            <div class="tabular-nums text-purple-300 font-semibold cursor-help" data-tip="Extra downloads a day if every keyword here reached #1: a ceiling, not a forecast.">
-                                +{{ row.headroom_low|dl_interval_from:row.headroom_high }}
+                            <div class="text-purple-300 font-semibold cursor-help" data-tip="Extra downloads a day if every keyword here reached #1: a ceiling, not a forecast.">
+                                {{ row.headroom_low|dl_interval_from:row.headroom_high|capfirst }}
                             </div>
-                            <div class="text-2xs text-slate-400">extra/day at #1</div>
+                            <div class="text-2xs text-slate-400">more a day at #1</div>
                         </td>
 
                         {# Where you rank — two-line, clear language #}
                         <td class="px-2 py-3 whitespace-nowrap align-top">
                             {% if row.best_rank %}
                             <div class="text-white">
-                                Best rank: <span class="font-semibold tabular-nums">#{{ row.best_rank }}</span>
+                                Best rank: <span class="font-semibold">#{{ row.best_rank }}</span>
                             </div>
                             <div class="text-2xs text-slate-400 cursor-help" data-tip="The top 20 is where most search downloads come from.">
-                                <span class="tabular-nums text-slate-200">{{ row.in_top_20 }}</span>
+                                <span class="text-slate-200">{{ row.in_top_20 }}</span>
                                 of
-                                <span class="tabular-nums text-slate-200">{{ row.total_keywords }}</span>
+                                <span class="text-slate-200">{{ row.total_keywords }}</span>
                                 in Top 20
                             </div>
                             {% else %}
@@ -185,9 +185,9 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
                             {% if row.top_performer %}
                             <div class="text-white truncate font-medium" title="{{ row.top_performer.keyword }}">{{ row.top_performer.keyword }}</div>
                             <div class="text-2xs text-slate-400 cursor-help" data-tip="At rank #{{ row.top_performer.rank }}{% if row.top_performer.popularity %}, popularity {{ row.top_performer.popularity }}/100{% endif %}, this keyword contributes the largest share of your daily downloads in this country.">
-                                <span class="tabular-nums">#{{ row.top_performer.rank }}</span>
+                                <span>#{{ row.top_performer.rank }}</span>
                                 <span class="text-slate-500">·</span>
-                                <span class="text-emerald-300 tabular-nums">{{ row.top_performer.downloads_low|dl_interval_from:row.top_performer.downloads_high }}/day</span>
+                                <span class="text-emerald-300">{{ row.top_performer.downloads_low|dl_interval_from:row.top_performer.downloads_high }} a day</span>
                             </div>
                             {% else %}
                             <div class="text-slate-400">—</div>
@@ -201,14 +201,14 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
                             <div class="text-white truncate font-medium" title="{{ row.biggest_gap.keyword }}">{{ row.biggest_gap.keyword }}</div>
                             <div class="text-2xs text-slate-400 cursor-help" data-tip="{% if row.biggest_gap.rank %}At #{{ row.biggest_gap.rank }} now{% else %}Not ranking here yet{% endif %}: reaching #1 could add up to about {{ row.biggest_gap.headroom_high|floatformat:0 }} downloads a day.">
                                 {% if row.biggest_gap.rank %}
-                                    <span class="tabular-nums">#{{ row.biggest_gap.rank }}</span>
+                                    <span>#{{ row.biggest_gap.rank }}</span>
                                 {% else %}
                                     <span class="text-slate-400">not ranking</span>
                                 {% endif %}
                                 <span class="text-slate-500">·</span>
-                                <span class="tabular-nums">pop {{ row.biggest_gap.popularity }}</span>
+                                <span>pop {{ row.biggest_gap.popularity }}</span>
                                 <span class="text-slate-500">·</span>
-                                <span class="text-purple-300 tabular-nums">+{{ row.biggest_gap.headroom_low|dl_interval_from:row.biggest_gap.headroom_high }}/day</span>
+                                <span class="text-purple-300">{{ row.biggest_gap.headroom_low|dl_interval_from:row.biggest_gap.headroom_high }} more a day</span>
                             </div>
                             {% else %}
                             <div class="text-slate-400">—</div>
@@ -282,7 +282,7 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-2xs text-slate-400">
                 {% with bd=summary.bucket_dist %}
                 {% for item in classification_legend %}{% with n=bd|get_item:item.label %}
-                {% if n %}<span class="cursor-help" data-tip="{{ item.description }}"><span class="inline-block w-2 h-2 rounded-sm {{ item.bar }} align-middle mr-1"></span>{{ item.icon }} {{ item.label }}: <span class="text-slate-300">{{ n }}</span></span>{% endif %}
+                {% if n %}<span class="inline-flex items-center gap-1 cursor-help" data-tip="{{ item.description }}"><span class="inline-block w-2 h-2 rounded-sm {{ item.bar }}"></span>{% icon item.icon %}<span>{{ item.label }}: <span class="text-slate-300">{{ n }}</span></span></span>{% endif %}
                 {% endwith %}{% endfor %}
                 {% endwith %}
             </div>
@@ -296,7 +296,7 @@ toggleAppSummary() in dashboard.html changes it.{% endcomment %}
             {% for callout in summary.callouts %}
             <li class="flex items-start gap-2 text-xs text-slate-300">
                 <svg class="w-3.5 h-3.5 text-purple-400/80 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h6m0 0v6m0-6L10 16l-4-4-6 6"/></svg>
-                <span>{{ callout|safe }}</span>
+                <span>{{ callout }}</span>
             </li>
             {% endfor %}
         </ul>

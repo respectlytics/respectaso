@@ -4,7 +4,7 @@
 {% block title %}Mac app · RespectASO{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div>
 
     {% include "aso/partials/settings_tabs.html" %}
 
@@ -16,6 +16,7 @@
 
     {% include "aso/partials/settings_message.html" %}
 
+    <div class="card-columns">
     {% comment %}Open at login. The state comes from macOS on every render
     (aso/desktop_bridge.py login_item_state), so what this card says is
     always what macOS will do at the next login.{% endcomment %}
@@ -68,6 +69,7 @@
         <h2 class="card-title mb-1">Closing the window</h2>
         <p class="text-sm text-slate-400">RespectASO keeps refreshing from the menu bar. Click its chart icon there to reopen or quit it.</p>
     </section>
+    </div>
 
 </div>
 {% endblock %}
