@@ -13,12 +13,11 @@ File permissions: 600 - the file holds Apple session cookies (secrets).
 
 import json
 import logging
-import os
-import stat
-import threading
 from pathlib import Path
 
 from django.conf import settings
+
+from aso.json_file import SETTINGS_LOCK, write_json
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +83,8 @@ APPLE_ADS_DEFAULTS = {
 # by migrate_legacy_settings(); listed here only for that purge.
 LEGACY_KEYS = ("cookies", "primary_app_id", "session_expired", "session_expired_at")
 
-_lock = threading.Lock()
+# The one lock of every settings.json writer in this process (aso/json_file.py).
+_lock = SETTINGS_LOCK
 _cache = {"mtime": None, "data": None}
 
 
@@ -105,11 +105,8 @@ def _read_raw() -> dict:
 
 
 def _write_raw(data: dict) -> None:
-    """Write the full settings.json with 600 permissions."""
-    path = _settings_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+    """Write the full settings.json with 600 permissions, whole or not at all (aso/json_file.py)."""
+    write_json(_settings_path(), data)
 
 
 def _merged_apple_block(raw: dict) -> dict:

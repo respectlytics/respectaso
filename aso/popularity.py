@@ -810,7 +810,9 @@ def start_history_upgrade() -> None:
 
     if os.environ.get("RESPECTASO_DISABLE_SCHEDULER") == "1":
         return
-    threading.Thread(target=upgrade_stored_history, daemon=True, name="history-upgrade").start()
+    from .apps import after_apps_ready
+
+    threading.Thread(target=after_apps_ready(upgrade_stored_history), daemon=True, name="history-upgrade").start()
 
 
 def recalculate_stored_popularity() -> dict:

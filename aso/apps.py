@@ -4,6 +4,28 @@ from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
 
+def after_apps_ready(target, timeout: float = 60.0):
+    """``target``, to run on a thread started from ``ready()``: it waits until
+    Django has finished loading every app before it touches the database.
+
+    A thread started in ``ready()`` runs while the other apps are still
+    loading, and its first query made Django warn "Accessing the database
+    during app initialization is discouraged" in the Docker edition's log
+    (the history upgrade, 2026-11-22). Waits at most ``timeout`` seconds.
+    """
+    def run():
+        import time
+
+        from django.apps import apps
+
+        deadline = time.monotonic() + timeout
+        while not apps.ready and time.monotonic() < deadline:
+            time.sleep(0.05)
+        target()
+
+    return run
+
+
 def _ensure_history_triggers(sender, using, **kwargs):
     """After every migrate, the Dashboard's change count keeps counting
     (aso/history_revision.py): a migration that rebuilds a table drops its
@@ -100,5 +122,5 @@ class AsoConfig(AppConfig):
                 and run_queue.should_resume_on_ready(sys.argv, os.environ, settings.IS_NATIVE_APP)):
             # On a thread: resuming imports the feature modules (in Pro the
             # LLM SDKs), and startup must not wait for that.
-            threading.Thread(target=run_queue.resume_after_startup, daemon=True,
+            threading.Thread(target=after_apps_ready(run_queue.resume_after_startup), daemon=True,
                              name="run-queue-resume").start()

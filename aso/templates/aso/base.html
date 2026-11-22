@@ -17,6 +17,22 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-slate-900 text-white min-h-screen flex flex-col">
+    {% comment %}Every App Store storefront, once per page. The shared country
+    picker and anything else needing a country name read it from here instead
+    of carrying a list of their own. See aso/country_picker.py.{% endcomment %}
+    {{ country_catalog|json_script:"country-catalog-data" }}
+    {{ classification_legend|json_script:"classification-legend-data" }}
+    {{ product_icons|json_script:"product-icons-data" }}
+    {{ difficulty_factors|json_script:"difficulty-factors-data" }}
+    {% comment %}The shared libraries a page's own script calls (icons, classification badges,
+    difficulty tiles, Markdown) and the catalogues they read, before any page content, so
+    a script inside a page can use them while the page loads: Settings → AI called
+    ProductIcon.say before icons.js had loaded and stopped with a TypeError (2026-11-22).
+    aso/tests/test_shared_scripts_first.py keeps them here.{% endcomment %}
+    <script src="{% static 'js/icons.js' %}"></script>
+    <script src="{% static 'js/classification-badge.js' %}"></script>
+    <script src="{% static 'js/difficulty-factors.js' %}"></script>
+    <script src="{% static 'js/markdown.js' %}"></script>
     <script>
         // Whether the Apple Ads popularity integration passed its connection
         // test - popularity-display.js uses this to decide if "no Apple data"
@@ -276,13 +292,6 @@
     })();
     </script>
 
-    {% comment %}Every App Store storefront, once per page. The shared country
-    picker and anything else needing a country name read it from here instead
-    of carrying a list of their own. See aso/country_picker.py.{% endcomment %}
-    {{ country_catalog|json_script:"country-catalog-data" }}
-    {{ classification_legend|json_script:"classification-legend-data" }}
-    {{ product_icons|json_script:"product-icons-data" }}
-    {{ difficulty_factors|json_script:"difficulty-factors-data" }}
     {% comment %}What the app remembers for a visitor between pages (aso/ui_memory.py).{% endcomment %}
     <script src="{% static 'js/ui-memory.js' %}" data-url="{% url 'aso:ui_memory' %}" data-csrf="{{ csrf_token }}"></script>
     <script src="{% static 'js/country-picker.js' %}"></script>
@@ -292,8 +301,6 @@
     <script src="{% static 'js/add-app.js' %}"></script>
     <script src="{% static 'js/back-link.js' %}"></script>
     <script src="{% static 'js/todo-badge.js' %}" data-url="{% url 'aso:apps_state' %}"></script>
-    {% comment %}Markdown to HTML, the one renderer: the AI tabs' analysis and the release notes below (docs/development/DEDUPE_RENDERERS_PLAN.md).{% endcomment %}
-    <script src="{% static 'js/markdown.js' %}"></script>
     <script>
         // Days in Search History are the reader's own (aso/local_day.py):
         // tell the app this browser's time zone when it counts days in another.
@@ -309,9 +316,6 @@
             } catch (e) { /* no Intl: the machine's zone stays in use */ }
         })();
     </script>
-    <script src="{% static 'js/icons.js' %}"></script>
-    <script src="{% static 'js/classification-badge.js' %}"></script>
-    <script src="{% static 'js/difficulty-factors.js' %}"></script>
 
     {% block scripts %}{% endblock %}
 

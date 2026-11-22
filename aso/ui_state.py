@@ -12,16 +12,15 @@ Ships in the free-tier `aso` app, so it must not import from aso_pro or
 licensing.
 """
 
-import contextlib
 import json
 import logging
-import os
-import tempfile
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
+
+from .json_file import write_json
 
 logger = logging.getLogger(__name__)
 
@@ -183,17 +182,7 @@ def _save(data: dict) -> None:
     global _writes
     _writes += 1
     try:
-        path = _path()
-        path.parent.mkdir(parents=True, exist_ok=True)
         # Whole or not at all: a reader never sees half a file, even across processes.
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".ui_state.", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(json.dumps(data, indent=2))
-            os.replace(tmp, path)
-        except BaseException:
-            with contextlib.suppress(OSError):
-                os.unlink(tmp)
-            raise
+        write_json(_path(), data)
     except OSError as e:  # A failed write must never break a page render.
         logger.debug("Could not persist UI state: %s", e)

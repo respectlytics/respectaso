@@ -54,11 +54,47 @@ class StartupOrderTest(SimpleTestCase):
 
     def test_it_runs_every_step_on_one_thread(self):
         with mock.patch.dict(os.environ, {"RESPECTASO_DISABLE_SCHEDULER": "0"}), \
-             mock.patch("threading.Thread") as thread:
+             mock.patch("threading.Thread") as thread, \
+             mock.patch("aso.popularity.upgrade_stored_history") as upgrade:
             popularity.start_history_upgrade()
-        thread.assert_called_once_with(target=popularity.upgrade_stored_history, daemon=True,
-                                       name="history-upgrade")
+        thread.assert_called_once()
+        self.assertEqual(thread.call_args.kwargs["name"], "history-upgrade")
+        self.assertTrue(thread.call_args.kwargs["daemon"])
         thread.return_value.start.assert_called_once_with()
+        # The thread's target is the whole upgrade, once every app has loaded.
+        upgrade.assert_not_called()
+        thread.call_args.kwargs["target"]()
+        upgrade.assert_called_once_with()
+
+
+class AfterAppsReadyTest(SimpleTestCase):
+    """A thread started from ready() waits for every app to load before its first query
+    (aso.apps.after_apps_ready): Django warned "Accessing the database during app
+    initialization is discouraged" when the history upgrade queried at once (2026-11-22)."""
+
+    def test_it_waits_until_every_app_has_loaded(self):
+        import threading
+        import time
+
+        from aso.apps import after_apps_ready
+
+        ran = threading.Event()
+        with mock.patch.object(apps, "ready", False):
+            worker = threading.Thread(target=after_apps_ready(ran.set))
+            worker.start()
+            time.sleep(0.3)
+            self.assertFalse(ran.is_set())
+            apps.ready = True
+            worker.join(5)
+        self.assertTrue(ran.is_set())
+
+    def test_it_does_not_wait_for_ever(self):
+        from aso.apps import after_apps_ready
+
+        ran = []
+        with mock.patch.object(apps, "ready", False):
+            after_apps_ready(lambda: ran.append(1), timeout=0.2)()
+        self.assertEqual(ran, [1])
 
 
 class McpProcessTest(SimpleTestCase):

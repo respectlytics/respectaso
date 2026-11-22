@@ -9,6 +9,7 @@ Apple keeps turning it away, and the next hourly check carries on with the
 pairs left. Apple's Search is faked at the HTTP layer (AppleSearch).
 """
 
+import time
 from datetime import timedelta
 from unittest import mock
 
@@ -44,8 +45,17 @@ class TheRefreshBacksOffWhileAppleIsBusyTest(TestCase):
         self.assertEqual(len(self.pairs), PAIRS)
 
     def _refresh(self, apple):
+        # The shared gate counts a wait from the clock (aso/throttle.py). The clock moves only
+        # when the refresh sleeps, so a slow machine between Apple's answer and the next wait
+        # does not shorten it: on a busy CI runner a wait came out 4.33 seconds (2026-11-22).
+        clock = [time.time()]
+
+        def sleep_on_the_clock(seconds):
+            clock[0] += seconds
+
         with mock.patch("aso.services.requests.get", side_effect=apple), \
-                mock.patch("aso.scheduler.time.sleep") as sleep, \
+                mock.patch("aso.scheduler.time.sleep", side_effect=sleep_on_the_clock) as sleep, \
+                mock.patch("aso.throttle.time.time", side_effect=lambda: clock[0]), \
                 mock.patch("aso.scheduler.run_queue.kick"), \
                 self.assertLogs("aso.scheduler", level="INFO") as logs:
             refreshed = scheduler._refresh_pairs(self.pairs, "Auto-refresh")
@@ -61,11 +71,9 @@ class TheRefreshBacksOffWhileAppleIsBusyTest(TestCase):
         self.assertEqual(len(apple.calls), 2 * 5)
         self.assertIn("stopped: Apple's App Store keeps turning reads away", log)
         self.assertIn(f"0 of {PAIRS} pairs refreshed; {PAIRS} wait for the next check", log)
-        # Every wait honours Apple's Retry-After, above the normal pace. The
-        # shared gate counts it from Apple's answer, so a wait is Retry-After
-        # less the moment the refresh took to note the answer.
+        # Every wait honours Apple's Retry-After, above the normal pace.
         self.assertTrue(waits)
-        self.assertGreaterEqual(min(waits), RETRY_AFTER - 0.5)
+        self.assertGreaterEqual(min(waits), RETRY_AFTER)
         status = scheduler.get_status()
         self.assertFalse(status["running"])
         self.assertIsNone(status["last_completed_at"])

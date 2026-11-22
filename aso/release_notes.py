@@ -40,9 +40,15 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 # Newest first. See the module docstring for the schema and rules.
 RELEASES = [{'version': '3.2.2',
   'date': '2026-11-22',
-  'title': 'Methodology says where your own AI endpoint sends your data',
+  'title': 'Settings → AI shows that your AI is ready',
   'kind': 'patch',
   'sections': [
+      {'heading': 'Smoother',
+       'items': [
+           ('Settings → AI shows at a glance whether your AI model passed its test, and that your '
+            'API key is saved.'),
+           'Your saved API keys and your chosen AI provider stay as you left them while RespectASO works in the background.',
+       ]},
       {'heading': 'Clearer',
        'items': [
            ('Methodology says plainly that, with your own AI endpoint, your keywords and app details '
