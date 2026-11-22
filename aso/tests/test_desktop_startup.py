@@ -73,7 +73,7 @@ class LoadingPageTest(SimpleTestCase):
     def _failed(self, log=None):
         logging = {"handlers": {"file": {"filename": str(log)}}} if log else {}
         with mock.patch("platform.mac_ver", return_value=("26.6", ("", "", ""), "arm64")), \
-             self.settings(VERSION="9.9.9", LOGGING=logging):
+             self.settings(VERSION="9.9.9", LOGGING=logging, LOGGING_CONFIG=None):
             return main.startup_page("failed", error="DatabaseError: file is not a database")
 
     def test_the_failed_page_shows_exactly_what_to_send_and_how(self):
@@ -156,8 +156,10 @@ class ShowLogTest(SimpleTestCase):
     def _show(self):
         # LOGGING only: overriding DATA_DIR here let another part of the app
         # put its lock file in this temporary folder (test_run_owner flaked).
+        # LOGGING_CONFIG=None: Django 6 applies an overridden LOGGING to the
+        # logging module, and this partial dictionary is only read, never applied.
         logging = {"handlers": {"file": {"filename": str(self.log)}}}
-        with self.settings(LOGGING=logging), \
+        with self.settings(LOGGING=logging, LOGGING_CONFIG=None), \
              mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)) as run:
             self.assertTrue(main.show_log_in_finder())
         return run.call_args.args[0]

@@ -38,7 +38,18 @@ _LAST_SEEN_FILENAME = "whats_new_last_seen.txt"
 
 
 # Newest first. See the module docstring for the schema and rules.
-RELEASES = [{'version': '3.2.1',
+RELEASES = [{'version': '3.2.2',
+  'date': '2026-11-22',
+  'title': 'Methodology says where your own AI endpoint sends your data',
+  'kind': 'patch',
+  'sections': [
+      {'heading': 'Clearer',
+       'items': [
+           ('Methodology says plainly that, with your own AI endpoint, your keywords and app details '
+            'go to the address you entered and nowhere else.'),
+       ]},
+  ]},
+ {'version': '3.2.1',
   'date': '2026-11-18',
   'title': 'Numbers read as you expect',
   'kind': 'patch',

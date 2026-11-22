@@ -128,7 +128,7 @@ shared_hiddenimports = [
         "cryptography",
         "cryptography.hazmat.primitives.asymmetric.ed25519",
         "cryptography.hazmat.primitives.serialization",
-        "httpx",
+        "httpx2",
         # MCP server
         "fastmcp",
         "mcp",

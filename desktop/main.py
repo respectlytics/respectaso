@@ -355,7 +355,7 @@ def main():
         def save_file(self, filename, content):
             """Show a native Save dialog and write content to the chosen path."""
             result = window.create_file_dialog(  # type: ignore[union-attr]
-                webview.SAVE_DIALOG,  # type: ignore[arg-type]
+                webview.FileDialog.SAVE,
                 directory=str(Path.home() / "Downloads"),
                 save_filename=filename,
             )
